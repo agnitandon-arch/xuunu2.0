@@ -1,0 +1,174 @@
+I'm building a health tracking app called Xuunu for people with diabetes and chronic illness. 
+I need you to create a complete, working React Native app using Expo that I can test on my phone TODAY.
+
+CORE FUNCTIONALITY:
+
+1. USER AUTHENTICATION (Firebase)
+   - Email/password sign up and login
+   - Google sign-in
+   - Password reset
+   - Persistent login (remember user)
+   - Clean, simple auth screens
+
+2. HOME SCREEN (Main Dashboard)
+   - Welcome message with user's name
+   - Today's date
+   - Quick stats: "Last logged X hours ago"
+   - Current environmental conditions for user's location:
+     * Air Quality Index (AQI) with color coding (green=good, yellow=moderate, red=unhealthy)
+     * Temperature and "feels like"
+     * Humidity percentage
+     * Weather description
+   - Large "Log Health Data" button
+   - Recent entries list (last 3 entries as cards)
+
+3. LOG HEALTH SCREEN
+   - Date/time picker (defaults to now)
+   - Blood glucose input (number, mg/dL)
+   - Overall symptom severity slider (1-10)
+   - Checkboxes for common symptoms:
+     * Fatigue
+     * Pain
+     * Brain Fog
+     * Nausea
+     * Headache
+     * Other
+   - Notes field (multi-line text, optional)
+   - Location input (zip code or city name)
+   - "Save Entry" button
+   - Show loading state while saving
+   - Success message after save
+   - Save to Firebase Firestore
+
+4. HISTORY SCREEN
+   - List of all logged entries (newest first)
+   - Each entry shows:
+     * Date/time
+     * Glucose level with units
+     * Symptom severity (1-10)
+     * Weather conditions that day
+     * Location
+   - Tap entry to see full details
+   - Last 7 days visible (free tier)
+   - "Upgrade to Premium" banner for unlimited history
+
+5. INSIGHTS SCREEN
+   - Simple correlations based on logged data:
+     * Average glucose by air quality level
+     * Symptom severity vs AQI
+     * Best/worst days summary
+   - If <10 entries: "Log more data to see patterns"
+   - If 10+ entries: Show basic statistics
+   - "AI Insights (Premium)" section (locked for now)
+
+6. PROFILE SCREEN
+   - User email
+   - Account created date
+   - Default location (save zip code)
+   - "Logout" button
+   - "About Xuunu" section
+   - "Contact Support" link
+
+TECHNICAL REQUIREMENTS:
+
+- Use Expo SDK 50 or latest
+- Firebase (v10+):
+  * Authentication (email/password + Google)
+  * Firestore database
+  * Set up with my Firebase config (I'll provide)
+- React Navigation v6 (bottom tabs):
+  * Home (house icon)
+  * Log (plus icon)  
+  * History (list icon)
+  * Insights (chart icon)
+  * Profile (person icon)
+- React Native Paper for UI components (consistent design)
+- Environmental data: OpenWeather API
+  * Air Quality (AQI, PM2.5, PM10)
+  * Current weather
+  * I'll provide API key
+- Async Storage: Save user preferences locally
+- Expo Location: Get user's coordinates (with permission)
+
+DESIGN REQUIREMENTS:
+
+- Clean, modern, calming design
+- Color scheme: 
+  * Primary: #4A90E2 (blue)
+  * Success: #7ED321 (green)
+  * Warning: #F5A623 (orange)
+  * Danger: #D0021B (red)
+  * Background: #F8F9FA (light gray)
+- Large, tappable buttons (accessibility)
+- Good spacing (padding: 16-24px)
+- Smooth transitions
+- Loading states for all async operations
+- Error handling with friendly messages
+- Works on both iOS and Android
+
+DATA STRUCTURE (Firestore):
+
+users/{userId}/
+  - email
+  - displayName
+  - defaultLocation (zip code)
+  - createdAt
+  - isPremium (boolean, default: false)
+
+users/{userId}/entries/{entryId}/
+  - timestamp
+  - glucose (number)
+  - symptomSeverity (1-10)
+  - symptoms (array)
+  - notes (string)
+  - location (string)
+  - environmental {
+      aqi: number,
+      temp: number,
+      humidity: number,
+      weather: string,
+      pm25: number
+    }
+
+CRITICAL REQUIREMENTS:
+
+1. Code must be complete and working - no TODOs or placeholders
+2. Include all necessary dependencies in package.json
+3. Handle errors gracefully (network failures, API errors, etc)
+4. Loading states for all API calls
+5. Optimize for performance (minimize re-renders)
+6. Comment complex logic
+7. Use TypeScript if possible, JavaScript is fine too
+8. Follow React Native best practices
+9. Ensure app works offline (with cached data)
+10. Clear instructions for:
+    - Setting up Firebase config
+    - Adding OpenWeather API key
+    - Testing on phone via Expo Go
+
+ADDITIONAL FEATURES (If Time):
+
+- Pull-to-refresh on history screen
+- Search/filter entries by date
+- Export data to CSV
+- Dark mode toggle
+- Biometric login (fingerprint/Face ID)
+
+START WITH:
+
+1. Set up navigation structure
+2. Create Firebase configuration placeholder
+3. Build authentication flow
+4. Build home screen with API integration
+5. Build logging screen with form validation
+6. Set up Firestore data flow
+7. Build other screens
+8. Polish UI and add loading states
+9. Test all flows work properly
+
+Please create the complete file structure and all code needed to run this app. 
+Make it production-quality, not a prototype.
+
+I want to test this on my iPhone using Expo Go within 2-3 hours.
+
+Let's build this.
