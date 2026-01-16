@@ -512,6 +512,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/terra/widget", async (req, res) => {
+    try {
+      const { userId } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+
+      const credentials = await storage.getUserApiCredentials(userId);
+
+      if (!credentials || !credentials.terraDevId || !credentials.terraApiKey) {
+        return res.status(400).json({
+          error: "Terra API credentials not configured. Please add your credentials first.",
+        });
+      }
+
+      const terra = new TerraClient({
+        devId: credentials.terraDevId,
+        apiKey: credentials.terraApiKey,
+      });
+
+      const session = await terra.generateWidgetSession({
+        referenceId: userId,
+        providers: ["APPLE_HEALTH"],
+        language: "en",
+      });
+
+      res.json({
+        url: session.url,
+        sessionId: session.session_id,
+      });
+    } catch (error) {
+      console.error("Error generating Terra widget URL:", error);
+      res.status(500).json({ error: "Failed to generate widget URL" });
+    }
+  });
+
   app.post("/api/terra/auth", async (req, res) => {
     try {
       const { userId } = req.body;
