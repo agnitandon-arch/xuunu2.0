@@ -124,7 +124,8 @@ npm start
 
 ## 📚 Documentation
 
-- `docs/` - Project documentation (architecture, development, integrations)
+- `docs/README.md` - Documentation index
+- `docs/` - Architecture, development, integrations, deployment
 - `design_guidelines.md` - UX/UI reference
 - `ENVIRONMENTAL_API_INTEGRATION.md` - Environmental data sources and setup
 - `MOBILE_DEPLOYMENT.md` - PWA deployment and app store guidance
