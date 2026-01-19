@@ -14,6 +14,16 @@ interface FitbitOAuthState {
 }
 
 const fitbitOAuthStates = new Map<string, FitbitOAuthState>();
+const TERRA_WEARABLE_PROVIDERS = [
+  "APPLE_HEALTH",
+  "GOOGLE_FIT",
+  "FITBIT",
+  "OURA",
+  "WHOOP",
+  "FREESTYLE_LIBRE",
+  "DEXCOM",
+];
+const TERRA_LAB_PROVIDERS = ["QUEST", "LABCORP", "EVERLYWELL", "LETSGETCHECKED"];
 
 function generateCodeVerifier(): string {
   return crypto.randomBytes(32).toString('base64url');
@@ -514,7 +524,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/terra/auth", async (req, res) => {
     try {
-      const { userId } = req.body;
+      const { userId, mode } = req.body;
 
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
@@ -535,10 +545,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         apiKey: credentials.terraApiKey,
       });
 
-      // Generate widget session for Apple Health
+      const widgetMode = mode === "labs" ? "labs" : "wearables";
+      const providers =
+        widgetMode === "labs" ? TERRA_LAB_PROVIDERS : TERRA_WEARABLE_PROVIDERS;
+
+      // Generate widget session for Terra providers
       const session = await terra.generateWidgetSession({
         referenceId: userId,
-        providers: ["APPLE_HEALTH"],
+        providers,
         language: "en",
       });
 

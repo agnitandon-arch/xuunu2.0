@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import DeviceIntegrationItem from "@/components/DeviceIntegrationItem";
 import IndoorAirQualityCredentials from "@/components/IndoorAirQualityCredentials";
-import { User, MapPin, Activity, Database, LogOut, RefreshCw, Watch, ChevronRight, Pill, Ruler } from "lucide-react";
+import { User, MapPin, Activity, Database, LogOut, RefreshCw, Watch, ChevronRight, Pill, Ruler, Droplets } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserLocation } from "@/hooks/useUserLocation";
@@ -46,6 +46,35 @@ export default function AccountScreen({ onLogout, onNavigate }: AccountScreenPro
       toast({
         title: "Error",
         description: "Failed to update preferences. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const connectBloodworkMutation = useMutation({
+    mutationFn: async () => {
+      if (!authUser?.uid) {
+        throw new Error("User not authenticated");
+      }
+
+      const response = await apiRequest("POST", "/api/terra/auth", {
+        userId: authUser.uid,
+        mode: "labs",
+      });
+
+      return await response.json();
+    },
+    onSuccess: (data: { url: string }) => {
+      window.open(data.url, "_blank");
+      toast({
+        title: "Connect Bloodwork",
+        description: "Complete the lab connection in the new window.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to connect bloodwork",
         variant: "destructive",
       });
     },
@@ -161,6 +190,12 @@ export default function AccountScreen({ onLogout, onNavigate }: AccountScreenPro
               </div>
               <ChevronRight className="w-4 h-4 opacity-60" />
             </button>
+            <DeviceIntegrationItem
+              name="Bloodwork Upload"
+              icon={<Droplets className="w-6 h-6 text-primary" />}
+              connected={false}
+              onClick={() => connectBloodworkMutation.mutate()}
+            />
           </div>
         </div>
 

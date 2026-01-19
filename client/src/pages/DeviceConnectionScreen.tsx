@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Watch, Loader2, CheckCircle, AlertCircle, Activity } from "lucide-react";
+import { Watch, Loader2, CheckCircle, AlertCircle, Droplets } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -15,9 +15,6 @@ interface UserCredentials {
   hasDevId: boolean;
   hasApiKey: boolean;
   hasWebhookSecret: boolean;
-  hasFitbitCredentials?: boolean;
-  fitbitConnected?: boolean;
-  fitbitUserId?: string | null;
 }
 
 interface ConnectedDevice {
@@ -36,10 +33,6 @@ export default function DeviceConnectionScreen() {
   const [terraDevId, setTerraDevId] = useState("");
   const [terraApiKey, setTerraApiKey] = useState("");
   const [terraWebhookSecret, setTerraWebhookSecret] = useState("");
-  
-  const [fitbitClientId, setFitbitClientId] = useState("");
-  const [fitbitClientSecret, setFitbitClientSecret] = useState("");
-  const [showFitbitForm, setShowFitbitForm] = useState(false);
 
   // Fetch existing credentials
   const { data: credentials, isLoading: credentialsLoading } = useQuery<UserCredentials | null>({
@@ -96,20 +89,20 @@ export default function DeviceConnectionScreen() {
     },
   });
 
-  // Connect Apple Watch mutation
-  const connectAppleWatchMutation = useMutation({
+  // Connect devices via Terra mutation
+  const connectTerraDevicesMutation = useMutation({
     mutationFn: async () => {
       if (!user?.uid) throw new Error("User not authenticated");
       
-      const response = await apiRequest("POST", "/api/terra/auth", { userId: user.uid });
+      const response = await apiRequest("POST", "/api/terra/auth", { userId: user.uid, mode: "wearables" });
       return await response.json();
     },
     onSuccess: (data: { url: string }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/connected-devices'] });
       window.open(data.url, "_blank");
       toast({
-        title: "Connect Apple Watch",
-        description: "Please complete the connection in the new window.",
+        title: "Connect Devices",
+        description: "Complete the connection in the new window.",
       });
     },
     onError: (error: Error) => {
@@ -121,61 +114,25 @@ export default function DeviceConnectionScreen() {
     },
   });
 
-  // Save Fitbit credentials mutation
-  const saveFitbitCredentialsMutation = useMutation({
+  const connectTerraLabsMutation = useMutation({
     mutationFn: async () => {
       if (!user?.uid) throw new Error("User not authenticated");
       
-      const response = await apiRequest("POST", "/api/fitbit/credentials", {
-        userId: user.uid,
-        clientId: fitbitClientId,
-        clientSecret: fitbitClientSecret,
-      });
-      
+      const response = await apiRequest("POST", "/api/terra/auth", { userId: user.uid, mode: "labs" });
       return await response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/user-credentials'] });
+    onSuccess: (data: { url: string }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/connected-devices'] });
+      window.open(data.url, "_blank");
       toast({
-        title: "Fitbit Credentials Saved",
-        description: "Your Fitbit API credentials have been saved. You can now connect your Fitbit device.",
-      });
-      setFitbitClientId("");
-      setFitbitClientSecret("");
-      setShowFitbitForm(false);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to save Fitbit credentials",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Connect Fitbit mutation
-  const connectFitbitMutation = useMutation({
-    mutationFn: async () => {
-      if (!user?.uid) throw new Error("User not authenticated");
-      
-      const response = await fetch(`/api/fitbit/auth-url?userId=${user.uid}`);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to get auth URL");
-      }
-      return await response.json();
-    },
-    onSuccess: (data: { authUrl: string }) => {
-      window.open(data.authUrl, "_blank");
-      toast({
-        title: "Connect Fitbit",
-        description: "Please complete the connection in the new window.",
+        title: "Connect Bloodwork",
+        description: "Complete the lab connection in the new window.",
       });
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to generate Fitbit connection URL",
+        description: error.message || "Failed to generate lab connection URL",
         variant: "destructive",
       });
     },
@@ -196,25 +153,7 @@ export default function DeviceConnectionScreen() {
     saveCredentialsMutation.mutate();
   };
 
-  const handleSaveFitbitCredentials = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!fitbitClientId || !fitbitClientSecret) {
-      toast({
-        title: "Missing Information",
-        description: "Please provide both Client ID and Client Secret",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    saveFitbitCredentialsMutation.mutate();
-  };
-
   const hasCredentials = credentials?.hasDevId && credentials?.hasApiKey;
-  const hasFitbitCredentials = credentials?.hasFitbitCredentials;
-  const isFitbitConnected = credentials?.fitbitConnected || devices.some(d => d.provider === "fitbit");
-  const isAppleWatchConnected = devices.some(d => d.provider === "APPLE_HEALTH");
 
   return (
     <div className="min-h-screen bg-black text-white p-4 pb-24">
@@ -222,7 +161,7 @@ export default function DeviceConnectionScreen() {
         <div className="space-y-2">
           <h1 className="text-2xl font-bold tracking-tight">Device Connections</h1>
           <p className="text-sm opacity-60">
-            Connect your Apple Watch and other health devices
+            Connect wearables and labs through Terra
           </p>
         </div>
 
@@ -341,164 +280,55 @@ export default function DeviceConnectionScreen() {
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
+                <div className="flex items-center justify-between gap-4 p-4 bg-white/5 border border-white/10 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
                       <Watch className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-medium">Apple Watch</h3>
+                      <h3 className="font-medium">Wearables & Devices</h3>
                       <p className="text-xs opacity-60">
-                        {isAppleWatchConnected ? "Connected" : "Not connected"}
+                        Apple Health, Google Fit, Fitbit, Oura, Whoop, Dexcom, and more.
                       </p>
                     </div>
                   </div>
                   <Button
-                    onClick={() => connectAppleWatchMutation.mutate()}
-                    disabled={connectAppleWatchMutation.isPending || isAppleWatchConnected}
-                    variant={isAppleWatchConnected ? "outline" : "default"}
-                    data-testid="button-connect-apple-watch"
+                    onClick={() => connectTerraDevicesMutation.mutate()}
+                    disabled={connectTerraDevicesMutation.isPending}
+                    data-testid="button-connect-terra-devices"
                   >
-                    {connectAppleWatchMutation.isPending && (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    )}
-                    {isAppleWatchConnected ? "Connected" : "Connect"}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Fitbit Integration */}
-        <Card className="bg-white/5 border-white/10">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Activity className="w-5 h-5 text-primary" />
-              Fitbit Integration
-            </CardTitle>
-            <CardDescription>
-              Connect your Fitbit device to sync activity, heart rate, and sleep data.{" "}
-              <a 
-                href="https://dev.fitbit.com/apps" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                Register your app at dev.fitbit.com
-              </a>
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {credentialsLoading ? (
-              <div className="flex items-center justify-center p-8">
-                <Loader2 className="w-6 h-6 animate-spin" />
-              </div>
-            ) : isFitbitConnected ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-sm text-green-500">
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Fitbit connected{credentials?.fitbitUserId ? ` (User: ${credentials.fitbitUserId})` : ''}</span>
-                </div>
-                <p className="text-xs opacity-60">
-                  Your Fitbit data will sync automatically. Activity, heart rate, sleep, and weight data are available.
-                </p>
-              </div>
-            ) : hasFitbitCredentials ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-sm text-primary">
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Credentials configured</span>
-                </div>
-                <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
-                      <Activity className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">Fitbit</h3>
-                      <p className="text-xs opacity-60">Click to authorize</p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => connectFitbitMutation.mutate()}
-                    disabled={connectFitbitMutation.isPending}
-                    data-testid="button-connect-fitbit"
-                  >
-                    {connectFitbitMutation.isPending && (
+                    {connectTerraDevicesMutation.isPending && (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     )}
                     Connect
                   </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowFitbitForm(true)}
-                >
-                  Update Credentials
-                </Button>
-              </div>
-            ) : showFitbitForm || !hasFitbitCredentials ? (
-              <form onSubmit={handleSaveFitbitCredentials} className="space-y-4">
-                <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg text-sm">
-                  <p className="font-medium mb-2">How to get Fitbit API credentials:</p>
-                  <ol className="list-decimal list-inside space-y-1 opacity-80">
-                    <li>Go to <a href="https://dev.fitbit.com/apps" target="_blank" rel="noopener noreferrer" className="text-primary underline">dev.fitbit.com/apps</a></li>
-                    <li>Click "Register a new app"</li>
-                    <li>Set OAuth 2.0 Application Type to "Server"</li>
-                    <li>Set Callback URL to your app's callback URL</li>
-                    <li>Copy the Client ID and Client Secret</li>
-                  </ol>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="fitbitClientId">Client ID</Label>
-                  <Input
-                    id="fitbitClientId"
-                    type="text"
-                    placeholder="Your Fitbit Client ID"
-                    value={fitbitClientId}
-                    onChange={(e) => setFitbitClientId(e.target.value)}
-                    data-testid="input-fitbit-client-id"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="fitbitClientSecret">Client Secret</Label>
-                  <Input
-                    id="fitbitClientSecret"
-                    type="password"
-                    placeholder="Your Fitbit Client Secret"
-                    value={fitbitClientSecret}
-                    onChange={(e) => setFitbitClientSecret(e.target.value)}
-                    data-testid="input-fitbit-client-secret"
-                  />
-                </div>
-
-                <div className="flex gap-2">
-                  <Button 
-                    type="submit" 
-                    disabled={saveFitbitCredentialsMutation.isPending}
-                    data-testid="button-save-fitbit-credentials"
+                <div className="flex items-center justify-between gap-4 p-4 bg-white/5 border border-white/10 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
+                      <Droplets className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">Bloodwork & Labs</h3>
+                      <p className="text-xs opacity-60">
+                        Quest, Labcorp, Everlywell, LetsGetChecked.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => connectTerraLabsMutation.mutate()}
+                    disabled={connectTerraLabsMutation.isPending}
+                    variant="outline"
+                    data-testid="button-connect-terra-labs"
                   >
-                    {saveFitbitCredentialsMutation.isPending && (
+                    {connectTerraLabsMutation.isPending && (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     )}
-                    Save Credentials
+                    Connect
                   </Button>
-                  {showFitbitForm && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setShowFitbitForm(false)}
-                    >
-                      Cancel
-                    </Button>
-                  )}
                 </div>
-              </form>
-            ) : null}
+              </div>
+            )}
           </CardContent>
         </Card>
 
