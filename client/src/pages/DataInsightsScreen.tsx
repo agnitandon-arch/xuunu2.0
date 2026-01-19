@@ -27,28 +27,6 @@ export default function DataInsightsScreen() {
         </div>
 
         <div className="bg-white/5 border border-white/10 rounded-lg p-6">
-          <div className="text-xs uppercase tracking-widest opacity-40 mb-4">GLUCOSE TREND</div>
-          <div className="h-48 flex items-end justify-between gap-2">
-            {[120, 135, 125, 145, 130, 125, 115].map((value, index) => {
-              const height = (value / 200) * 100;
-              return (
-                <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                  <div
-                    className="w-full bg-gradient-to-t from-primary to-primary/30 rounded-t"
-                    style={{ height: `${height}%` }}
-                  ></div>
-                  <div className="text-xs opacity-40">{["M", "T", "W", "T", "F", "S", "S"][index]}</div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-4 text-center">
-            <div className="text-2xl font-mono font-bold">127</div>
-            <div className="text-xs opacity-60">Average this week</div>
-          </div>
-        </div>
-
-        <div className="bg-white/5 border border-white/10 rounded-lg p-6">
           <div className="text-xs uppercase tracking-widest opacity-40 mb-4">CORRELATIONS</div>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
