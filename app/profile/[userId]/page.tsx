@@ -28,12 +28,14 @@ import {
   Image as ImageIcon,
   Moon,
   TrendingUp,
+  UploadCloud,
   User as UserIcon,
   Users,
   Zap,
 } from "lucide-react";
 
 import { auth, db } from "../../../lib/firebase/config";
+import { isTerraLabsEnabled } from "../../../lib/featureFlags";
 
 type ProfileData = {
   fullName?: string;
@@ -408,6 +410,10 @@ export default function ProfilePage() {
   const [biosignature, setBiosignature] = useState<BiosignatureData | null>(null);
   const [healthData, setHealthData] = useState<HealthDatum[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isWidgetLoading, setIsWidgetLoading] = useState(false);
+  const [isWidgetOpen, setIsWidgetOpen] = useState(false);
+  const [widgetUrl, setWidgetUrl] = useState<string | null>(null);
+  const [terraError, setTerraError] = useState<string | null>(null);
 
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingActivities, setLoadingActivities] = useState(true);
@@ -424,6 +430,7 @@ export default function ProfilePage() {
   );
 
   const isOwnProfile = authUser?.uid === profileUserId;
+  const terraLabsEnabled = isTerraLabsEnabled();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -557,6 +564,43 @@ export default function ProfilePage() {
       createdAt: new Date().toISOString(),
     });
     setIsFollowing(true);
+  };
+
+  const handleUploadBloodwork = async () => {
+    if (!authUser) return;
+    if (!terraLabsEnabled) {
+      setTerraError("Terra Labs is currently disabled.");
+      return;
+    }
+
+    setIsWidgetLoading(true);
+    setTerraError(null);
+    try {
+      const response = await fetch("/api/terra/widget", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: authUser.uid, mode: "labs" }),
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Failed to open Terra Labs.");
+      }
+
+      const data = (await response.json()) as { url?: string };
+      if (!data.url) {
+        throw new Error("Missing Terra widget URL.");
+      }
+
+      setWidgetUrl(data.url);
+      setIsWidgetOpen(true);
+    } catch (error) {
+      setTerraError(
+        error instanceof Error ? error.message : "Unable to connect Terra Labs."
+      );
+    } finally {
+      setIsWidgetLoading(false);
+    }
   };
 
   const profileStats = profile?.stats || {};
@@ -839,6 +883,43 @@ export default function ProfilePage() {
                 {profileStats.currentStreak ?? 0} days
               </p>
             </div>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-white/10 bg-[#0f1424] p-6 sm:p-8">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-semibold">Settings</h3>
+            {terraError && (
+              <span className="text-xs text-red-300">{terraError}</span>
+            )}
+          </div>
+          <div className="mt-4 space-y-3">
+            <button
+              type="button"
+              onClick={handleUploadBloodwork}
+              disabled={isWidgetLoading || !terraLabsEnabled}
+              className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-left transition hover:border-[#0066ff]/40 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#0066ff]/20 text-[#6fa5ff]">
+                  <UploadCloud className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Upload Bloodwork</p>
+                  <p className="text-xs text-white/60">
+                    Connect Quest, LabCorp, or other lab providers.
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs text-white/50">
+                {isWidgetLoading ? "Connecting..." : "Connect"}
+              </span>
+            </button>
+            {!terraLabsEnabled && (
+              <p className="text-xs text-white/50">
+                Enable Terra Labs to upload bloodwork.
+              </p>
+            )}
           </div>
         </section>
 
@@ -1139,6 +1220,28 @@ export default function ProfilePage() {
           </div>
         </section>
       </div>
+
+      {isWidgetOpen && widgetUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-white/10 bg-black shadow-xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <p className="text-sm font-semibold text-white">Terra Labs</p>
+              <button
+                type="button"
+                onClick={() => setIsWidgetOpen(false)}
+                className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-white/70 transition hover:border-white/40 hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+            <iframe
+              title="Terra Labs Widget"
+              src={widgetUrl}
+              className="h-[70vh] w-full"
+            />
+          </div>
+        </div>
+      )}
 
       <style jsx global>{`
         .animate-spin-slow {
