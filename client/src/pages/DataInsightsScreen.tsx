@@ -264,14 +264,24 @@ export default function DataInsightsScreen() {
               </h2>
               <p className="text-xs text-white/50">Share your public progress profile.</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowProfileShare((prev) => !prev)}
-              className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/70 transition hover:border-white/40 hover:text-white"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              Share profile
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => window.open(profileUrl || "/app/profile/sample", "_blank")}
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/70 transition hover:border-white/40 hover:text-white"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Preview public profile
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowProfileShare((prev) => !prev)}
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/70 transition hover:border-white/40 hover:text-white"
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                Share profile
+              </button>
+            </div>
           </div>
           <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white/70">
             <span className="truncate">{profileUrl || "Generating profile link..."}</span>
