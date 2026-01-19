@@ -1,6 +1,5 @@
 import { format, formatDistanceToNow } from "date-fns";
-import { Button } from "@/components/ui/button";
-import { Plus, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 import EnvironmentalCard from "@/components/EnvironmentalCard";
 import HealthEntryCard from "@/components/HealthEntryCard";
 import { useQuery } from "@tanstack/react-query";
@@ -8,10 +7,9 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface HomeScreenProps {
   userName?: string;
-  onLogClick: () => void;
 }
 
-export default function HomeScreen({ userName = "User", onLogClick }: HomeScreenProps) {
+export default function HomeScreen({ userName = "User" }: HomeScreenProps) {
   const { user } = useAuth();
 
   const { data: latestEnvReading, isError: envError, isLoading: envLoading } = useQuery({
@@ -92,14 +90,9 @@ export default function HomeScreen({ userName = "User", onLogClick }: HomeScreen
           </div>
         )}
         
-        <Button 
-          className="w-full h-14 text-lg"
-          onClick={onLogClick}
-          data-testid="button-log-health"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Log Health Data
-        </Button>
+        <div className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-muted-foreground">
+          Health data is synced from connected devices.
+        </div>
         
         <div>
           <h2 className="text-lg font-semibold mb-4">Recent Entries</h2>
@@ -129,7 +122,9 @@ export default function HomeScreen({ userName = "User", onLogClick }: HomeScreen
           ) : (
             <div className="p-6 bg-card rounded-lg border border-card-border text-center">
               <p className="text-sm text-muted-foreground">No health entries yet</p>
-              <p className="text-xs text-muted-foreground mt-1">Tap "Log Health Data" to get started</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Connect a device to start syncing data
+              </p>
             </div>
           )}
         </div>
