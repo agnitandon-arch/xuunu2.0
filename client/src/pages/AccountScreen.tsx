@@ -4,6 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import DeviceIntegrationItem from "@/components/DeviceIntegrationItem";
 import IndoorAirQualityCredentials from "@/components/IndoorAirQualityCredentials";
+import MedicationQuickLog from "@/components/MedicationQuickLog";
+import { Switch } from "@/components/ui/switch";
+import { useMedicationReminderPreference } from "@/hooks/useMedicationReminders";
 import { User, MapPin, Activity, Droplets, Heart, Database, LogOut, RefreshCw, Watch, ChevronRight, Pill, Ruler } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,7 +14,7 @@ import { useUserLocation } from "@/hooks/useUserLocation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { User as UserType } from "@shared/schema";
+import type { Medication, User as UserType } from "@shared/schema";
 
 interface AccountScreenProps {
   onLogout?: () => void;
@@ -23,9 +26,16 @@ export default function AccountScreen({ onLogout, onNavigate }: AccountScreenPro
   const { toast } = useToast();
   const { cityName, isLoading: locationLoading, refetch } = useUserLocation();
   const [location, setLocation] = useState("");
+  const [medicationRemindersEnabled, setMedicationRemindersEnabled] =
+    useMedicationReminderPreference();
 
   const { data: userData } = useQuery<UserType>({
     queryKey: [`/api/users/${authUser?.uid}`],
+    enabled: !!authUser?.uid,
+  });
+
+  const { data: medications = [] } = useQuery<Medication[]>({
+    queryKey: [`/api/medications?userId=${authUser?.uid}`],
     enabled: !!authUser?.uid,
   });
 
@@ -181,6 +191,31 @@ export default function AccountScreen({ onLogout, onNavigate }: AccountScreenPro
           <IndoorAirQualityCredentials />
         </div>
 
+        <div className="mt-6">
+          <div className="text-xs uppercase tracking-widest opacity-40 mb-4">MEDICATIONS</div>
+          <div className="space-y-3">
+            <MedicationQuickLog />
+            <button
+              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+              onClick={() => onNavigate?.("medications")}
+              data-testid="button-manage-medications"
+            >
+              <div className="flex items-center gap-3">
+                <Pill className="w-5 h-5 text-primary" />
+                <span className="text-sm">
+                  {medications.length > 0 ? "Manage Medications" : "Add Medications"}
+                </span>
+              </div>
+              <ChevronRight className="w-4 h-4 opacity-60" />
+            </button>
+            {medications.length === 0 && (
+              <p className="text-xs opacity-60">
+                Add medications to set reminder times and log doses.
+              </p>
+            )}
+          </div>
+        </div>
+
         <div>
           <div className="text-xs uppercase tracking-widest opacity-40 mb-4">SETTINGS</div>
           <div className="space-y-3">
@@ -206,13 +241,21 @@ export default function AccountScreen({ onLogout, onNavigate }: AccountScreenPro
               </div>
               <ChevronRight className="w-4 h-4 opacity-60" />
             </button>
-            <button 
-              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+            <div
+              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg"
               data-testid="button-notifications"
             >
-              <span className="text-sm">Notifications</span>
-              <span className="text-xs opacity-60">Enabled</span>
-            </button>
+              <div>
+                <p className="text-sm">Medication Reminders</p>
+                <p className="text-xs opacity-60">
+                  In-app alerts at scheduled times
+                </p>
+              </div>
+              <Switch
+                checked={medicationRemindersEnabled}
+                onCheckedChange={setMedicationRemindersEnabled}
+              />
+            </div>
             <button 
               className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
               data-testid="button-privacy"

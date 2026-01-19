@@ -4,6 +4,10 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import {
+  useMedicationReminderPreference,
+  useMedicationReminders,
+} from "@/hooks/useMedicationReminders";
 import MinimalBottomNav from "@/components/MinimalBottomNav";
 import LoginScreen from "@/pages/LoginScreen";
 import DashboardScreen from "@/pages/DashboardScreen";
@@ -19,6 +23,10 @@ function AppContent() {
   const { user, loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showShowcase, setShowShowcase] = useState(false);
+
+  const [medicationRemindersEnabled] = useMedicationReminderPreference();
+
+  useMedicationReminders(user?.uid, medicationRemindersEnabled);
 
   const handleLogout = async () => {
     await signOut();
