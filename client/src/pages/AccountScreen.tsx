@@ -1,13 +1,9 @@
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import DeviceIntegrationItem from "@/components/DeviceIntegrationItem";
 import IndoorAirQualityCredentials from "@/components/IndoorAirQualityCredentials";
-import { MapPin, Activity, Database, LogOut, RefreshCw, Watch, ChevronRight, Pill, Droplets, ImagePlus, Trash2, Users, MessageSquare, Camera } from "lucide-react";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { Activity, Database, LogOut, Watch, ChevronRight, Pill, Droplets, ImagePlus, Trash2, Users, MessageSquare, Camera } from "lucide-react";
+import { useState, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useUserLocation } from "@/hooks/useUserLocation";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -23,8 +19,6 @@ interface AccountScreenProps {
 export default function AccountScreen({ onLogout, onNavigate }: AccountScreenProps) {
   const { user: authUser } = useAuth();
   const { toast } = useToast();
-  const { cityName, isLoading: locationLoading, refetch } = useUserLocation();
-  const [location, setLocation] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { photoUrl, setPhotoUrl } = useProfilePhoto();
   const [updateText, setUpdateText] = useState("");
@@ -101,12 +95,6 @@ export default function AccountScreen({ onLogout, onNavigate }: AccountScreenPro
       });
     },
   });
-
-  useEffect(() => {
-    if (cityName) {
-      setLocation(cityName);
-    }
-  }, [cityName]);
 
   const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -277,36 +265,6 @@ export default function AccountScreen({ onLogout, onNavigate }: AccountScreenPro
           />
         </div>
 
-        <div className="space-y-6">
-          {/* Location */}
-          <div className="space-y-3">
-            <Label className="text-xs uppercase tracking-widest opacity-60 flex items-center gap-2 justify-between">
-              <span className="flex items-center gap-2">
-                <MapPin className="w-3 h-3" />
-                Default Location
-              </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={refetch}
-                disabled={locationLoading}
-                className="h-6 w-6 p-0"
-                data-testid="button-refresh-location"
-              >
-                <RefreshCw className={`w-3 h-3 ${locationLoading ? "animate-spin" : ""}`} />
-              </Button>
-            </Label>
-            <Input
-              value={location || (locationLoading ? "Detecting location..." : "Unknown")}
-              onChange={(e) => setLocation(e.target.value)}
-              className="h-12 bg-black border-white/20"
-              data-testid="input-location"
-            />
-            <p className="text-xs opacity-60">
-              Used for environmental data collection
-            </p>
-          </div>
-        </div>
       </div>
 
       <div className="max-w-lg mx-auto px-6 mt-6 space-y-6">
