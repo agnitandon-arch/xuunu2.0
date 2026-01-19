@@ -8,7 +8,7 @@ interface MinimalBottomNavProps {
 export default function MinimalBottomNav({ activeTab, onTabChange }: MinimalBottomNavProps) {
   const tabs = [
     { id: "dashboard", icon: Home, label: "Dashboard" },
-    { id: "data", icon: BarChart2, label: "Data" },
+    { id: "data", icon: BarChart2, label: "Share My Progress" },
     { id: "environmental", icon: MapPin, label: "Map" },
     { id: "account", icon: User, label: "Account" },
   ];
