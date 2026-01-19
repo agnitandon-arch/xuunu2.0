@@ -550,9 +550,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         widgetMode === "labs" ? TERRA_LAB_PROVIDERS : TERRA_WEARABLE_PROVIDERS;
 
       // Generate widget session for Terra providers
-      const session = await terra.generateWidgetSession({
-        referenceId: userId,
-        providers,
+      const session = await terra.authentication.generatewidgetsession({
+        reference_id: userId,
+        providers: providers.join(","),
         language: "en",
       });
 
