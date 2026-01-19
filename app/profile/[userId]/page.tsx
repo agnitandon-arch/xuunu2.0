@@ -607,6 +607,8 @@ export default function ProfilePage() {
   const displayName =
     profile?.fullName || profile?.displayName || "Anonymous User";
   const bio = profile?.bio || "No bio yet.";
+  const healthDashboardUrl =
+    process.env.NEXT_PUBLIC_LOOKER_HEALTH_DASHBOARD_URL || "";
 
   const score = clamp(Math.round(biosignature?.score ?? 0), 0, 100);
   const insights = biosignature?.insights ?? [];
@@ -1015,6 +1017,44 @@ export default function ProfilePage() {
                   </div>
                 ))}
             </div>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-white/10 bg-[#0f1424] p-6 sm:p-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-semibold">Health Dashboard</h3>
+              <p className="text-sm text-white/60">
+                Google Looker Studio health trends
+              </p>
+            </div>
+            {healthDashboardUrl && (
+              <a
+                href={healthDashboardUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-[#6fa5ff] hover:text-white"
+              >
+                Open full dashboard →
+              </a>
+            )}
+          </div>
+          <div className="mt-4">
+            {healthDashboardUrl ? (
+              <div className="overflow-hidden rounded-2xl border border-white/10 bg-black">
+                <iframe
+                  title="Looker Studio Health Dashboard"
+                  src={healthDashboardUrl}
+                  className="h-[520px] w-full"
+                  style={{ border: "none" }}
+                  allowFullScreen
+                />
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-white/60">
+                Dashboard not configured yet.
+              </div>
+            )}
           </div>
         </section>
 
