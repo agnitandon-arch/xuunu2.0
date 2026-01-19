@@ -42,9 +42,19 @@ export default function MedicationTrackerScreen() {
 
   const createMedication = useMutation({
     mutationFn: async (data: any) => {
+      if (!user?.uid) {
+        throw new Error("User not authenticated");
+      }
+      if (!user.email) {
+        throw new Error("Missing user email");
+      }
+      await apiRequest("POST", "/api/users/sync", {
+        id: user.uid,
+        email: user.email,
+      });
       return apiRequest("POST", `/api/medications`, {
         ...data,
-        userId: user!.uid,
+        userId: user.uid,
         isActive: 1,
       });
     },
@@ -63,10 +73,13 @@ export default function MedicationTrackerScreen() {
         description: "Your medication has been saved successfully.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: "Failed to add medication. Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to add medication. Please try again.",
         variant: "destructive",
       });
     },
