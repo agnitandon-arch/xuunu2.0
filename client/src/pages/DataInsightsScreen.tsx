@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Copy, ExternalLink, Globe, Lock, Share2 } from "lucide-react";
-import VoiceRecorder from "@/components/VoiceRecorder";
-import VoiceNotesList from "@/components/VoiceNotesList";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
@@ -406,10 +404,6 @@ export default function DataInsightsScreen() {
           </div>
         </section>
 
-        <section className="space-y-6">
-          <VoiceRecorder />
-          <VoiceNotesList />
-        </section>
       </div>
     </div>
   );
