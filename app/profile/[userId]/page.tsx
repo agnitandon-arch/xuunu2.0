@@ -108,7 +108,16 @@ export default function ProfilePage() {
 
         {/* Blood Work Trends */}
         <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h3 className="text-xl font-semibold mb-4">🩸 Blood Work Trends</h3>
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-xl font-semibold">🩸 Blood Work Trends</h3>
+            <button
+              type="button"
+              onClick={() => router.push("/bloodwork")}
+              className="rounded-full border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white"
+            >
+              Add Bloodwork
+            </button>
+          </div>
           {bloodWork.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center p-4 bg-black/40 rounded-lg">
