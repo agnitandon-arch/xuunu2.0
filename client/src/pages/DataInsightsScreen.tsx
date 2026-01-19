@@ -1,13 +1,62 @@
+import { useState } from "react";
 import VoiceRecorder from "@/components/VoiceRecorder";
 import VoiceNotesList from "@/components/VoiceNotesList";
+import { DashboardSelector } from "@/components/dashboard/DashboardSelector";
+import { LookerStudioEmbed } from "@/components/dashboard/LookerStudioEmbed";
 
 export default function DataInsightsScreen() {
+  const [currentDashboard, setCurrentDashboard] = useState("performance");
+  const env = import.meta.env as Record<string, string | undefined>;
+
+  const dashboardUrls: Record<string, { url: string; title: string }> = {
+    performance: {
+      url:
+        env.VITE_LOOKER_PERFORMANCE_DASHBOARD_URL ||
+        env.NEXT_PUBLIC_LOOKER_PERFORMANCE_DASHBOARD_URL ||
+        "",
+      title: "Performance Metrics Dashboard",
+    },
+    health: {
+      url:
+        env.VITE_LOOKER_HEALTH_DASHBOARD_URL ||
+        env.NEXT_PUBLIC_LOOKER_HEALTH_DASHBOARD_URL ||
+        "",
+      title: "Health Trends Dashboard",
+    },
+    recovery: {
+      url:
+        env.VITE_LOOKER_RECOVERY_DASHBOARD_URL ||
+        env.NEXT_PUBLIC_LOOKER_RECOVERY_DASHBOARD_URL ||
+        "",
+      title: "Sleep & Recovery Dashboard",
+    },
+    energy: {
+      url:
+        env.VITE_LOOKER_ENERGY_DASHBOARD_URL ||
+        env.NEXT_PUBLIC_LOOKER_ENERGY_DASHBOARD_URL ||
+        "",
+      title: "Energy & Nutrition Dashboard",
+    },
+  };
+
   return (
     <div className="min-h-screen bg-black pb-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       <div className="max-w-lg mx-auto px-6 py-8 space-y-6">
         <div>
           <h1 className="text-2xl font-bold mb-2">Data</h1>
           <p className="text-sm opacity-60">Insights and voice notes</p>
+        </div>
+
+        <div>
+          <DashboardSelector
+            currentDashboard={currentDashboard}
+            onSelectDashboard={setCurrentDashboard}
+          />
+          <LookerStudioEmbed
+            dashboardUrl={dashboardUrls[currentDashboard].url}
+            title={dashboardUrls[currentDashboard].title}
+            height="700px"
+          />
         </div>
 
         <VoiceRecorder />
