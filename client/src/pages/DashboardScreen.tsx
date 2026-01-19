@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MapPin, Loader2, Plus } from "lucide-react";
+import ProfileAvatar from "@/components/ProfileAvatar";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -165,7 +166,8 @@ export default function DashboardScreen() {
   return (
     <div className="min-h-screen bg-black pb-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       <div className="max-w-lg mx-auto px-6 py-8 space-y-8">
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between">
+          <ProfileAvatar className="h-10 w-10" />
           <button
             onClick={() => setShowBioSignature(!showBioSignature)}
             className="text-xs uppercase tracking-widest text-primary hover-elevate active-elevate-2 px-4 py-2 rounded-full border border-primary/30"

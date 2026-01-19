@@ -4,13 +4,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import DeviceIntegrationItem from "@/components/DeviceIntegrationItem";
 import IndoorAirQualityCredentials from "@/components/IndoorAirQualityCredentials";
-import { User, MapPin, Activity, Database, LogOut, RefreshCw, Watch, ChevronRight, Pill, Droplets } from "lucide-react";
-import { useState, useEffect } from "react";
+import { MapPin, Activity, Database, LogOut, RefreshCw, Watch, ChevronRight, Pill, Droplets, ImagePlus, Trash2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import ProfileAvatar from "@/components/ProfileAvatar";
+import { useProfilePhoto } from "@/hooks/useProfilePhoto";
 
 interface AccountScreenProps {
   onLogout?: () => void;
@@ -22,6 +24,8 @@ export default function AccountScreen({ onLogout, onNavigate }: AccountScreenPro
   const { toast } = useToast();
   const { cityName, isLoading: locationLoading, refetch } = useUserLocation();
   const [location, setLocation] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { photoUrl, setPhotoUrl } = useProfilePhoto();
 
   const connectBloodworkMutation = useMutation({
     mutationFn: async () => {
@@ -58,17 +62,93 @@ export default function AccountScreen({ onLogout, onNavigate }: AccountScreenPro
     }
   }, [cityName]);
 
+  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Unsupported file",
+        description: "Please choose an image file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please upload an image smaller than 2MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setPhotoUrl(reader.result);
+        toast({
+          title: "Profile photo updated",
+          description: "Your photo will appear across all tabs.",
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoUrl(null);
+    toast({
+      title: "Profile photo removed",
+      description: "You can upload a new photo anytime.",
+    });
+  };
+
   return (
     <div className="min-h-screen bg-black pb-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       <div className="max-w-lg mx-auto m-6 p-8 bg-black border border-white/10 rounded-lg">
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-            <User className="w-8 h-8 text-primary" />
+        <div className="flex flex-wrap items-center gap-4 mb-8">
+          <ProfileAvatar className="h-16 w-16" />
+          <div className="space-y-2">
+            <div className="text-xs uppercase tracking-widest opacity-60">Profile Photo</div>
+            <div className="text-sm opacity-60" data-testid="text-user-email">
+              {authUser?.email || ""}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="button-upload-profile-photo"
+              >
+                <ImagePlus className="w-4 h-4 mr-2" />
+                {photoUrl ? "Change photo" : "Upload photo"}
+              </Button>
+              {photoUrl && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleRemovePhoto}
+                  data-testid="button-remove-profile-photo"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Remove
+                </Button>
+              )}
+            </div>
           </div>
-          <div>
-            <div className="font-bold text-lg" data-testid="text-user-name">{authUser?.displayName || authUser?.email?.split('@')[0] || "User"}</div>
-            <div className="text-sm opacity-60" data-testid="text-user-email">{authUser?.email || ""}</div>
-          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePhotoChange}
+            data-testid="input-profile-photo"
+          />
         </div>
 
         <div className="space-y-6">

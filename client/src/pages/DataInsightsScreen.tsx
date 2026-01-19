@@ -4,6 +4,7 @@ import { Copy, ExternalLink, Globe, Lock, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
+import ProfileAvatar from "@/components/ProfileAvatar";
 
 type DashboardConfig = {
   id: string;
@@ -224,14 +225,17 @@ export default function DataInsightsScreen() {
                 Share progress snapshots and dashboards with your community.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowShareOptions((prev) => !prev)}
-              className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm text-white/80 transition hover:border-white/40 hover:text-white"
-            >
-              <Share2 className="h-4 w-4" />
-              Share this page
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowShareOptions((prev) => !prev)}
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm text-white/80 transition hover:border-white/40 hover:text-white"
+              >
+                <Share2 className="h-4 w-4" />
+                Share this page
+              </button>
+              <ProfileAvatar className="h-9 w-9" />
+            </div>
           </div>
 
           {showShareOptions && (
