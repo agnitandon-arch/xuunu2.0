@@ -4,14 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import DeviceIntegrationItem from "@/components/DeviceIntegrationItem";
 import IndoorAirQualityCredentials from "@/components/IndoorAirQualityCredentials";
-import { User, MapPin, Activity, Database, LogOut, RefreshCw, Watch, ChevronRight, Pill, Ruler, Droplets } from "lucide-react";
+import { User, MapPin, Activity, Database, LogOut, RefreshCw, Watch, ChevronRight, Pill, Droplets } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserLocation } from "@/hooks/useUserLocation";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { User as UserType } from "@shared/schema";
 
 interface AccountScreenProps {
   onLogout?: () => void;
@@ -23,33 +22,6 @@ export default function AccountScreen({ onLogout, onNavigate }: AccountScreenPro
   const { toast } = useToast();
   const { cityName, isLoading: locationLoading, refetch } = useUserLocation();
   const [location, setLocation] = useState("");
-
-  const { data: userData } = useQuery<UserType>({
-    queryKey: [`/api/users/${authUser?.uid}`],
-    enabled: !!authUser?.uid,
-  });
-
-  const updateUnitsMutation = useMutation({
-    mutationFn: async (preferredUnits: string) => {
-      return await apiRequest("PATCH", `/api/users/${authUser?.uid}/preferences`, { preferredUnits });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/users/${authUser?.uid}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/health-entries/latest?userId=${authUser?.uid}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/environmental-readings/latest?userId=${authUser?.uid}`] });
-      toast({
-        title: "Preferences updated",
-        description: "Your unit preferences have been saved.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update preferences. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
 
   const connectBloodworkMutation = useMutation({
     mutationFn: async () => {
@@ -80,12 +52,6 @@ export default function AccountScreen({ onLogout, onNavigate }: AccountScreenPro
     },
   });
 
-  const handleUnitsChange = (units: string) => {
-    if (authUser?.uid) {
-      updateUnitsMutation.mutate(units);
-    }
-  };
-
   useEffect(() => {
     if (cityName) {
       setLocation(cityName);
@@ -106,37 +72,6 @@ export default function AccountScreen({ onLogout, onNavigate }: AccountScreenPro
         </div>
 
         <div className="space-y-6">
-          {/* Unit Preference */}
-          <div className="space-y-3">
-            <Label className="text-xs uppercase tracking-widest opacity-60 flex items-center gap-2">
-              <Ruler className="w-3 h-3" />
-              Measurement Units
-            </Label>
-            <div className="flex gap-3">
-              <Button
-                variant={userData?.preferredUnits === "imperial" ? "default" : "outline"}
-                className="flex-1"
-                onClick={() => handleUnitsChange("imperial")}
-                disabled={updateUnitsMutation.isPending}
-                data-testid="button-units-imperial"
-              >
-                Imperial (°F, mg/dL)
-              </Button>
-              <Button
-                variant={userData?.preferredUnits === "metric" ? "default" : "outline"}
-                className="flex-1"
-                onClick={() => handleUnitsChange("metric")}
-                disabled={updateUnitsMutation.isPending}
-                data-testid="button-units-metric"
-              >
-                Metric (°C, mmol/L)
-              </Button>
-            </div>
-            <p className="text-xs opacity-60">
-              Affects glucose, temperature, and other measurements
-            </p>
-          </div>
-
           {/* Location */}
           <div className="space-y-3">
             <Label className="text-xs uppercase tracking-widest opacity-60 flex items-center gap-2 justify-between">
