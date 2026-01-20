@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Sparkles, TrendingUp, Info } from "lucide-react";
+import { Loader2, Sparkles, Info } from "lucide-react";
 import { useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -77,15 +77,22 @@ export default function SynergyInsightsDialog({
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
-          {/* Synergy Level Display */}
-          <div className="bg-white/5 border border-white/10 rounded-lg p-6 text-center">
-            <div className="text-6xl font-bold font-mono" style={{ color: getColor() }}>
-              {synergyLevel}
+          {/* AI Insights */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">AI-Powered Insights</span>
             </div>
-            <div className="text-sm opacity-60 mt-1">SYNERGY LEVEL</div>
-            <div className="mt-3 text-sm font-medium" style={{ color: getColor() }}>
-              {getLabel()}
-            </div>
+            
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              </div>
+            ) : (
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+                <p className="text-sm leading-relaxed">{insights || "Loading insights..."}</p>
+              </div>
+            )}
           </div>
 
           {/* Calculation Breakdown */}
@@ -108,24 +115,6 @@ export default function SynergyInsightsDialog({
                 <span className="font-mono">{Math.min(100, Math.round((healthData.recovery || 75) * 1.1))}%</span>
               </div>
             </div>
-          </div>
-
-          {/* AI Insights */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">AI-Powered Insights</span>
-            </div>
-            
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 text-primary animate-spin" />
-              </div>
-            ) : (
-              <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
-                <p className="text-sm leading-relaxed">{insights || "Loading insights..."}</p>
-              </div>
-            )}
           </div>
 
           <Button
