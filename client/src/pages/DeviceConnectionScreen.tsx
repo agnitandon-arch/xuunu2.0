@@ -33,6 +33,10 @@ export default function DeviceConnectionScreen() {
   const [terraDevId, setTerraDevId] = useState("");
   const [terraApiKey, setTerraApiKey] = useState("");
   const [terraWebhookSecret, setTerraWebhookSecret] = useState("");
+  const [appleHealthConnected, setAppleHealthConnected] = useState(false);
+  const [isAppleHealthConnecting, setIsAppleHealthConnecting] = useState(false);
+
+  const APPLE_HEALTH_STORAGE_KEY = "xuunu-apple-health-connected";
 
   // Fetch existing credentials
   const { data: credentials, isLoading: credentialsLoading } = useQuery<UserCredentials | null>({
@@ -55,6 +59,46 @@ export default function DeviceConnectionScreen() {
       return await res.json();
     },
   });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(APPLE_HEALTH_STORAGE_KEY);
+    setAppleHealthConnected(stored === "true");
+  }, []);
+
+  const handleConnectAppleHealth = async () => {
+    if (isAppleHealthConnecting) return;
+    const isIos =
+      typeof navigator !== "undefined" && /iPad|iPhone|iPod/i.test(navigator.userAgent);
+    if (!isIos) {
+      toast({
+        title: "Apple Health requires iPhone",
+        description: "Open this page on your iOS device to connect.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsAppleHealthConnecting(true);
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(APPLE_HEALTH_STORAGE_KEY, "true");
+        window.location.href = "x-apple-health://";
+      }
+      setAppleHealthConnected(true);
+      toast({
+        title: "Apple Health connected",
+        description: "Allow access in the Health app if prompted.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Connection failed",
+        description: error?.message || "Unable to connect Apple Health right now.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAppleHealthConnecting(false);
+    }
+  };
 
   // Save credentials mutation
   const saveCredentialsMutation = useMutation({
@@ -239,7 +283,7 @@ export default function DeviceConnectionScreen() {
           <CardHeader>
             <CardTitle className="text-lg">Connect Devices</CardTitle>
             <CardDescription>
-              Apple Health is always connected on your phone.
+              Apple Health syncs directly from your phone.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -251,14 +295,33 @@ export default function DeviceConnectionScreen() {
                 <div>
                   <h3 className="font-medium">Apple Health</h3>
                   <p className="text-xs opacity-60">
-                    Apple Health syncs automatically on your device.
+                    Tap to open Apple Health and grant access.
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs text-green-400">
-                <CheckCircle className="w-4 h-4" />
-                Connected
-              </div>
+              {appleHealthConnected ? (
+                <div className="flex items-center gap-2 text-xs text-green-400">
+                  <CheckCircle className="w-4 h-4" />
+                  Connected
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleConnectAppleHealth}
+                  disabled={isAppleHealthConnecting}
+                  data-testid="button-connect-apple-health"
+                >
+                  {isAppleHealthConnecting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Connecting
+                    </>
+                  ) : (
+                    "Connect"
+                  )}
+                </Button>
+              )}
             </div>
 
             {!hasCredentials ? (

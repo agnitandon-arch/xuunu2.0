@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ShieldCheck, Smartphone, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,25 +10,49 @@ interface OnboardingScreenProps {
   onComplete: () => void;
 }
 
+const APPLE_HEALTH_STORAGE_KEY = "xuunu-apple-health-connected";
+
 export default function OnboardingScreen({ userId, onComplete }: OnboardingScreenProps) {
   const { toast } = useToast();
   const [hipaaAccepted, setHipaaAccepted] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(APPLE_HEALTH_STORAGE_KEY);
+    if (stored === "true") {
+      setIsConnected(true);
+    }
+  }, []);
+
   const handleConnectAppleHealth = async () => {
     if (!userId || isConnecting) return;
+    const isIos =
+      typeof navigator !== "undefined" && /iPad|iPhone|iPod/i.test(navigator.userAgent);
+    if (!isIos) {
+      toast({
+        title: "Apple Health requires iPhone",
+        description: "Open onboarding on an iOS device to connect Apple Health.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsConnecting(true);
     try {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(APPLE_HEALTH_STORAGE_KEY, "true");
+        window.location.href = "x-apple-health://";
+      }
       setIsConnected(true);
       toast({
-        title: "Apple Health ready",
-        description: "Apple Health is available on this device.",
+        title: "Apple Health connected",
+        description: "If prompted, allow access in the Health app.",
       });
     } catch (error: any) {
       toast({
         title: "Connection failed",
-        description: error?.message || "Unable to confirm Apple Health right now.",
+        description: error?.message || "Unable to connect Apple Health right now.",
         variant: "destructive",
       });
     } finally {
@@ -106,7 +130,7 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
             </h2>
           </div>
           <p className="text-xs text-white/60">
-            Apple Health data syncs automatically from your device.
+            Tap to open Apple Health and grant access on your phone.
           </p>
           <Button
             type="button"
@@ -115,7 +139,7 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
             disabled={isConnecting}
             data-testid="button-connect-apple-health"
           >
-            {isConnected ? "Apple Health Connected" : isConnecting ? "Connecting..." : "Confirm Apple Health"}
+            {isConnected ? "Apple Health Connected" : isConnecting ? "Connecting..." : "Connect Apple Health"}
           </Button>
         </div>
 
