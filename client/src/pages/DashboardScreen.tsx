@@ -870,11 +870,11 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
           </form>
         </section>
 
-        <div className="pt-4">
+        <div className="pt-4 flex justify-center">
           <Button
             variant="destructive"
             onClick={handleLogout}
-            className="w-full h-13 rounded-full"
+            className="h-11 px-6 rounded-full w-auto"
             data-testid="button-logout"
           >
             Logout
