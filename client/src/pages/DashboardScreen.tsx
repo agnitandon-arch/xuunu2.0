@@ -600,6 +600,12 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
             </button>
             <button
               className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+              onClick={() =>
+                window.open(
+                  "https://www.hhs.gov/hipaa/for-professionals/privacy/laws-regulations/index.html",
+                  "_blank"
+                )
+              }
               data-testid="button-privacy"
             >
               <span className="text-sm">Privacy & Data</span>
