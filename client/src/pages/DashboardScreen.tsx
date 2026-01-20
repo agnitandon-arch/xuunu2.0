@@ -561,7 +561,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
         </div>
 
         <div>
-          <div className="text-xs uppercase tracking-widest opacity-40 mb-4">SETTINGS</div>
+          <div className="text-xs uppercase tracking-widest opacity-40 mb-4">INTEGRATIONS</div>
           <div className="space-y-3">
             <button
               className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
