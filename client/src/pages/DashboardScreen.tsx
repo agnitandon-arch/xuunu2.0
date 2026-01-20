@@ -3,7 +3,6 @@ import BioSignature from "@/components/BioSignature";
 import SynergyInsightsDialog from "@/components/SynergyInsightsDialog";
 import BioSignatureDialog from "@/components/BioSignatureDialog";
 import MedicationQuickLog from "@/components/MedicationQuickLog";
-import IndoorAirQualityCredentials from "@/components/IndoorAirQualityCredentials";
 import EnvironmentalMap from "@/components/EnvironmentalMap";
 import HourlyImpactTracker from "@/components/HourlyImpactTracker";
 import { Button } from "@/components/ui/button";
@@ -23,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MapPin, Loader2, Plus, Database, ChevronRight, Pill, Watch, Droplets, Wind } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -51,8 +51,9 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const [cardioDialog, setCardioDialog] = useState(false);
   const [strengthMinutes, setStrengthMinutes] = useState("");
   const [cardioMinutes, setCardioMinutes] = useState("");
-  const [showIndoorAirQuality, setShowIndoorAirQuality] = useState(false);
   const [refreshingMetric, setRefreshingMetric] = useState<string | null>(null);
+  const stripePortalUrl = (import.meta.env as Record<string, string | undefined>)
+    .VITE_STRIPE_PAYMENT_URL;
 
   const { data: latestHealth, isLoading: healthLoading, refetch: refetchHealth } =
     useQuery<HealthEntry | null>({
@@ -107,6 +108,15 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     } finally {
       setRefreshingMetric(null);
     }
+  };
+
+  const handleOpenPaymentPortal = () => {
+    const portalUrl = stripePortalUrl || "https://stripe.com";
+    window.open(portalUrl, "_blank");
+    toast({
+      title: "Premium membership",
+      description: "Powered by Stripe • $10/month or $100/year.",
+    });
   };
 
   const handleLogout = async () => {
@@ -167,35 +177,6 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
       });
     }
   };
-
-  const connectBloodworkMutation = useMutation({
-    mutationFn: async () => {
-      if (!user?.uid) {
-        throw new Error("User not authenticated");
-      }
-
-      const response = await apiRequest("POST", "/api/terra/auth", {
-        userId: user.uid,
-        mode: "labs",
-      });
-
-      return await response.json();
-    },
-    onSuccess: (data: { url: string }) => {
-      window.open(data.url, "_blank");
-      toast({
-        title: "Connect Bloodwork",
-        description: "Complete the lab connection in the new window.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to connect bloodwork",
-        variant: "destructive",
-      });
-    },
-  });
 
   const handleStrengthSubmit = () => {
     if (!strengthMinutes || !user) return;
@@ -677,7 +658,19 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
         <MedicationQuickLog />
 
         <div>
-          <div className="text-xs uppercase tracking-widest opacity-40 mb-4">INTEGRATIONS</div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="text-xs uppercase tracking-widest opacity-40">INTEGRATIONS</div>
+              </TooltipTrigger>
+              <TooltipContent className="bg-black border-white/10 text-white text-xs">
+                Become a premium Member to enable integrations.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <div className="text-xs text-white/50 mt-2 mb-4">
+            Powered by Stripe • $10/month or $100/year
+          </div>
           <div className="space-y-3">
             <button
               className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
@@ -692,7 +685,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
             </button>
             <button
               className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-              onClick={() => onNavigate?.("devices")}
+              onClick={handleOpenPaymentPortal}
               data-testid="button-device-connections"
             >
               <div className="flex items-center gap-3">
@@ -704,7 +697,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
             <div className="space-y-3 pl-4">
               <button
                 className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-                onClick={() => console.log("Connect healthcare provider")}
+                onClick={handleOpenPaymentPortal}
                 data-testid="button-connect-healthcare-provider"
               >
                 <div className="flex items-center gap-3">
@@ -715,7 +708,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
               </button>
               <button
                 className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-                onClick={() => connectBloodworkMutation.mutate()}
+                onClick={handleOpenPaymentPortal}
                 data-testid="button-upload-bloodwork"
               >
                 <div className="flex items-center gap-3">
@@ -726,7 +719,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
               </button>
               <button
                 className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-                onClick={() => setShowIndoorAirQuality((prev) => !prev)}
+                onClick={handleOpenPaymentPortal}
                 data-testid="button-connect-indoor-air"
               >
                 <div className="flex items-center gap-3">
@@ -735,11 +728,6 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                 </div>
                 <ChevronRight className="w-4 h-4 opacity-60" />
               </button>
-              {showIndoorAirQuality && (
-                <div className="pt-2">
-                  <IndoorAirQualityCredentials />
-                </div>
-              )}
             </div>
             <button
               className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
