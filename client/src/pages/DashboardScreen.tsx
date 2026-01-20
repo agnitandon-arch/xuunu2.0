@@ -52,13 +52,16 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const [strengthMinutes, setStrengthMinutes] = useState("");
   const [cardioMinutes, setCardioMinutes] = useState("");
   const [showIndoorAirQuality, setShowIndoorAirQuality] = useState(false);
+  const [refreshingMetric, setRefreshingMetric] = useState<string | null>(null);
 
-  const { data: latestHealth, isLoading: healthLoading } = useQuery<HealthEntry | null>({
+  const { data: latestHealth, isLoading: healthLoading, refetch: refetchHealth } =
+    useQuery<HealthEntry | null>({
     queryKey: [`/api/health-entries/latest?userId=${user?.uid}`],
     enabled: !!user,
   });
 
-  const { data: latestEnv, isLoading: envLoading } = useQuery<EnvironmentalReading | null>({
+  const { data: latestEnv, isLoading: envLoading, refetch: refetchEnv } =
+    useQuery<EnvironmentalReading | null>({
     queryKey: [`/api/environmental-readings/latest?userId=${user?.uid}`],
     enabled: !!user,
   });
@@ -95,6 +98,16 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
       });
     },
   });
+
+  const handleMetricRefresh = async (metricId: string) => {
+    if (!user || refreshingMetric) return;
+    setRefreshingMetric(metricId);
+    try {
+      await Promise.all([refetchHealth(), refetchEnv()]);
+    } finally {
+      setRefreshingMetric(null);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -351,9 +364,18 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
             <div>
               <div className="text-xs uppercase tracking-widest opacity-40 mb-4">HEALTH METRICS</div>
               <div className="grid grid-cols-2 gap-3">
-                <Card data-testid="card-glucose">
+                <Card
+                  className="cursor-pointer hover-elevate active-elevate-2"
+                  onClick={() => handleMetricRefresh("glucose")}
+                  data-testid="card-glucose"
+                >
                   <CardContent className="p-4">
-                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Glucose</div>
+                    <div className="flex items-center justify-between text-xs uppercase tracking-widest opacity-60 mb-2">
+                      <span>Glucose</span>
+                      {refreshingMetric === "glucose" && (
+                        <Loader2 className="w-3 h-3 animate-spin text-white/60" />
+                      )}
+                    </div>
                     <div className="text-3xl font-bold font-mono text-primary">
                       {latestHealth?.glucose || "--"}
                     </div>
@@ -361,9 +383,18 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                   </CardContent>
                 </Card>
 
-                <Card data-testid="card-hrv">
+                <Card
+                  className="cursor-pointer hover-elevate active-elevate-2"
+                  onClick={() => handleMetricRefresh("hrv")}
+                  data-testid="card-hrv"
+                >
                   <CardContent className="p-4">
-                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">HRV</div>
+                    <div className="flex items-center justify-between text-xs uppercase tracking-widest opacity-60 mb-2">
+                      <span>HRV</span>
+                      {refreshingMetric === "hrv" && (
+                        <Loader2 className="w-3 h-3 animate-spin text-white/60" />
+                      )}
+                    </div>
                     <div className="text-3xl font-bold font-mono text-primary">
                       {latestHealth?.hrv || "--"}
                     </div>
@@ -371,9 +402,18 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                   </CardContent>
                 </Card>
 
-                <Card data-testid="card-sleep">
+                <Card
+                  className="cursor-pointer hover-elevate active-elevate-2"
+                  onClick={() => handleMetricRefresh("sleep")}
+                  data-testid="card-sleep"
+                >
                   <CardContent className="p-4">
-                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Sleep</div>
+                    <div className="flex items-center justify-between text-xs uppercase tracking-widest opacity-60 mb-2">
+                      <span>Sleep</span>
+                      {refreshingMetric === "sleep" && (
+                        <Loader2 className="w-3 h-3 animate-spin text-white/60" />
+                      )}
+                    </div>
                     <div className="text-3xl font-bold font-mono text-primary">
                       {latestHealth?.sleepHours ? parseFloat(latestHealth.sleepHours.toString()).toFixed(1) : "--"}
                     </div>
@@ -381,9 +421,18 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                   </CardContent>
                 </Card>
 
-                <Card data-testid="card-bp">
+                <Card
+                  className="cursor-pointer hover-elevate active-elevate-2"
+                  onClick={() => handleMetricRefresh("blood-pressure")}
+                  data-testid="card-bp"
+                >
                   <CardContent className="p-4">
-                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Blood Pressure</div>
+                    <div className="flex items-center justify-between text-xs uppercase tracking-widest opacity-60 mb-2">
+                      <span>Blood Pressure</span>
+                      {refreshingMetric === "blood-pressure" && (
+                        <Loader2 className="w-3 h-3 animate-spin text-white/60" />
+                      )}
+                    </div>
                     <div className="text-2xl font-bold font-mono text-primary">
                       {latestHealth?.bloodPressureSystolic && latestHealth?.bloodPressureDiastolic
                         ? `${latestHealth.bloodPressureSystolic}/${latestHealth.bloodPressureDiastolic}`
@@ -393,9 +442,18 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                   </CardContent>
                 </Card>
 
-                <Card data-testid="card-heart-rate">
+                <Card
+                  className="cursor-pointer hover-elevate active-elevate-2"
+                  onClick={() => handleMetricRefresh("heart-rate")}
+                  data-testid="card-heart-rate"
+                >
                   <CardContent className="p-4">
-                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Heart Rate</div>
+                    <div className="flex items-center justify-between text-xs uppercase tracking-widest opacity-60 mb-2">
+                      <span>Heart Rate</span>
+                      {refreshingMetric === "heart-rate" && (
+                        <Loader2 className="w-3 h-3 animate-spin text-white/60" />
+                      )}
+                    </div>
                     <div className="text-3xl font-bold font-mono text-primary">
                       {latestHealth?.heartRate || "--"}
                     </div>
@@ -403,9 +461,18 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                   </CardContent>
                 </Card>
 
-                <Card data-testid="card-steps">
+                <Card
+                  className="cursor-pointer hover-elevate active-elevate-2"
+                  onClick={() => handleMetricRefresh("steps")}
+                  data-testid="card-steps"
+                >
                   <CardContent className="p-4">
-                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Steps</div>
+                    <div className="flex items-center justify-between text-xs uppercase tracking-widest opacity-60 mb-2">
+                      <span>Steps</span>
+                      {refreshingMetric === "steps" && (
+                        <Loader2 className="w-3 h-3 animate-spin text-white/60" />
+                      )}
+                    </div>
                     <div className="text-3xl font-bold font-mono text-primary">
                       {latestHealth?.steps ? latestHealth.steps.toLocaleString() : "--"}
                     </div>
@@ -415,9 +482,18 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
 
                 <Dialog open={strengthDialog} onOpenChange={setStrengthDialog}>
                   <DialogTrigger asChild>
-                    <Card className="cursor-pointer hover-elevate active-elevate-2" data-testid="card-strength">
+                    <Card
+                      className="cursor-pointer hover-elevate active-elevate-2"
+                      onClick={() => handleMetricRefresh("strength")}
+                      data-testid="card-strength"
+                    >
                       <CardContent className="p-4">
-                        <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Strength Training</div>
+                        <div className="flex items-center justify-between text-xs uppercase tracking-widest opacity-60 mb-2">
+                          <span>Strength Training</span>
+                          {refreshingMetric === "strength" && (
+                            <Loader2 className="w-3 h-3 animate-spin text-white/60" />
+                          )}
+                        </div>
                         <div className="text-3xl font-bold font-mono text-primary">
                           {latestHealth?.strain ? Number(latestHealth.strain).toFixed(0) : "--"}
                         </div>
@@ -454,9 +530,18 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
 
                 <Dialog open={cardioDialog} onOpenChange={setCardioDialog}>
                   <DialogTrigger asChild>
-                    <Card className="cursor-pointer hover-elevate active-elevate-2" data-testid="card-cardio">
+                    <Card
+                      className="cursor-pointer hover-elevate active-elevate-2"
+                      onClick={() => handleMetricRefresh("cardio")}
+                      data-testid="card-cardio"
+                    >
                       <CardContent className="p-4">
-                        <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Cardio</div>
+                        <div className="flex items-center justify-between text-xs uppercase tracking-widest opacity-60 mb-2">
+                          <span>Cardio</span>
+                          {refreshingMetric === "cardio" && (
+                            <Loader2 className="w-3 h-3 animate-spin text-white/60" />
+                          )}
+                        </div>
                         <div className="text-3xl font-bold font-mono text-primary">
                           {latestHealth?.activity ? Number(latestHealth.activity).toFixed(0) : "--"}
                         </div>
@@ -491,9 +576,18 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                   </DialogContent>
                 </Dialog>
 
-                <Card data-testid="card-aqi">
+                <Card
+                  className="cursor-pointer hover-elevate active-elevate-2"
+                  onClick={() => handleMetricRefresh("aqi")}
+                  data-testid="card-aqi"
+                >
                   <CardContent className="p-4">
-                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">AQI</div>
+                    <div className="flex items-center justify-between text-xs uppercase tracking-widest opacity-60 mb-2">
+                      <span>AQI</span>
+                      {refreshingMetric === "aqi" && (
+                        <Loader2 className="w-3 h-3 animate-spin text-white/60" />
+                      )}
+                    </div>
                     <div className="text-3xl font-bold font-mono text-primary">
                       {latestEnv?.aqi || "--"}
                     </div>
@@ -501,9 +595,18 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                   </CardContent>
                 </Card>
 
-                <Card data-testid="card-noise">
+                <Card
+                  className="cursor-pointer hover-elevate active-elevate-2"
+                  onClick={() => handleMetricRefresh("noise")}
+                  data-testid="card-noise"
+                >
                   <CardContent className="p-4">
-                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Headphone Noise</div>
+                    <div className="flex items-center justify-between text-xs uppercase tracking-widest opacity-60 mb-2">
+                      <span>Headphone Noise</span>
+                      {refreshingMetric === "noise" && (
+                        <Loader2 className="w-3 h-3 animate-spin text-white/60" />
+                      )}
+                    </div>
                     <div className="text-3xl font-bold font-mono text-primary">
                       {latestEnv?.noiseAverage || latestEnv?.noiseCurrent || "--"}
                     </div>
