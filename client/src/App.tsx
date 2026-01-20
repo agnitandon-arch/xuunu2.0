@@ -56,19 +56,19 @@ function AppContent() {
   const renderScreen = () => {
     switch (activeTab) {
       case "dashboard":
-        return <DashboardScreen />;
+        return <DashboardScreen onNavigate={setActiveTab} />;
       case "data":
         return <DataInsightsScreen />;
       case "environmental":
         return <EnvironmentalScreen />;
       case "account":
-        return <AccountScreen onLogout={handleLogout} onNavigate={setActiveTab} />;
+        return <AccountScreen onLogout={handleLogout} />;
       case "devices":
         return <DeviceConnectionScreen />;
       case "medications":
         return <MedicationTrackerScreen />;
       default:
-        return <DashboardScreen />;
+        return <DashboardScreen onNavigate={setActiveTab} />;
     }
   };
 

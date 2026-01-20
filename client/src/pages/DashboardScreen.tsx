@@ -3,6 +3,8 @@ import BioSignature from "@/components/BioSignature";
 import SynergyInsightsDialog from "@/components/SynergyInsightsDialog";
 import BioSignatureDialog from "@/components/BioSignatureDialog";
 import MedicationQuickLog from "@/components/MedicationQuickLog";
+import DeviceIntegrationItem from "@/components/DeviceIntegrationItem";
+import IndoorAirQualityCredentials from "@/components/IndoorAirQualityCredentials";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -16,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MapPin, Loader2, Plus } from "lucide-react";
+import { MapPin, Loader2, Plus, Activity, Database, ChevronRight, Pill, Watch, Droplets } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,7 +27,12 @@ import type { HealthEntry, EnvironmentalReading } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-export default function DashboardScreen() {
+interface DashboardScreenProps {
+  onNavigate?: (tab: string) => void;
+  onTrackClick?: () => void;
+}
+
+export default function DashboardScreen({ onNavigate }: DashboardScreenProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [showBioSignature, setShowBioSignature] = useState(false);
@@ -80,6 +87,35 @@ export default function DashboardScreen() {
       toast({
         title: "Error",
         description: "Failed to save health data. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const connectBloodworkMutation = useMutation({
+    mutationFn: async () => {
+      if (!user?.uid) {
+        throw new Error("User not authenticated");
+      }
+
+      const response = await apiRequest("POST", "/api/terra/auth", {
+        userId: user.uid,
+        mode: "labs",
+      });
+
+      return await response.json();
+    },
+    onSuccess: (data: { url: string }) => {
+      window.open(data.url, "_blank");
+      toast({
+        title: "Connect Bloodwork",
+        description: "Complete the lab connection in the new window.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to connect bloodwork",
         variant: "destructive",
       });
     },
@@ -541,6 +577,82 @@ export default function DashboardScreen() {
               <p className="text-xs mt-2">Tap any metric above to log your first entry</p>
             </div>
           )}
+        </div>
+
+        <div>
+          <div className="text-xs uppercase tracking-widest opacity-40 mb-4">INTEGRATIONS</div>
+          <div className="space-y-3">
+            <DeviceIntegrationItem
+              name="Health Care Provider Records"
+              icon={<Activity className="w-6 h-6 text-primary" />}
+              connected={true}
+              lastSync="2 hours ago"
+              onClick={() => console.log("Healthcare provider clicked")}
+            />
+            <button
+              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+              onClick={() => console.log("Connect healthcare provider")}
+              data-testid="button-connect-healthcare-provider"
+            >
+              <div className="flex items-center gap-3">
+                <Database className="w-6 h-6 text-primary" />
+                <span className="text-sm">Connect to Health Care Provider</span>
+              </div>
+              <ChevronRight className="w-4 h-4 opacity-60" />
+            </button>
+            <DeviceIntegrationItem
+              name="Bloodwork Upload"
+              icon={<Droplets className="w-6 h-6 text-primary" />}
+              connected={false}
+              onClick={() => connectBloodworkMutation.mutate()}
+            />
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <IndoorAirQualityCredentials />
+        </div>
+
+        <div>
+          <div className="text-xs uppercase tracking-widest opacity-40 mb-4">SETTINGS</div>
+          <div className="space-y-3">
+            <button
+              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+              onClick={() => onNavigate?.("medications")}
+              data-testid="button-medications"
+            >
+              <div className="flex items-center gap-3">
+                <Pill className="w-5 h-5 text-primary" />
+                <span className="text-sm">Medication Tracker</span>
+              </div>
+              <ChevronRight className="w-4 h-4 opacity-60" />
+            </button>
+            <button
+              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+              onClick={() => onNavigate?.("devices")}
+              data-testid="button-device-connections"
+            >
+              <div className="flex items-center gap-3">
+                <Watch className="w-5 h-5 text-primary" />
+                <span className="text-sm">Device Connections</span>
+              </div>
+              <ChevronRight className="w-4 h-4 opacity-60" />
+            </button>
+            <button
+              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+              data-testid="button-notifications"
+            >
+              <span className="text-sm">Notifications</span>
+              <span className="text-xs opacity-60">Enabled</span>
+            </button>
+            <button
+              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+              data-testid="button-privacy"
+            >
+              <span className="text-sm">Privacy & Data</span>
+              <span className="text-xs opacity-60">→</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

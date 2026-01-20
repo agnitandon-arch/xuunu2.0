@@ -1,11 +1,7 @@
 import { Button } from "@/components/ui/button";
-import DeviceIntegrationItem from "@/components/DeviceIntegrationItem";
-import IndoorAirQualityCredentials from "@/components/IndoorAirQualityCredentials";
-import { Activity, Database, LogOut, Watch, ChevronRight, Pill, Droplets, ImagePlus, Trash2, Users, MessageSquare, Camera } from "lucide-react";
+import { LogOut, ImagePlus, Trash2, Users, MessageSquare, Camera } from "lucide-react";
 import { useState, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { useProfilePhoto } from "@/hooks/useProfilePhoto";
@@ -13,10 +9,9 @@ import { Switch } from "@/components/ui/switch";
 
 interface AccountScreenProps {
   onLogout?: () => void;
-  onNavigate?: (tab: string) => void;
 }
 
-export default function AccountScreen({ onLogout, onNavigate }: AccountScreenProps) {
+export default function AccountScreen({ onLogout }: AccountScreenProps) {
   const { user: authUser } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -66,35 +61,6 @@ export default function AccountScreen({ onLogout, onNavigate }: AccountScreenPro
       source: "you" as const,
     },
   ]);
-
-  const connectBloodworkMutation = useMutation({
-    mutationFn: async () => {
-      if (!authUser?.uid) {
-        throw new Error("User not authenticated");
-      }
-
-      const response = await apiRequest("POST", "/api/terra/auth", {
-        userId: authUser.uid,
-        mode: "labs",
-      });
-
-      return await response.json();
-    },
-    onSuccess: (data: { url: string }) => {
-      window.open(data.url, "_blank");
-      toast({
-        title: "Connect Bloodwork",
-        description: "Complete the lab connection in the new window.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to connect bloodwork",
-        variant: "destructive",
-      });
-    },
-  });
 
   const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -427,82 +393,6 @@ export default function AccountScreen({ onLogout, onNavigate }: AccountScreenPro
             ))}
           </div>
         </section>
-
-        <div>
-          <div className="text-xs uppercase tracking-widest opacity-40 mb-4">INTEGRATIONS</div>
-          <div className="space-y-3">
-            <DeviceIntegrationItem
-              name="Health Care Provider Records"
-              icon={<Activity className="w-6 h-6 text-primary" />}
-              connected={true}
-              lastSync="2 hours ago"
-              onClick={() => console.log("Healthcare provider clicked")}
-            />
-            <button 
-              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-              onClick={() => console.log("Connect healthcare provider")}
-              data-testid="button-connect-healthcare-provider"
-            >
-              <div className="flex items-center gap-3">
-                <Database className="w-6 h-6 text-primary" />
-                <span className="text-sm">Connect to Health Care Provider</span>
-              </div>
-              <ChevronRight className="w-4 h-4 opacity-60" />
-            </button>
-            <DeviceIntegrationItem
-              name="Bloodwork Upload"
-              icon={<Droplets className="w-6 h-6 text-primary" />}
-              connected={false}
-              onClick={() => connectBloodworkMutation.mutate()}
-            />
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <IndoorAirQualityCredentials />
-        </div>
-
-        <div>
-          <div className="text-xs uppercase tracking-widest opacity-40 mb-4">SETTINGS</div>
-          <div className="space-y-3">
-            <button 
-              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-              onClick={() => onNavigate?.("medications")}
-              data-testid="button-medications"
-            >
-              <div className="flex items-center gap-3">
-                <Pill className="w-5 h-5 text-primary" />
-                <span className="text-sm">Medication Tracker</span>
-              </div>
-              <ChevronRight className="w-4 h-4 opacity-60" />
-            </button>
-            <button 
-              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-              onClick={() => onNavigate?.("devices")}
-              data-testid="button-device-connections"
-            >
-              <div className="flex items-center gap-3">
-                <Watch className="w-5 h-5 text-primary" />
-                <span className="text-sm">Device Connections</span>
-              </div>
-              <ChevronRight className="w-4 h-4 opacity-60" />
-            </button>
-            <button 
-              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-              data-testid="button-notifications"
-            >
-              <span className="text-sm">Notifications</span>
-              <span className="text-xs opacity-60">Enabled</span>
-            </button>
-            <button 
-              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-              data-testid="button-privacy"
-            >
-              <span className="text-sm">Privacy & Data</span>
-              <span className="text-xs opacity-60">→</span>
-            </button>
-          </div>
-        </div>
 
         <Button
           variant="destructive"
