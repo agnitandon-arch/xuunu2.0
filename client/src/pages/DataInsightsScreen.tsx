@@ -101,7 +101,7 @@ export default function DataInsightsScreen({
 
   const CROP_SIZE = 240;
   const OUTPUT_SIZE = 320;
-  const MAX_PHOTO_SIZE = 10 * 1024 * 1024;
+  const MAX_PHOTO_SIZE = 100 * 1024 * 1024;
   const displayName = user?.displayName || user?.email?.split("@")[0] || "Member";
 
   const friends = useMemo<FriendProfile[]>(
@@ -192,7 +192,7 @@ export default function DataInsightsScreen({
     if (file.size > MAX_PHOTO_SIZE) {
       toast({
         title: "File too large",
-        description: "Please upload an image smaller than 10MB.",
+        description: "Please upload an image smaller than 100MB.",
         variant: "destructive",
       });
       return;
