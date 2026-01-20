@@ -599,10 +599,7 @@ export default function DataInsightsScreen({
                 </Tooltip>
               </TooltipProvider>
               <div>
-                <h1 className="text-2xl font-bold">Share My Progress</h1>
-                <p className="text-sm opacity-60">
-                  Share progress snapshots and dashboards with your community.
-                </p>
+                <h1 className="text-2xl font-bold">Profile</h1>
               </div>
             </div>
             <div className="flex items-center gap-2">
