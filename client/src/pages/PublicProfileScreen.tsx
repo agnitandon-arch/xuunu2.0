@@ -1,4 +1,4 @@
-import { ArrowLeft, Globe } from "lucide-react";
+import { ArrowLeft, Globe, Link } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import ProfileAvatar from "@/components/ProfileAvatar";
@@ -20,6 +20,7 @@ export default function PublicProfileScreen({ onBack }: PublicProfileScreenProps
   const { user } = useAuth();
   const env = import.meta.env as Record<string, string | undefined>;
   const [dashboardVisibility, setDashboardVisibility] = useState<Record<string, boolean>>({});
+  const [publicUrl, setPublicUrl] = useState("");
 
   const dashboards: DashboardConfig[] = useMemo(
     () => [
@@ -65,6 +66,7 @@ export default function PublicProfileScreen({ onBack }: PublicProfileScreenProps
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    setPublicUrl(window.location.href);
     const loadVisibility = () => {
       const stored = window.localStorage.getItem(STORAGE_KEY);
       if (!stored) {
@@ -113,6 +115,21 @@ export default function PublicProfileScreen({ onBack }: PublicProfileScreenProps
               Only dashboards you marked public appear here.
             </p>
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-white/50">
+            <Link className="h-3.5 w-3.5" />
+            Public profile link
+          </div>
+          <a
+            href={publicUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 block truncate text-sm text-white/80 hover:text-white"
+          >
+            {publicUrl || "Generating link..."}
+          </a>
         </div>
 
         <section className="space-y-4">

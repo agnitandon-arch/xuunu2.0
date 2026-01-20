@@ -638,11 +638,26 @@ export default function DataInsightsScreen({
                 <h1 className="text-2xl font-bold">{displayName}</h1>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onPreviewPublicProfile) {
+                    onPreviewPublicProfile();
+                    return;
+                  }
+                  window.open(profileUrl || "/app/profile/sample", "_blank");
+                }}
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-[11px] text-white/70 transition hover:border-white/40 hover:text-white"
+                data-testid="button-preview-public-profile"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Preview public profile
+              </button>
               <button
                 type="button"
                 onClick={() => setShowShareOptions((prev) => !prev)}
-                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm text-white/80 transition hover:border-white/40 hover:text-white"
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-[11px] text-white/70 transition hover:border-white/40 hover:text-white"
               >
                 <Share2 className="h-4 w-4" />
                 Share this page
@@ -1033,20 +1048,6 @@ export default function DataInsightsScreen({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  if (onPreviewPublicProfile) {
-                    onPreviewPublicProfile();
-                    return;
-                  }
-                  window.open(profileUrl || "/app/profile/sample", "_blank");
-                }}
-                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/70 transition hover:border-white/40 hover:text-white"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Preview public profile
-              </button>
-              <button
-                type="button"
                 onClick={() => setShowProfileShare((prev) => !prev)}
                 className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/70 transition hover:border-white/40 hover:text-white"
               >
@@ -1054,17 +1055,6 @@ export default function DataInsightsScreen({
                 Share profile
               </button>
             </div>
-          </div>
-          <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white/70">
-            <span className="truncate">{profileUrl || "Generating profile link..."}</span>
-            <button
-              type="button"
-              onClick={() => copyToClipboard(profileUrl, "Profile link")}
-              className="inline-flex items-center gap-1 text-white/70 hover:text-white"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              Copy
-            </button>
           </div>
           {showProfileShare && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
