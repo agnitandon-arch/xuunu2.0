@@ -324,7 +324,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
               data-testid="button-open-profile"
             >
               <div className="flex flex-col items-center gap-1">
-                <ProfileAvatar className="h-10 w-10" />
+                <ProfileAvatar className="h-20 w-20" />
                 <span className="text-[10px] uppercase tracking-widest text-white/50">
                   Member
                 </span>

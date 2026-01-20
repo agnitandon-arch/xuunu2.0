@@ -13,7 +13,6 @@ import {
   MessageSquare,
   UserPlus,
   Heart,
-  LogOut,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -82,7 +81,7 @@ export default function DataInsightsScreen({
   onViewFriend,
 }: DataInsightsScreenProps) {
   const { toast } = useToast();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { photoUrl, setPhotoUrl } = useProfilePhoto();
   const [shareUrl, setShareUrl] = useState("");
@@ -950,19 +949,8 @@ export default function DataInsightsScreen({
           </div>
         </section>
 
-        <div className="space-y-3">
-          <Button
-            variant="destructive"
-            onClick={() => signOut()}
-            className="w-full h-13 rounded-full"
-            data-testid="button-logout"
-          >
-            <LogOut className="w-5 h-5 mr-2" />
-            Logout
-          </Button>
-          <div className="text-center pt-2">
-            <p className="text-xs opacity-40">Xuunu v1.0.0</p>
-          </div>
+        <div className="text-center pt-2">
+          <p className="text-xs opacity-40">Xuunu v1.0.0</p>
         </div>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
