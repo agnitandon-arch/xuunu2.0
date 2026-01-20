@@ -57,9 +57,10 @@ const buildInsights = (healthData: any, snapshots: any[]) => {
 };
 
 export async function handleLocalApi({ method, url, data }: LocalRequest) {
-  if (!url.startsWith("/api/")) return null;
-
   const parsed = new URL(url, "http://localhost");
+  if (!parsed.pathname.startsWith("/api/")) {
+    return null;
+  }
   const path = parsed.pathname;
   const searchParams = parsed.searchParams;
   const body = (data ?? {}) as Record<string, any>;
