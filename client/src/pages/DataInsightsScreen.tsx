@@ -27,6 +27,8 @@ type ShareTarget = {
   buildUrl: (url: string, text: string) => string;
 };
 
+const FEED_STORAGE_KEY = "xuunu-feed-items";
+
 type NetworkMember = {
   id: string;
   name: string;
@@ -321,13 +323,9 @@ export default function DataInsightsScreen({
       return;
     }
 
-    const nextUrls: string[] = [];
-    for (const file of files.slice(0, remainingSlots)) {
-      if (!file.type.startsWith("image/")) continue;
-      nextUrls.push(URL.createObjectURL(file));
-    }
-
-    if (nextUrls.length === 0) {
+    const images = files.filter((file) => file.type.startsWith("image/"));
+    const selected = images.slice(0, remainingSlots);
+    if (selected.length === 0) {
       toast({
         title: "Unsupported files",
         description: "Please choose image files only.",
@@ -336,22 +334,39 @@ export default function DataInsightsScreen({
       return;
     }
 
-    setUpdatePhotos((prev) => [...prev, ...nextUrls]);
+    Promise.all(
+      selected.map(
+        (file) =>
+          new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error("Failed to read image"));
+            reader.readAsDataURL(file);
+          })
+      )
+    )
+      .then((results) => {
+        setUpdatePhotos((prev) => [...prev, ...results]);
+      })
+      .catch(() => {
+        toast({
+          title: "Photo upload failed",
+          description: "Please try adding your photos again.",
+          variant: "destructive",
+        });
+      });
     event.target.value = "";
   };
 
   const handleRemoveUpdatePhoto = (index: number) => {
     setUpdatePhotos((prev) => {
       const next = [...prev];
-      const [removed] = next.splice(index, 1);
-      if (removed) {
-        URL.revokeObjectURL(removed);
-      }
+      next.splice(index, 1);
       return next;
     });
   };
 
-  const [feedItems, setFeedItems] = useState(() => [
+  const buildDefaultFeedItems = (avatar: string) => [
     {
       id: "feed-1",
       authorName: "Ava Martinez",
@@ -379,7 +394,7 @@ export default function DataInsightsScreen({
     {
       id: "feed-3",
       authorName: "You",
-      authorAvatar: photoUrl || "",
+      authorAvatar: avatar,
       time: "Yesterday",
       content: "Started sharing my progress publicly this week.",
       photos: [],
@@ -388,7 +403,39 @@ export default function DataInsightsScreen({
       likesCount: 3,
       liked: false,
     },
-  ]);
+  ];
+
+  const [feedItems, setFeedItems] = useState(() => {
+    if (typeof window === "undefined") {
+      return buildDefaultFeedItems(photoUrl || "");
+    }
+    const stored = window.localStorage.getItem(FEED_STORAGE_KEY);
+    if (stored) {
+      try {
+        return JSON.parse(stored) as ReturnType<typeof buildDefaultFeedItems>;
+      } catch {
+        return buildDefaultFeedItems(photoUrl || "");
+      }
+    }
+    return buildDefaultFeedItems(photoUrl || "");
+  });
+
+  useEffect(() => {
+    setFeedItems((prev) =>
+      prev.map((item) =>
+        item.source === "you" ? { ...item, authorAvatar: photoUrl || "" } : item
+      )
+    );
+  }, [photoUrl]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(FEED_STORAGE_KEY, JSON.stringify(feedItems));
+    } catch (error) {
+      // Ignore storage failures (e.g., quota exceeded).
+    }
+  }, [feedItems]);
 
   const publicFeedItems = useMemo(
     () => feedItems.filter((item) => item.shared),
