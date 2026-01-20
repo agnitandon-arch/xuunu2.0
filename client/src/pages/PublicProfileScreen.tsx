@@ -83,7 +83,7 @@ export default function PublicProfileScreen({ onBack }: PublicProfileScreenProps
         </button>
 
         <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-5">
-          <ProfileAvatar className="h-14 w-14" />
+          <ProfileAvatar className="h-20 w-20" />
           <div>
             <h1 className="text-xl font-semibold">
               {user?.displayName || user?.email?.split("@")[0] || "Your"} Public Profile

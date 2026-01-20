@@ -21,7 +21,7 @@ export default function EnvironmentalScreen() {
               Comprehensive environmental monitoring across 7 categories
             </p>
           </div>
-          <ProfileAvatar className="h-9 w-9" />
+          <ProfileAvatar className="h-20 w-20" />
         </div>
 
         <Tabs defaultValue="location" className="w-full">

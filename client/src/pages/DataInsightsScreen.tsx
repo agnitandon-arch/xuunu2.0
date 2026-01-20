@@ -101,7 +101,7 @@ export default function DataInsightsScreen({
 
   const CROP_SIZE = 240;
   const OUTPUT_SIZE = 320;
-  const MAX_PHOTO_SIZE = 4 * 1024 * 1024;
+  const MAX_PHOTO_SIZE = 10 * 1024 * 1024;
   const displayName = user?.displayName || user?.email?.split("@")[0] || "Member";
 
   const friends = useMemo<FriendProfile[]>(
@@ -192,7 +192,7 @@ export default function DataInsightsScreen({
     if (file.size > MAX_PHOTO_SIZE) {
       toast({
         title: "File too large",
-        description: "Please upload an image smaller than 4MB.",
+        description: "Please upload an image smaller than 10MB.",
         variant: "destructive",
       });
       return;
@@ -514,7 +514,7 @@ export default function DataInsightsScreen({
                       className="rounded-full"
                       data-testid="button-update-profile-photo"
                     >
-                      <ProfileAvatar className="h-12 w-12" />
+                      <ProfileAvatar className="h-20 w-20" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent className="bg-black border-white/10 text-white text-xs">

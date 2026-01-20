@@ -32,7 +32,7 @@ export default function MinimalBottomNav({ activeTab, onTabChange }: MinimalBott
               {isAccountTab ? (
                 <ProfileAvatar
                   className={cn(
-                    "h-6 w-6",
+                    "h-20 w-20",
                     isActive ? "ring-2 ring-primary/60 ring-offset-2 ring-offset-black" : ""
                   )}
                 />
