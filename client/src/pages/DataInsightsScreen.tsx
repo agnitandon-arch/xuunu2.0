@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
   Copy,
   ExternalLink,
-  Globe,
-  Lock,
   Share2,
   Camera,
   Users,
@@ -22,13 +19,6 @@ import { useProfilePhoto } from "@/hooks/useProfilePhoto";
 import type { FriendProfile } from "@/pages/FriendProfileScreen";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-type DashboardConfig = {
-  id: string;
-  title: string;
-  description: string;
-  url: string;
-};
 
 type ShareTarget = {
   id: "tiktok" | "facebook" | "x" | "instagram" | "whatsapp";
@@ -109,53 +99,10 @@ export default function DataInsightsScreen({
   const [showNetworkMembers, setShowNetworkMembers] = useState(false);
   const [networkDegree, setNetworkDegree] = useState<"second" | "third">("second");
 
-  const env = import.meta.env as Record<string, string | undefined>;
   const CROP_SIZE = 240;
   const OUTPUT_SIZE = 320;
   const MAX_PHOTO_SIZE = 4 * 1024 * 1024;
   const displayName = user?.displayName || user?.email?.split("@")[0] || "Member";
-
-  const dashboards: DashboardConfig[] = useMemo(
-    () => [
-      {
-        id: "performance",
-        title: "Performance Dashboard",
-        description: "Training load, HRV, recovery, and readiness trends.",
-        url:
-          env.VITE_LOOKER_PERFORMANCE_DASHBOARD_URL ||
-          env.NEXT_PUBLIC_LOOKER_PERFORMANCE_DASHBOARD_URL ||
-          "",
-      },
-      {
-        id: "health",
-        title: "Health Dashboard",
-        description: "Vitals, glucose stability, and metabolic patterns.",
-        url:
-          env.VITE_LOOKER_HEALTH_DASHBOARD_URL ||
-          env.NEXT_PUBLIC_LOOKER_HEALTH_DASHBOARD_URL ||
-          "",
-      },
-      {
-        id: "recovery",
-        title: "Recovery Dashboard",
-        description: "Sleep quality, strain balance, and recovery insights.",
-        url:
-          env.VITE_LOOKER_RECOVERY_DASHBOARD_URL ||
-          env.NEXT_PUBLIC_LOOKER_RECOVERY_DASHBOARD_URL ||
-          "",
-      },
-      {
-        id: "energy",
-        title: "Energy Dashboard",
-        description: "Nutrition, activity, and energy utilization trends.",
-        url:
-          env.VITE_LOOKER_ENERGY_DASHBOARD_URL ||
-          env.NEXT_PUBLIC_LOOKER_ENERGY_DASHBOARD_URL ||
-          "",
-      },
-    ],
-    [env]
-  );
 
   const friends = useMemo<FriendProfile[]>(
     () => [
@@ -204,21 +151,6 @@ export default function DataInsightsScreen({
     []
   );
 
-  const [dashboardVisibility, setDashboardVisibility] = useState<Record<string, boolean>>(() => {
-    if (typeof window === "undefined") {
-      return dashboards.reduce((acc, dashboard) => ({ ...acc, [dashboard.id]: false }), {});
-    }
-    const stored = window.localStorage.getItem("xuunu-dashboard-visibility");
-    if (stored) {
-      try {
-        return JSON.parse(stored) as Record<string, boolean>;
-      } catch {
-        return dashboards.reduce((acc, dashboard) => ({ ...acc, [dashboard.id]: false }), {});
-      }
-    }
-    return dashboards.reduce((acc, dashboard) => ({ ...acc, [dashboard.id]: false }), {});
-  });
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     const currentUrl = window.location.href;
@@ -227,40 +159,6 @@ export default function DataInsightsScreen({
     const profilePath = user?.uid ? `/app/profile/${user.uid}` : "/app/profile/sample";
     setProfileUrl(`${origin}${profilePath}`);
   }, [user?.uid]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("xuunu-dashboard-visibility", JSON.stringify(dashboardVisibility));
-  }, [dashboardVisibility]);
-
-  const weeklyDates = useMemo(() => {
-    const today = new Date();
-    return Array.from({ length: 5 }, (_, index) => {
-      const date = new Date(today);
-      date.setDate(today.getDate() - (28 - index * 7));
-      return date;
-    });
-  }, []);
-
-  const formatDate = (date: Date) =>
-    date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
-  const buildTrend = (start: number, step: number) =>
-    weeklyDates.map((date, index) => ({
-      date: formatDate(date),
-      value: Number((start + step * index).toFixed(1)),
-    }));
-
-  const terraCharts = [
-    { id: "activity", title: "Activity Score", unit: "pts", data: buildTrend(62, 3.5) },
-    { id: "sleep", title: "Sleep Duration", unit: "hrs", data: buildTrend(6.7, 0.3) },
-    { id: "recovery", title: "Recovery", unit: "%", data: buildTrend(68, 2.8) },
-    { id: "hrv", title: "HRV", unit: "ms", data: buildTrend(44, 2.2) },
-    { id: "glucose", title: "Glucose Avg", unit: "mg/dL", data: buildTrend(138, 2.4) },
-    { id: "nutrition", title: "Nutrition Score", unit: "pts", data: buildTrend(58, 3.1) },
-    { id: "strain", title: "Strain", unit: "pts", data: buildTrend(10, 1.1) },
-    { id: "weight", title: "Body Weight", unit: "lb", data: buildTrend(182, 0.4) },
-  ];
 
   const copyToClipboard = async (value: string, label: string) => {
     try {
@@ -591,16 +489,6 @@ export default function DataInsightsScreen({
 
     const shareLink = target.buildUrl(url, text);
     window.open(shareLink, "_blank", "noopener,noreferrer");
-  };
-
-  const toggleDashboardVisibility = (id: string, value: boolean) => {
-    setDashboardVisibility((prev) => ({ ...prev, [id]: value }));
-    toast({
-      title: value ? "Dashboard shared" : "Dashboard hidden",
-      description: value
-        ? "Your dashboard is now visible on your public profile."
-        : "Only you can view this dashboard.",
-    });
   };
 
   return (
@@ -1069,104 +957,6 @@ export default function DataInsightsScreen({
                 >
                   View
                 </button>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Dashboards</h2>
-            </div>
-          </div>
-
-          <div className="grid gap-4">
-            {dashboards.map((dashboard) => {
-              const isPublic = dashboardVisibility[dashboard.id] ?? false;
-              return (
-                <div key={dashboard.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-base font-semibold">{dashboard.title}</h3>
-                      <p className="text-xs text-white/60">{dashboard.description}</p>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-white/60">
-                      <span className="uppercase tracking-widest text-[10px] text-white/40">
-                        Public
-                      </span>
-                      <Switch
-                        checked={isPublic}
-                        onCheckedChange={(value) => toggleDashboardVisibility(dashboard.id, value)}
-                      />
-                      {isPublic ? (
-                        <span className="flex items-center gap-1 text-green-400">
-                          <Globe className="h-3.5 w-3.5" /> Visible
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-white/50">
-                          <Lock className="h-3.5 w-3.5" /> Hidden
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3">
-                    {dashboard.url ? (
-                      <iframe
-                        title={dashboard.title}
-                        src={dashboard.url}
-                        className="h-[360px] w-full"
-                        style={{ border: "none" }}
-                        allowFullScreen
-                      />
-                    ) : (
-                      <div className="flex h-[240px] items-center justify-center text-xs text-white/50">
-                        Dashboard URL not configured yet.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold">Terra Sync Trends</h2>
-            <p className="text-xs text-white/50">
-              Sample weekly data (every 7 days over the last month).
-            </p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {terraCharts.map((chart) => (
-              <div key={chart.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold">{chart.title}</h3>
-                    <p className="text-xs text-white/50">Terra sync data</p>
-                  </div>
-                  <span className="text-xs text-white/40">{chart.unit}</span>
-                </div>
-                <div className="h-40">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chart.data}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-                      <XAxis dataKey="date" tick={{ fill: "#94a3b8", fontSize: 10 }} />
-                      <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} />
-                      <Tooltip
-                        contentStyle={{
-                          background: "#0f172a",
-                          border: "1px solid #1f2937",
-                          borderRadius: 8,
-                          color: "#e2e8f0",
-                          fontSize: 12,
-                        }}
-                      />
-                      <Line type="monotone" dataKey="value" stroke="#60a5fa" strokeWidth={2} dot />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
               </div>
             ))}
           </div>

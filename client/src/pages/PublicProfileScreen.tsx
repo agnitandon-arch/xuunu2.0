@@ -14,12 +14,9 @@ interface PublicProfileScreenProps {
   onBack: () => void;
 }
 
-const STORAGE_KEY = "xuunu-dashboard-visibility";
-
 export default function PublicProfileScreen({ onBack }: PublicProfileScreenProps) {
   const { user } = useAuth();
   const env = import.meta.env as Record<string, string | undefined>;
-  const [dashboardVisibility, setDashboardVisibility] = useState<Record<string, boolean>>({});
   const [publicUrl, setPublicUrl] = useState("");
 
   const dashboards: DashboardConfig[] = useMemo(
@@ -65,32 +62,12 @@ export default function PublicProfileScreen({ onBack }: PublicProfileScreenProps
   );
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    setPublicUrl(window.location.href);
-    const loadVisibility = () => {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (!stored) {
-        setDashboardVisibility({});
-        return;
-      }
-      try {
-        setDashboardVisibility(JSON.parse(stored));
-      } catch {
-        setDashboardVisibility({});
-      }
-    };
-
-    loadVisibility();
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY) {
-        loadVisibility();
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    if (typeof window !== "undefined") {
+      setPublicUrl(window.location.href);
+    }
   }, []);
 
-  const sharedDashboards = dashboards.filter((dashboard) => dashboardVisibility[dashboard.id]);
+  const sharedDashboards = dashboards;
 
   return (
     <div className="min-h-screen bg-black pb-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
