@@ -7,11 +7,14 @@ import ProfileAvatar from "@/components/ProfileAvatar";
 import { useProfilePhoto } from "@/hooks/useProfilePhoto";
 import { Switch } from "@/components/ui/switch";
 
+import type { FriendProfile } from "@/pages/FriendProfileScreen";
+
 interface AccountScreenProps {
   onLogout?: () => void;
+  onViewFriend?: (friend: FriendProfile) => void;
 }
 
-export default function AccountScreen({ onLogout }: AccountScreenProps) {
+export default function AccountScreen({ onLogout, onViewFriend }: AccountScreenProps) {
   const { user: authUser } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -20,11 +23,29 @@ export default function AccountScreen({ onLogout }: AccountScreenProps) {
   const [updatePhotos, setUpdatePhotos] = useState<string[]>([]);
   const [shareUpdate, setShareUpdate] = useState(true);
 
-  const friends = useMemo(
+  const friends = useMemo<FriendProfile[]>(
     () => [
-      { id: "friend-1", name: "Ava Martinez", status: "Shared a recovery win" },
-      { id: "friend-2", name: "Jordan Lee", status: "Hit a 7-day sleep streak" },
-      { id: "friend-3", name: "Riley Patel", status: "New bloodwork results" },
+      {
+        id: "friend-1",
+        name: "Ava Martinez",
+        status: "Shared a recovery win",
+        avatarUrl: "https://i.pravatar.cc/120?img=16",
+        sharedDashboards: { performance: true, health: true, recovery: false, energy: true },
+      },
+      {
+        id: "friend-2",
+        name: "Jordan Lee",
+        status: "Hit a 7-day sleep streak",
+        avatarUrl: "https://i.pravatar.cc/120?img=12",
+        sharedDashboards: { performance: false, health: true, recovery: true, energy: false },
+      },
+      {
+        id: "friend-3",
+        name: "Riley Patel",
+        status: "New bloodwork results",
+        avatarUrl: "https://i.pravatar.cc/120?img=22",
+        sharedDashboards: { performance: true, health: false, recovery: false, energy: true },
+      },
     ],
     []
   );
@@ -385,6 +406,7 @@ export default function AccountScreen({ onLogout }: AccountScreenProps) {
                 <button
                   type="button"
                   className="text-xs text-white/60 hover:text-white"
+                  onClick={() => onViewFriend?.(friend)}
                   data-testid={`button-view-friend-${friend.id}`}
                 >
                   View

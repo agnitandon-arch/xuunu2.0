@@ -14,11 +14,13 @@ import DeviceConnectionScreen from "@/pages/DeviceConnectionScreen";
 import MedicationTrackerScreen from "@/pages/MedicationTrackerScreen";
 import ShowcaseAll from "@/pages/ShowcaseAll";
 import { Loader2 } from "lucide-react";
+import FriendProfileScreen, { FriendProfile } from "@/pages/FriendProfileScreen";
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showShowcase, setShowShowcase] = useState(false);
+  const [selectedFriend, setSelectedFriend] = useState<FriendProfile | null>(null);
 
   const handleLogout = async () => {
     await signOut();
@@ -62,7 +64,22 @@ function AppContent() {
       case "environmental":
         return <EnvironmentalScreen />;
       case "account":
-        return <AccountScreen onLogout={handleLogout} />;
+        return (
+          <AccountScreen
+            onLogout={handleLogout}
+            onViewFriend={(friend) => {
+              setSelectedFriend(friend);
+              setActiveTab("friend-profile");
+            }}
+          />
+        );
+      case "friend-profile":
+        return (
+          <FriendProfileScreen
+            friend={selectedFriend}
+            onBack={() => setActiveTab("account")}
+          />
+        );
       case "devices":
         return <DeviceConnectionScreen />;
       case "medications":
