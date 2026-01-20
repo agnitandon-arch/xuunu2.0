@@ -35,6 +35,7 @@ const FEED_DRAFT_KEY = "xuunu-feed-draft";
 const FEED_NOTIFIED_KEY = "xuunu-feed-notified";
 const NOTIFICATIONS_KEY = "xuunu-notifications-enabled";
 const CHALLENGE_STORAGE_KEY = "xuunu-challenges";
+const CHALLENGE_SCHEDULE_KEY = "xuunu-challenge-schedules";
 
 type ChallengeType = "Hiking" | "Running" | "Biking";
 
@@ -57,6 +58,7 @@ type ChallengeRecord = {
   endLocation: ChallengeLocation;
   autoStopped?: boolean;
   shared?: boolean;
+  invitedFriends?: string[];
 };
 
 type ChallengeSummary = {
@@ -65,6 +67,23 @@ type ChallengeSummary = {
   stepsDelta: number;
   startLocation: ChallengeLocation;
   endLocation: ChallengeLocation;
+  invitedFriends?: string[];
+};
+
+type ChallengeSchedule = {
+  id: string;
+  userId: string;
+  type: ChallengeType;
+  scheduledFor: string;
+  createdAt: string;
+  invitedFriends: string[];
+  shared: boolean;
+};
+
+type ChallengeScheduleSummary = {
+  type: ChallengeType;
+  scheduledFor: string;
+  invitedFriends: string[];
 };
 
 type FeedItem = {
@@ -79,6 +98,7 @@ type FeedItem = {
   likesCount: number;
   liked: boolean;
   challenge?: ChallengeSummary;
+  challengeSchedule?: ChallengeScheduleSummary;
 };
 
 type NetworkMember = {
@@ -141,16 +161,24 @@ export default function DataInsightsScreen({
   const [updatePhotos, setUpdatePhotos] = useState<string[]>([]);
   const [shareUpdate, setShareUpdate] = useState(true);
   const [showChallengePicker, setShowChallengePicker] = useState(false);
+  const [selectedChallengeType, setSelectedChallengeType] = useState<ChallengeType | null>(null);
+  const [invitedFriends, setInvitedFriends] = useState<string[]>([]);
+  const [scheduleChallenge, setScheduleChallenge] = useState(false);
+  const [scheduledStart, setScheduledStart] = useState("");
+  const [shareScheduledChallenge, setShareScheduledChallenge] = useState(true);
   const [activeChallenge, setActiveChallenge] = useState<{
     id: string;
     type: ChallengeType;
     startedAt: string;
     stepsStart: number;
     startLocation: ChallengeLocation;
+    invitedFriends: string[];
   } | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [pendingChallenge, setPendingChallenge] = useState<ChallengeRecord | null>(null);
   const [shareChallenge, setShareChallenge] = useState(true);
+  const [scheduledChallenges, setScheduledChallenges] = useState<ChallengeSchedule[]>([]);
+  const [scheduleTick, setScheduleTick] = useState(0);
   const lastStepsRef = useRef<number | null>(null);
   const lastStepChangeAtRef = useRef<number | null>(null);
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -270,6 +298,26 @@ export default function DataInsightsScreen({
       // Ignore invalid drafts.
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(CHALLENGE_SCHEDULE_KEY);
+      const parsed = stored ? (JSON.parse(stored) as ChallengeSchedule[]) : [];
+      setScheduledChallenges(parsed.filter((challenge) => challenge.userId === user?.uid));
+    } catch {
+      setScheduledChallenges([]);
+    }
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(CHALLENGE_SCHEDULE_KEY, JSON.stringify(scheduledChallenges));
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [scheduledChallenges]);
 
   const copyToClipboard = async (value: string, label: string) => {
     try {
@@ -680,6 +728,43 @@ export default function DataInsightsScreen({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const formatDateTimeLocal = (date: Date) => {
+    const pad = (value: number) => value.toString().padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+      date.getHours()
+    )}:${pad(date.getMinutes())}`;
+  };
+
+  const getScheduleBounds = () => {
+    const now = Date.now();
+    return {
+      min: new Date(now + 24 * 60 * 60 * 1000),
+      max: new Date(now + 7 * 24 * 60 * 60 * 1000),
+    };
+  };
+
+  const resetChallengeDialog = () => {
+    setSelectedChallengeType(null);
+    setInvitedFriends([]);
+    setScheduleChallenge(false);
+    setScheduledStart("");
+    setShareScheduledChallenge(true);
+  };
+
+  useEffect(() => {
+    if (!scheduleChallenge) return;
+    if (scheduledStart) return;
+    const { min } = getScheduleBounds();
+    setScheduledStart(formatDateTimeLocal(min));
+  }, [scheduleChallenge, scheduledStart]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setScheduleTick((prev) => prev + 1);
+    }, 60000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   const formatCoord = (value: number) => value.toFixed(6);
 
   const getDistanceKm = (start: ChallengeLocation, end: ChallengeLocation) => {
@@ -730,21 +815,126 @@ export default function DataInsightsScreen({
     }
   };
 
-  const handleStartChallenge = async (type: ChallengeType) => {
+  const handleStartChallenge = async (
+    type: ChallengeType,
+    options?: { invitedFriends?: string[] }
+  ) => {
     if (!user) return;
+    if (activeChallenge) {
+      toast({
+        title: "Challenge in progress",
+        description: "Stop the current challenge before starting a new one.",
+        variant: "destructive",
+      });
+      return;
+    }
     const startedAt = new Date().toISOString();
     const stepsStart = typeof latestHealth?.steps === "number" ? latestHealth.steps : 0;
     const startLocation = await getCurrentLocation();
     const id = `challenge-${Date.now()}`;
-    setActiveChallenge({ id, type, startedAt, stepsStart, startLocation });
+    setActiveChallenge({
+      id,
+      type,
+      startedAt,
+      stepsStart,
+      startLocation,
+      invitedFriends: options?.invitedFriends ?? [],
+    });
     setElapsedSeconds(0);
     lastStepsRef.current = stepsStart;
     lastStepChangeAtRef.current = Date.now();
     setShowChallengePicker(false);
+    resetChallengeDialog();
     toast({
       title: `${type} challenge started`,
       description: "Timer is running. Move to record steps.",
     });
+  };
+
+  const handleScheduleChallenge = () => {
+    if (!user || !selectedChallengeType) return;
+    if (!scheduledStart) {
+      toast({
+        title: "Pick a start time",
+        description: "Schedule at least 24 hours ahead.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const scheduledDate = new Date(scheduledStart);
+    if (Number.isNaN(scheduledDate.getTime())) {
+      toast({
+        title: "Invalid time",
+        description: "Please choose a valid start date and time.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const { min, max } = getScheduleBounds();
+    if (scheduledDate < min || scheduledDate > max) {
+      toast({
+        title: "Schedule window",
+        description: "Challenges must be scheduled 24 hours to 7 days in advance.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const record: ChallengeSchedule = {
+      id: `schedule-${Date.now()}`,
+      userId: user.uid,
+      type: selectedChallengeType,
+      scheduledFor: scheduledDate.toISOString(),
+      createdAt: new Date().toISOString(),
+      invitedFriends,
+      shared: shareScheduledChallenge,
+    };
+    setScheduledChallenges((prev) => [record, ...prev]);
+    if (shareScheduledChallenge) {
+      const feedItem: FeedItem = {
+        id: `challenge-schedule-${record.id}`,
+        authorName: "You",
+        authorAvatar: photoUrl || "",
+        time: "Just now",
+        content: `Scheduled a ${record.type} challenge.`,
+        photos: [],
+        shared: true,
+        source: "you",
+        likesCount: 0,
+        liked: false,
+        challengeSchedule: {
+          type: record.type,
+          scheduledFor: record.scheduledFor,
+          invitedFriends: record.invitedFriends,
+        },
+      };
+      setFeedItems((prev) => [feedItem, ...prev]);
+    }
+    setShowChallengePicker(false);
+    resetChallengeDialog();
+    toast({
+      title: "Challenge scheduled",
+      description: `Starts ${scheduledDate.toLocaleString()}.`,
+    });
+  };
+
+  const handleStartScheduledChallenge = (challenge: ChallengeSchedule) => {
+    const startTime = new Date(challenge.scheduledFor).getTime();
+    if (Date.now() < startTime) {
+      toast({
+        title: "Too early",
+        description: "This challenge cannot start before its scheduled time.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setScheduledChallenges((prev) => prev.filter((item) => item.id !== challenge.id));
+    handleStartChallenge(challenge.type, { invitedFriends: challenge.invitedFriends });
+  };
+
+  const toggleInviteFriend = (name: string) => {
+    setInvitedFriends((prev) =>
+      prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]
+    );
   };
 
   const handleStopChallenge = useCallback(
@@ -777,6 +967,7 @@ export default function DataInsightsScreen({
         endLocation,
         autoStopped,
         shared: false,
+        invitedFriends: current.invitedFriends,
       };
       lastStepsRef.current = null;
       lastStepChangeAtRef.current = null;
@@ -812,6 +1003,7 @@ export default function DataInsightsScreen({
           stepsDelta: record.stepsDelta,
           startLocation: record.startLocation,
           endLocation: record.endLocation,
+          invitedFriends: record.invitedFriends,
         },
       };
       setFeedItems((prev) => [feedItem, ...prev]);
@@ -907,6 +1099,11 @@ export default function DataInsightsScreen({
     const shareLink = target.buildUrl(url, text);
     window.open(shareLink, "_blank", "noopener,noreferrer");
   };
+
+  const scheduleBounds = getScheduleBounds();
+  const scheduleMin = formatDateTimeLocal(scheduleBounds.min);
+  const scheduleMax = formatDateTimeLocal(scheduleBounds.max);
+  const scheduleNow = useMemo(() => Date.now(), [scheduleTick]);
 
   return (
     <div className="min-h-screen bg-black pb-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
@@ -1135,7 +1332,7 @@ export default function DataInsightsScreen({
             variant="outline"
             onClick={() => setShowChallengePicker(true)}
             data-testid="button-join-challenge"
-            disabled={!user || !!activeChallenge}
+            disabled={!user}
           >
             Join Challenge
           </Button>
@@ -1159,6 +1356,11 @@ export default function DataInsightsScreen({
                 {activeChallenge.startLocation.lng.toFixed(4)}
               </div>
             )}
+            {activeChallenge.invitedFriends.length > 0 && (
+              <div className="text-xs text-white/50">
+                Invited: {activeChallenge.invitedFriends.join(", ")}
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <div className="text-xs text-white/50">
                 Steps recorded:{" "}
@@ -1177,9 +1379,55 @@ export default function DataInsightsScreen({
             </p>
           </div>
         )}
+        {scheduledChallenges.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-xs uppercase tracking-widest text-white/40">Scheduled Challenges</p>
+            {scheduledChallenges.map((challenge) => {
+              const startTime = new Date(challenge.scheduledFor).getTime();
+              const isReady = scheduleNow >= startTime;
+              return (
+                <div
+                  key={challenge.id}
+                  className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-2"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold">{challenge.type} Challenge</p>
+                      <p className="text-xs text-white/50">
+                        Starts {new Date(challenge.scheduledFor).toLocaleString()}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={isReady ? "default" : "outline"}
+                      onClick={() => handleStartScheduledChallenge(challenge)}
+                      disabled={!isReady || !!activeChallenge}
+                      data-testid={`button-start-scheduled-${challenge.id}`}
+                    >
+                      {isReady ? "Start Challenge" : "Scheduled"}
+                    </Button>
+                  </div>
+                  {challenge.invitedFriends.length > 0 && (
+                    <p className="text-xs text-white/50">
+                      Invited: {challenge.invitedFriends.join(", ")}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
-      <Dialog open={showChallengePicker} onOpenChange={setShowChallengePicker}>
+      <Dialog
+        open={showChallengePicker}
+        onOpenChange={(open) => {
+          setShowChallengePicker(open);
+          if (!open) {
+            resetChallengeDialog();
+          }
+        }}
+      >
         <DialogContent className="bg-black border-white/10 text-white">
           <DialogHeader>
             <DialogTitle>Join a challenge</DialogTitle>
@@ -1187,17 +1435,110 @@ export default function DataInsightsScreen({
               Pick a challenge type to start your timer.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3">
-            {(["Hiking", "Running", "Biking"] as ChallengeType[]).map((type) => (
-              <Button
-                key={type}
-                variant="outline"
-                onClick={() => handleStartChallenge(type)}
-                data-testid={`button-start-${type.toLowerCase()}-challenge`}
-              >
-                {type} Challenge
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-widest text-white/40">Challenge Type</p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {(["Hiking", "Running", "Biking"] as ChallengeType[]).map((type) => {
+                  const isSelected = selectedChallengeType === type;
+                  return (
+                    <Button
+                      key={type}
+                      variant={isSelected ? "default" : "outline"}
+                      onClick={() => setSelectedChallengeType(type)}
+                      data-testid={`button-select-${type.toLowerCase()}-challenge`}
+                    >
+                      {type}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-widest text-white/40">Invite Friends</p>
+              <div className="grid gap-2">
+                {friends.map((friend) => (
+                  <label
+                    key={friend.id}
+                    className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white/70"
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-primary"
+                      checked={invitedFriends.includes(friend.name)}
+                      onChange={() => toggleInviteFriend(friend.name)}
+                      data-testid={`checkbox-invite-${friend.id}`}
+                    />
+                    <span>{friend.name}</span>
+                  </label>
+                ))}
+                {friends.length === 0 && (
+                  <p className="text-xs text-white/50">No friends to invite yet.</p>
+                )}
+              </div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/40 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Schedule for later</p>
+                  <p className="text-xs text-white/50">
+                    Start 24 hours to 7 days in advance.
+                  </p>
+                </div>
+                <Switch checked={scheduleChallenge} onCheckedChange={setScheduleChallenge} />
+              </div>
+              {scheduleChallenge && (
+                <div className="space-y-2">
+                  <label className="text-xs text-white/60">Start time</label>
+                  <Input
+                    type="datetime-local"
+                    value={scheduledStart}
+                    min={scheduleMin}
+                    max={scheduleMax}
+                    onChange={(event) => setScheduledStart(event.target.value)}
+                    className="bg-black/40 border-white/10 text-sm"
+                    data-testid="input-schedule-challenge"
+                  />
+                  <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+                    <div>
+                      <p className="text-xs font-medium text-white/80">Share scheduled challenge</p>
+                      <p className="text-[11px] text-white/50">
+                        Posts the invite to your public profile.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={shareScheduledChallenge}
+                      onCheckedChange={setShareScheduledChallenge}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowChallengePicker(false)}>
+                Cancel
               </Button>
-            ))}
+              {scheduleChallenge ? (
+                <Button
+                  onClick={handleScheduleChallenge}
+                  disabled={!selectedChallengeType}
+                  data-testid="button-schedule-challenge"
+                >
+                  Schedule Challenge
+                </Button>
+              ) : (
+                <Button
+                  onClick={() =>
+                    selectedChallengeType &&
+                    handleStartChallenge(selectedChallengeType, { invitedFriends })
+                  }
+                  disabled={!selectedChallengeType}
+                  data-testid="button-start-challenge"
+                >
+                  Start Challenge
+                </Button>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -1229,6 +1570,12 @@ export default function DataInsightsScreen({
                 <div className="text-xs text-white/60">
                   Steps: {pendingChallenge.stepsDelta.toLocaleString()}
                 </div>
+                {pendingChallenge.invitedFriends &&
+                  pendingChallenge.invitedFriends.length > 0 && (
+                    <div className="text-xs text-white/60">
+                      Invited: {pendingChallenge.invitedFriends.join(", ")}
+                    </div>
+                  )}
                 {pendingChallenge.autoStopped && (
                   <div className="text-xs text-yellow-300/80">
                     Auto-stopped after steps stopped updating.
@@ -1372,8 +1719,31 @@ export default function DataInsightsScreen({
                   </span>
                 </div>
                 <p className="mt-3 text-sm text-white/80">{item.content}</p>
+                {item.challengeSchedule && (
+                  <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-white/70">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">{item.challengeSchedule.type} Challenge</span>
+                      <span>
+                        {new Date(item.challengeSchedule.scheduledFor).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-white/50">
+                      Scheduled start (24 hours to 7 days in advance).
+                    </p>
+                    {item.challengeSchedule.invitedFriends.length > 0 && (
+                      <p className="mt-2 text-[11px] text-white/60">
+                        Invited: {item.challengeSchedule.invitedFriends.join(", ")}
+                      </p>
+                    )}
+                  </div>
+                )}
                 {item.challenge && (
                   <div className="mt-3 space-y-2">
+                    {item.challenge.invitedFriends && item.challenge.invitedFriends.length > 0 && (
+                      <div className="text-[11px] text-white/60">
+                        Invited: {item.challenge.invitedFriends.join(", ")}
+                      </div>
+                    )}
                     {item.challenge.startLocation && item.challenge.endLocation ? (
                       <>
                         <div className="overflow-hidden rounded-lg border border-white/10 bg-black/40">
