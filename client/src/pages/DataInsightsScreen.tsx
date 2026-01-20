@@ -36,6 +36,7 @@ const FEED_NOTIFIED_KEY = "xuunu-feed-notified";
 const NOTIFICATIONS_KEY = "xuunu-notifications-enabled";
 const CHALLENGE_STORAGE_KEY = "xuunu-challenges";
 const CHALLENGE_SCHEDULE_KEY = "xuunu-challenge-schedules";
+const LONGEVITY_STORAGE_KEY = "xuunu-longevity-challenge";
 
 type ChallengeType = "Hiking" | "Running" | "Biking";
 
@@ -43,6 +44,52 @@ type ChallengeLocation = {
   lat: number;
   lng: number;
 } | null;
+
+type LongevityChallengeType = "Veggies" | "Strength" | "Cardio";
+
+type LongevityLog = {
+  date: string;
+  photos: string[];
+  note?: string;
+};
+
+type LongevityChallenge = {
+  id: string;
+  userId: string;
+  type: LongevityChallengeType;
+  startedAt: string;
+  logs: LongevityLog[];
+};
+
+const LONGEVITY_OPTIONS: Array<{
+  type: LongevityChallengeType;
+  title: string;
+  cadence: string;
+  requiredDays: number;
+  description: string;
+}> = [
+  {
+    type: "Veggies",
+    title: "Eat 5 servings of veggies",
+    cadence: "7 days/week",
+    requiredDays: 7,
+    description: "Post photos of your meals each day.",
+  },
+  {
+    type: "Strength",
+    title: "Strength training",
+    cadence: "5 days/week",
+    requiredDays: 5,
+    description: "Post workout photos on training days.",
+  },
+  {
+    type: "Cardio",
+    title: "Cardio 30 minutes",
+    cadence: "7 days/week",
+    requiredDays: 7,
+    description: "Post activity photos each day.",
+  },
+];
 
 type ChallengeRecord = {
   id: string;
@@ -160,6 +207,11 @@ export default function DataInsightsScreen({
   const [updateText, setUpdateText] = useState("");
   const [updatePhotos, setUpdatePhotos] = useState<string[]>([]);
   const [shareUpdate, setShareUpdate] = useState(true);
+  const [longevityChallenge, setLongevityChallenge] = useState<LongevityChallenge | null>(null);
+  const [selectedLongevityType, setSelectedLongevityType] =
+    useState<LongevityChallengeType | null>(null);
+  const [longevityPhotos, setLongevityPhotos] = useState<string[]>([]);
+  const [longevityNote, setLongevityNote] = useState("");
   const [showChallengePicker, setShowChallengePicker] = useState(false);
   const [selectedChallengeType, setSelectedChallengeType] = useState<ChallengeType | null>(null);
   const [invitedFriends, setInvitedFriends] = useState<string[]>([]);
@@ -298,6 +350,36 @@ export default function DataInsightsScreen({
       // Ignore invalid drafts.
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !user?.uid) return;
+    try {
+      const stored = window.localStorage.getItem(LONGEVITY_STORAGE_KEY);
+      const parsed = stored ? (JSON.parse(stored) as Record<string, LongevityChallenge>) : {};
+      setLongevityChallenge(parsed[user.uid] ?? null);
+      setSelectedLongevityType(null);
+      setLongevityPhotos([]);
+      setLongevityNote("");
+    } catch {
+      setLongevityChallenge(null);
+    }
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !user?.uid) return;
+    try {
+      const stored = window.localStorage.getItem(LONGEVITY_STORAGE_KEY);
+      const parsed = stored ? (JSON.parse(stored) as Record<string, LongevityChallenge>) : {};
+      if (longevityChallenge) {
+        parsed[user.uid] = longevityChallenge;
+      } else {
+        delete parsed[user.uid];
+      }
+      window.localStorage.setItem(LONGEVITY_STORAGE_KEY, JSON.stringify(parsed));
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [longevityChallenge, user?.uid]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -513,6 +595,63 @@ export default function DataInsightsScreen({
         });
       });
     event.target.value = "";
+  };
+
+  const handleAddLongevityPhotos = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    const remainingSlots = 4 - longevityPhotos.length;
+    if (remainingSlots <= 0) {
+      toast({
+        title: "Photo limit reached",
+        description: "You can add up to 4 photos per day.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const images = files.filter((file) => file.type.startsWith("image/"));
+    const selected = images.slice(0, remainingSlots);
+    if (selected.length === 0) {
+      toast({
+        title: "Unsupported files",
+        description: "Please choose image files only.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    Promise.all(
+      selected.map(
+        (file) =>
+          new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error("Failed to read image"));
+            reader.readAsDataURL(file);
+          })
+      )
+    )
+      .then((results) => {
+        setLongevityPhotos((prev) => [...prev, ...results]);
+      })
+      .catch(() => {
+        toast({
+          title: "Photo upload failed",
+          description: "Please try adding your photos again.",
+          variant: "destructive",
+        });
+      });
+    event.target.value = "";
+  };
+
+  const handleRemoveLongevityPhoto = (index: number) => {
+    setLongevityPhotos((prev) => {
+      const next = [...prev];
+      next.splice(index, 1);
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -735,6 +874,14 @@ export default function DataInsightsScreen({
     )}:${pad(date.getMinutes())}`;
   };
 
+  const getLocalDateKey = (date: Date) => {
+    const pad = (value: number) => value.toString().padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  };
+
+  const getLongevityConfig = (type: LongevityChallengeType) =>
+    LONGEVITY_OPTIONS.find((option) => option.type === type);
+
   const getScheduleBounds = () => {
     const now = Date.now();
     return {
@@ -937,6 +1084,84 @@ export default function DataInsightsScreen({
     );
   };
 
+  const handleStartLongevityChallenge = () => {
+    if (!user || !selectedLongevityType) {
+      toast({
+        title: "Select a challenge",
+        description: "Pick a longevity challenge to get started.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const record: LongevityChallenge = {
+      id: `longevity-${Date.now()}`,
+      userId: user.uid,
+      type: selectedLongevityType,
+      startedAt: new Date().toISOString(),
+      logs: [],
+    };
+    setLongevityChallenge(record);
+    setSelectedLongevityType(null);
+    setLongevityPhotos([]);
+    setLongevityNote("");
+    toast({
+      title: "Longevity challenge started",
+      description: "Log your daily activity with photos.",
+    });
+  };
+
+  const handleLogLongevityDay = () => {
+    if (!longevityChallenge) return;
+    if (longevityPhotos.length === 0) {
+      toast({
+        title: "Add photos",
+        description: "Upload at least one photo for today.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const todayKey = getLocalDateKey(new Date());
+    if (longevityChallenge.logs.some((log) => log.date === todayKey)) {
+      toast({
+        title: "Already logged today",
+        description: "Come back tomorrow to add another entry.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const startedAt = new Date(longevityChallenge.startedAt).getTime();
+    const daysSinceStart = Math.floor((Date.now() - startedAt) / (24 * 60 * 60 * 1000)) + 1;
+    if (daysSinceStart > 7) {
+      toast({
+        title: "Week complete",
+        description: "Start a new longevity challenge for this week.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const log: LongevityLog = {
+      date: todayKey,
+      photos: longevityPhotos,
+      note: longevityNote.trim() ? longevityNote.trim() : undefined,
+    };
+    setLongevityChallenge((prev) =>
+      prev ? { ...prev, logs: [log, ...prev.logs] } : prev
+    );
+    setLongevityPhotos([]);
+    setLongevityNote("");
+    toast({
+      title: "Day logged",
+      description: "Your longevity activity has been saved.",
+    });
+  };
+
+  const handleResetLongevityChallenge = () => {
+    setLongevityChallenge(null);
+    setSelectedLongevityType(null);
+    setLongevityPhotos([]);
+    setLongevityNote("");
+  };
+
   const handleStopChallenge = useCallback(
     async (autoStopped = false) => {
       if (!activeChallenge || !user) return;
@@ -1104,6 +1329,30 @@ export default function DataInsightsScreen({
   const scheduleMin = formatDateTimeLocal(scheduleBounds.min);
   const scheduleMax = formatDateTimeLocal(scheduleBounds.max);
   const scheduleNow = useMemo(() => Date.now(), [scheduleTick]);
+  const longevityConfig = longevityChallenge ? getLongevityConfig(longevityChallenge.type) : null;
+  const longevityRequiredDays = longevityConfig?.requiredDays ?? 7;
+  const longevityLoggedDays = longevityChallenge?.logs.length ?? 0;
+  const longevityStartedAtLabel = longevityChallenge
+    ? new Date(longevityChallenge.startedAt).toLocaleDateString()
+    : "";
+  const longevityTodayKey = getLocalDateKey(new Date());
+  const longevityHasLoggedToday = longevityChallenge
+    ? longevityChallenge.logs.some((log) => log.date === longevityTodayKey)
+    : false;
+  const longevityDaysSinceStart = longevityChallenge
+    ? Math.floor(
+        (Date.now() - new Date(longevityChallenge.startedAt).getTime()) / (24 * 60 * 60 * 1000)
+      ) + 1
+    : 0;
+  const longevityDaysRemaining = longevityChallenge
+    ? Math.max(0, 7 - longevityDaysSinceStart)
+    : 0;
+  const longevityIsComplete = longevityChallenge
+    ? longevityLoggedDays >= longevityRequiredDays
+    : false;
+  const longevityLogs = longevityChallenge
+    ? [...longevityChallenge.logs].sort((a, b) => b.date.localeCompare(a.date))
+    : [];
 
   return (
     <div className="min-h-screen bg-black pb-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
@@ -1613,6 +1862,200 @@ export default function DataInsightsScreen({
           )}
         </DialogContent>
       </Dialog>
+
+      <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-widest text-white/70">
+              Longevity Challenge
+            </h3>
+            <p className="text-xs text-white/50">
+              Pick a weekly habit and post daily photo proof.
+            </p>
+          </div>
+          {longevityChallenge && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleResetLongevityChallenge}
+              data-testid="button-reset-longevity"
+            >
+              Start New
+            </Button>
+          )}
+        </div>
+        {longevityChallenge ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">
+                    {longevityConfig?.title ?? "Longevity Challenge"}{" "}
+                    <span className="text-xs text-white/50">({longevityConfig?.cadence})</span>
+                  </p>
+                  <p className="text-xs text-white/50">Started {longevityStartedAtLabel}</p>
+                </div>
+                <div className="text-xs text-white/60 text-right">
+                  <div>
+                    {longevityLoggedDays}/{longevityRequiredDays} days logged
+                  </div>
+                  <div>{longevityDaysRemaining} days remaining</div>
+                </div>
+              </div>
+              <p className="text-xs text-white/60">{longevityConfig?.description}</p>
+              {longevityIsComplete && (
+                <div className="text-xs text-green-300">
+                  Week complete! Start a new challenge to continue.
+                </div>
+              )}
+            </div>
+
+            {!longevityIsComplete && longevityDaysSinceStart <= 7 && (
+              <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Log today's activity</p>
+                    <p className="text-xs text-white/50">
+                      {longevityHasLoggedToday
+                        ? "Already logged for today."
+                        : "Add photos of today's activity."}
+                    </p>
+                  </div>
+                  <span className="text-[11px] uppercase tracking-widest text-white/40">
+                    {longevityHasLoggedToday ? "Logged" : "Pending"}
+                  </span>
+                </div>
+                {!longevityHasLoggedToday && (
+                  <>
+                    <textarea
+                      value={longevityNote}
+                      onChange={(event) => setLongevityNote(event.target.value)}
+                      className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/80 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      rows={2}
+                      placeholder="Activity note (optional)"
+                      data-testid="input-longevity-note"
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/70 transition hover:border-white/40 hover:text-white">
+                        <Camera className="h-3.5 w-3.5" />
+                        Add photos
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={handleAddLongevityPhotos}
+                          data-testid="input-longevity-photos"
+                        />
+                      </label>
+                      <span className="text-xs text-white/40">
+                        {longevityPhotos.length}/4 photos
+                      </span>
+                    </div>
+                    {longevityPhotos.length > 0 && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {longevityPhotos.map((photo, index) => (
+                          <div
+                            key={`${photo}-${index}`}
+                            className="relative overflow-hidden rounded-lg border border-white/10 bg-black/40"
+                          >
+                            <img src={photo} alt="Longevity upload" className="h-24 w-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveLongevityPhoto(index)}
+                              className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] text-white/80"
+                              data-testid={`button-remove-longevity-photo-${index}`}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={handleLogLongevityDay}
+                        disabled={longevityPhotos.length === 0}
+                        data-testid="button-log-longevity-day"
+                      >
+                        Post Today's Activity
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {longevityDaysSinceStart > 7 && !longevityIsComplete && (
+              <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-4 text-xs text-yellow-100">
+                This weekly challenge window is complete. Start a new longevity challenge to
+                continue.
+              </div>
+            )}
+
+            {longevityLogs.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs uppercase tracking-widest text-white/40">Daily Posts</p>
+                {longevityLogs.map((log) => (
+                  <div
+                    key={log.date}
+                    className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-2"
+                  >
+                    <div className="flex items-center justify-between text-xs text-white/60">
+                      <span>{log.date}</span>
+                      <span>{log.photos.length} photos</span>
+                    </div>
+                    {log.note && <p className="text-sm text-white/80">{log.note}</p>}
+                    <div className="grid grid-cols-2 gap-2">
+                      {log.photos.map((photo, index) => (
+                        <img
+                          key={`${log.date}-${index}`}
+                          src={photo}
+                          alt="Longevity day"
+                          className="h-24 w-full rounded-lg object-cover"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid gap-3">
+              {LONGEVITY_OPTIONS.map((option) => (
+                <button
+                  key={option.type}
+                  type="button"
+                  onClick={() => setSelectedLongevityType(option.type)}
+                  className={`rounded-xl border px-4 py-3 text-left transition ${
+                    selectedLongevityType === option.type
+                      ? "border-primary/60 bg-primary/10"
+                      : "border-white/10 bg-black/40 hover:border-white/30"
+                  }`}
+                  data-testid={`button-select-longevity-${option.type.toLowerCase()}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold">{option.title}</p>
+                    <span className="text-xs text-white/50">{option.cadence}</span>
+                  </div>
+                  <p className="text-xs text-white/60 mt-1">{option.description}</p>
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end">
+              <Button
+                onClick={handleStartLongevityChallenge}
+                disabled={!selectedLongevityType}
+                data-testid="button-start-longevity"
+              >
+                Start Longevity Challenge
+              </Button>
+            </div>
+          </div>
+        )}
+      </section>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
           <div className="flex items-center justify-between">
