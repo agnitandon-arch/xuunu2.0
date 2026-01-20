@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 
 interface OnboardingScreenProps {
   userId: string;
@@ -21,24 +20,15 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
     if (!userId || isConnecting) return;
     setIsConnecting(true);
     try {
-      const response = await apiRequest("POST", "/api/terra/auth", {
-        userId,
-        mode: "wearables",
-        provider: "APPLE_HEALTH",
-      });
-      const data = await response.json();
-      if (data?.url) {
-        window.open(data.url, "_blank");
-      }
       setIsConnected(true);
       toast({
-        title: "Apple Health connection",
-        description: "Finish connecting in the new window.",
+        title: "Apple Health ready",
+        description: "Apple Health is available on this device.",
       });
     } catch (error: any) {
       toast({
         title: "Connection failed",
-        description: error?.message || "Unable to connect Apple Health right now.",
+        description: error?.message || "Unable to confirm Apple Health right now.",
         variant: "destructive",
       });
     } finally {
@@ -51,6 +41,14 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
       toast({
         title: "HIPAA terms required",
         description: "Please accept HIPAA terms to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!isConnected) {
+      toast({
+        title: "Apple Health required",
+        description: "Confirm Apple Health access to continue.",
         variant: "destructive",
       });
       return;
@@ -108,7 +106,7 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
             </h2>
           </div>
           <p className="text-xs text-white/60">
-            Connect your phone&apos;s Apple Health account to sync wearable data.
+            Apple Health data syncs automatically from your device.
           </p>
           <Button
             type="button"
@@ -117,7 +115,7 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
             disabled={isConnecting}
             data-testid="button-connect-apple-health"
           >
-            {isConnected ? "Apple Health Connected" : isConnecting ? "Connecting..." : "Connect Apple Health"}
+            {isConnected ? "Apple Health Connected" : isConnecting ? "Connecting..." : "Confirm Apple Health"}
           </Button>
         </div>
 

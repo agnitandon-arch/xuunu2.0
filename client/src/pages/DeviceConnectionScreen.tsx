@@ -89,35 +89,6 @@ export default function DeviceConnectionScreen() {
     },
   });
 
-  // Connect devices via Terra mutation
-  const connectTerraDevicesMutation = useMutation({
-    mutationFn: async () => {
-      if (!user?.uid) throw new Error("User not authenticated");
-      
-      const response = await apiRequest("POST", "/api/terra/auth", {
-        userId: user.uid,
-        mode: "wearables",
-        provider: "APPLE_HEALTH",
-      });
-      return await response.json();
-    },
-    onSuccess: (data: { url: string }) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/connected-devices'] });
-      window.open(data.url, "_blank");
-      toast({
-        title: "Connect Apple Health",
-        description: "Complete the Apple Health connection in the new window.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to generate connection URL",
-        variant: "destructive",
-      });
-    },
-  });
-
   const connectTerraLabsMutation = useMutation({
     mutationFn: async () => {
       if (!user?.uid) throw new Error("User not authenticated");
@@ -165,7 +136,7 @@ export default function DeviceConnectionScreen() {
         <div className="space-y-2">
           <h1 className="text-2xl font-bold tracking-tight">Device Connections</h1>
           <p className="text-sm opacity-60">
-            On iOS, the app pulls Apple Health data automatically after install. Connect labs through Terra.
+            Apple Health syncs automatically on-device. Terra is used for labs.
           </p>
         </div>
 
@@ -268,69 +239,62 @@ export default function DeviceConnectionScreen() {
           <CardHeader>
             <CardTitle className="text-lg">Connect Devices</CardTitle>
             <CardDescription>
-              Link your health devices to start tracking data
+              Apple Health is always connected on your phone.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex items-center justify-between gap-4 p-4 bg-white/5 border border-white/10 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
+                  <Watch className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-medium">Apple Health</h3>
+                  <p className="text-xs opacity-60">
+                    Apple Health syncs automatically on your device.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-green-400">
+                <CheckCircle className="w-4 h-4" />
+                Connected
+              </div>
+            </div>
+
             {!hasCredentials ? (
               <div className="flex items-start gap-2 p-4 bg-primary/10 border border-primary/20 rounded-lg">
                 <AlertCircle className="w-5 h-5 text-primary mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-medium">Credentials Required</p>
+                  <p className="font-medium">Terra credentials required</p>
                   <p className="opacity-80 mt-1">
-                    Please add your Terra API credentials above before connecting devices.
+                    Add Terra API credentials above to connect labs.
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-4 p-4 bg-white/5 border border-white/10 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
-                      <Watch className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">Apple Health</h3>
-                      <p className="text-xs opacity-60">
-                        Sync metrics from Apple Health on iOS.
-                      </p>
-                    </div>
+              <div className="flex items-center justify-between gap-4 p-4 bg-white/5 border border-white/10 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
+                    <Droplets className="w-5 h-5 text-primary" />
                   </div>
-                  <Button
-                    onClick={() => connectTerraDevicesMutation.mutate()}
-                    disabled={connectTerraDevicesMutation.isPending}
-                    data-testid="button-connect-terra-devices"
-                  >
-                    {connectTerraDevicesMutation.isPending && (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    )}
-                    Connect
-                  </Button>
-                </div>
-                <div className="flex items-center justify-between gap-4 p-4 bg-white/5 border border-white/10 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
-                      <Droplets className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">Bloodwork & Labs</h3>
-                      <p className="text-xs opacity-60">
-                        Quest, Labcorp, Everlywell, LetsGetChecked.
-                      </p>
-                    </div>
+                  <div>
+                    <h3 className="font-medium">Bloodwork & Labs</h3>
+                    <p className="text-xs opacity-60">
+                      Quest, Labcorp, Everlywell, LetsGetChecked.
+                    </p>
                   </div>
-                  <Button
-                    onClick={() => connectTerraLabsMutation.mutate()}
-                    disabled={connectTerraLabsMutation.isPending}
-                    variant="outline"
-                    data-testid="button-connect-terra-labs"
-                  >
-                    {connectTerraLabsMutation.isPending && (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    )}
-                    Connect
-                  </Button>
                 </div>
+                <Button
+                  onClick={() => connectTerraLabsMutation.mutate()}
+                  disabled={connectTerraLabsMutation.isPending}
+                  variant="outline"
+                  data-testid="button-connect-terra-labs"
+                >
+                  {connectTerraLabsMutation.isPending && (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  )}
+                  Connect
+                </Button>
               </div>
             )}
           </CardContent>
