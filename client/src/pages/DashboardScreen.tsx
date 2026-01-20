@@ -108,6 +108,53 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     }
   };
 
+  const handleNotificationsClick = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      toast({
+        title: "Notifications",
+        description: "Enable notifications in your phone settings.",
+      });
+      return;
+    }
+
+    if (Notification.permission === "granted") {
+      toast({
+        title: "Notifications enabled",
+        description: "Notifications are already enabled.",
+      });
+      return;
+    }
+
+    if (Notification.permission === "denied") {
+      toast({
+        title: "Notifications blocked",
+        description: "Enable notifications in your phone settings.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        toast({
+          title: "Notifications enabled",
+          description: "You're all set to receive alerts.",
+        });
+      } else {
+        toast({
+          title: "Notifications disabled",
+          description: "Enable notifications in your phone settings.",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Notifications",
+        description: "Enable notifications in your phone settings.",
+      });
+    }
+  };
+
   const connectBloodworkMutation = useMutation({
     mutationFn: async () => {
       if (!user?.uid) {
@@ -593,6 +640,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
             </div>
             <button
               className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+              onClick={handleNotificationsClick}
               data-testid="button-notifications"
             >
               <span className="text-sm">Notifications</span>
