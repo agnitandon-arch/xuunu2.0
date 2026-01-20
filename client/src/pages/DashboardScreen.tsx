@@ -160,10 +160,10 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
       title: "Premium membership",
       description:
         plan === "monthly"
-          ? "Stripe monthly • $10/month."
+          ? "Stripe monthly • $9.99/month."
           : plan === "yearly"
-            ? "Stripe yearly • $100/year."
-            : "Powered by Stripe • $10/month or $100/year.",
+            ? "Stripe yearly • $99/year."
+            : "Powered by Stripe • $9.99/month or $99/year.",
     });
   };
 
@@ -716,9 +716,6 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <div className="text-xs text-white/50 mt-2 mb-4">
-            Powered by Stripe • $10/month or $100/year
-          </div>
           <div className="rounded-lg border border-white/10 bg-white/5 p-4 mb-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -732,7 +729,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                   onClick={() => handleOpenPaymentPortal("monthly")}
                   data-testid="button-stripe-monthly"
                 >
-                  $10/mo
+                  $9.99/mo
                 </Button>
                 <Button
                   variant="outline"
@@ -740,7 +737,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                   onClick={() => handleOpenPaymentPortal("yearly")}
                   data-testid="button-stripe-yearly"
                 >
-                  $100/yr
+                  $99/yr
                 </Button>
               </div>
             </div>
