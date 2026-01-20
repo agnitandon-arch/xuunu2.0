@@ -5,6 +5,8 @@ import BioSignatureDialog from "@/components/BioSignatureDialog";
 import MedicationQuickLog from "@/components/MedicationQuickLog";
 import DeviceIntegrationItem from "@/components/DeviceIntegrationItem";
 import IndoorAirQualityCredentials from "@/components/IndoorAirQualityCredentials";
+import EnvironmentalMap from "@/components/EnvironmentalMap";
+import HourlyImpactTracker from "@/components/HourlyImpactTracker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -20,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MapPin, Loader2, Plus, Activity, Database, ChevronRight, Pill, Watch, Droplets } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -38,6 +41,7 @@ export default function DashboardScreen({ onNavigate }: DashboardScreenProps) {
   const [showBioSignature, setShowBioSignature] = useState(false);
   const [showSynergyDialog, setShowSynergyDialog] = useState(false);
   const [showBioSignatureDialog, setShowBioSignatureDialog] = useState(false);
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   
   // Dialog states for each metric
   const [glucoseDialog, setGlucoseDialog] = useState(false);
@@ -181,6 +185,10 @@ export default function DashboardScreen({ onNavigate }: DashboardScreenProps) {
     });
     setSteps("");
     setStepsDialog(false);
+  };
+
+  const handleLocationUpdate = (lat: number, lng: number) => {
+    setLocation({ lat, lng });
   };
 
   // Only use real data from database/integrations - no fake values
@@ -538,6 +546,41 @@ export default function DashboardScreen({ onNavigate }: DashboardScreenProps) {
               <div className="flex items-center gap-2 mt-4 text-xs opacity-40">
                 <MapPin className="w-3 h-3" />
                 <span>{latestEnv?.locationMode === "manual" ? "Indoor" : "Outdoor"}</span>
+              </div>
+              <div className="mt-6">
+                <Tabs defaultValue="location" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 bg-white/5">
+                    <TabsTrigger value="location" data-testid="tab-location">
+                      Location
+                    </TabsTrigger>
+                    <TabsTrigger value="impact" data-testid="tab-impact">
+                      Impact
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="location" className="mt-6">
+                    <EnvironmentalMap onLocationUpdate={handleLocationUpdate} />
+                  </TabsContent>
+
+                  <TabsContent value="impact" className="mt-6">
+                    <HourlyImpactTracker />
+                  </TabsContent>
+                </Tabs>
+
+                <div className="pt-4 space-y-3 text-xs opacity-60">
+                  <p>
+                    <strong>7 Environmental Categories:</strong> Air, Noise, Water, Soil,
+                    Light, Thermal, and Radioactive exposure tracking.
+                  </p>
+                  <p>
+                    <strong>Data Sources:</strong> Multiple APIs including OpenWeatherMap,
+                    IQAir, EPA databases, and local monitoring stations.
+                  </p>
+                  <p>
+                    <strong>Privacy:</strong> Location data is only used to fetch environmental
+                    conditions and is not stored on external servers.
+                  </p>
+                </div>
               </div>
             </div>
           </>

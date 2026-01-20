@@ -9,7 +9,6 @@ import LoginScreen from "@/pages/LoginScreen";
 import DashboardScreen from "@/pages/DashboardScreen";
 import DataInsightsScreen from "@/pages/DataInsightsScreen";
 import AccountScreen from "@/pages/AccountScreen";
-import EnvironmentalScreen from "@/pages/EnvironmentalScreen";
 import DeviceConnectionScreen from "@/pages/DeviceConnectionScreen";
 import MedicationTrackerScreen from "@/pages/MedicationTrackerScreen";
 import ShowcaseAll from "@/pages/ShowcaseAll";
@@ -70,8 +69,6 @@ function AppContent() {
             }}
           />
         );
-      case "environmental":
-        return <EnvironmentalScreen />;
       case "account":
         return (
           <AccountScreen

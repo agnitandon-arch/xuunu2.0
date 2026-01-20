@@ -1,4 +1,4 @@
-import { Home, BarChart2, MapPin, User } from "lucide-react";
+import { Home, BarChart2, User } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +11,6 @@ export default function MinimalBottomNav({ activeTab, onTabChange }: MinimalBott
   const tabs = [
     { id: "dashboard", icon: Home, label: "Dashboard" },
     { id: "data", icon: BarChart2, label: "Share My Progress" },
-    { id: "environmental", icon: MapPin, label: "Map" },
     { id: "account", icon: User, label: "Account" },
   ];
 
