@@ -5,15 +5,7 @@ import { insertHealthEntrySchema, insertEnvironmentalReadingSchema, insertUserAp
 import { fromZodError } from "zod-validation-error";
 import { TerraClient } from "terra-api";
 import Anthropic from "@anthropic-ai/sdk";
-const TERRA_WEARABLE_PROVIDERS = [
-  "APPLE_HEALTH",
-  "GOOGLE_FIT",
-  "FITBIT",
-  "OURA",
-  "WHOOP",
-  "FREESTYLE_LIBRE",
-  "DEXCOM",
-];
+const TERRA_WEARABLE_PROVIDERS = ["APPLE_HEALTH"];
 const TERRA_LAB_PROVIDERS = ["QUEST", "LABCORP", "EVERLYWELL", "LETSGETCHECKED"];
 
 

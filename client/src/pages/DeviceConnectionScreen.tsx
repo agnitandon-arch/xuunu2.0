@@ -161,7 +161,7 @@ export default function DeviceConnectionScreen() {
         <div className="space-y-2">
           <h1 className="text-2xl font-bold tracking-tight">Device Connections</h1>
           <p className="text-sm opacity-60">
-            Connect wearables and labs through Terra
+            Connect Apple Health and labs through Terra
           </p>
         </div>
 
@@ -286,9 +286,9 @@ export default function DeviceConnectionScreen() {
                       <Watch className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-medium">Wearables & Devices</h3>
+                      <h3 className="font-medium">Apple Health</h3>
                       <p className="text-xs opacity-60">
-                        Apple Health, Google Fit, Fitbit, Oura, Whoop, Dexcom, and more.
+                        Sync metrics from Apple Health on iOS.
                       </p>
                     </div>
                   </div>
