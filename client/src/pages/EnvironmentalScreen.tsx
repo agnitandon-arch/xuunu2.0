@@ -1,6 +1,5 @@
 import { useState } from "react";
 import EnvironmentalMap from "@/components/EnvironmentalMap";
-import ComprehensiveEnvironmentalData from "@/components/ComprehensiveEnvironmentalData";
 import HourlyImpactTracker from "@/components/HourlyImpactTracker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProfileAvatar from "@/components/ProfileAvatar";
@@ -26,26 +25,13 @@ export default function EnvironmentalScreen() {
         </div>
 
         <Tabs defaultValue="location" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-white/5">
+          <TabsList className="grid w-full grid-cols-2 bg-white/5">
             <TabsTrigger value="location" data-testid="tab-location">Location</TabsTrigger>
-            <TabsTrigger value="data" data-testid="tab-data" disabled={!location}>
-              Health Data
-            </TabsTrigger>
             <TabsTrigger value="impact" data-testid="tab-impact">Impact</TabsTrigger>
           </TabsList>
 
           <TabsContent value="location" className="mt-6">
             <EnvironmentalMap onLocationUpdate={handleLocationUpdate} />
-          </TabsContent>
-
-          <TabsContent value="data" className="mt-6">
-            {location ? (
-              <ComprehensiveEnvironmentalData latitude={location.lat} longitude={location.lng} />
-            ) : (
-              <div className="p-8 text-center">
-                <p className="text-sm opacity-60">Please enable location tracking first</p>
-              </div>
-            )}
           </TabsContent>
 
           <TabsContent value="impact" className="mt-6">
