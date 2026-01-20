@@ -105,6 +105,7 @@ export default function DataInsightsScreen({
   const CROP_SIZE = 240;
   const OUTPUT_SIZE = 320;
   const MAX_PHOTO_SIZE = 4 * 1024 * 1024;
+  const displayName = user?.displayName || user?.email?.split("@")[0] || "Member";
 
   const dashboards: DashboardConfig[] = useMemo(
     () => [
@@ -599,7 +600,7 @@ export default function DataInsightsScreen({
                 </Tooltip>
               </TooltipProvider>
               <div>
-                <h1 className="text-2xl font-bold">Profile</h1>
+                <h1 className="text-2xl font-bold">{displayName}</h1>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -726,6 +727,12 @@ export default function DataInsightsScreen({
           <textarea
             value={updateText}
             onChange={(e) => setUpdateText(e.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                handleShareUpdate();
+              }
+            }}
             className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/80 focus:outline-none focus:ring-2 focus:ring-primary/40"
             rows={3}
             placeholder="Share a milestone or weekly progress..."
@@ -772,14 +779,6 @@ export default function DataInsightsScreen({
               ))}
             </div>
           )}
-          <Button
-            type="button"
-            onClick={handleShareUpdate}
-            className="w-full"
-            data-testid="button-share-update"
-          >
-            Share update
-          </Button>
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
