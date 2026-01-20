@@ -61,7 +61,15 @@ function AppContent() {
       case "dashboard":
         return <DashboardScreen onNavigate={setActiveTab} />;
       case "data":
-        return <DataInsightsScreen onPreviewPublicProfile={() => setActiveTab("public-profile")} />;
+        return (
+          <DataInsightsScreen
+            onPreviewPublicProfile={() => setActiveTab("public-profile")}
+            onViewFriend={(friend) => {
+              setSelectedFriend(friend);
+              setActiveTab("friend-profile");
+            }}
+          />
+        );
       case "environmental":
         return <EnvironmentalScreen />;
       case "account":
