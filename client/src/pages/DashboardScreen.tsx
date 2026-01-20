@@ -483,7 +483,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-3xl font-bold font-mono mb-1">{latestEnv?.aqi || "—"}</div>
-                  <div className="text-xs opacity-60">AQI • {latestEnv?.aqi ? (latestEnv.aqi < 50 ? "Good" : latestEnv.aqi < 100 ? "Moderate" : "Unhealthy") : "No data"}</div>
+                  <div className="text-xs opacity-60">Current AQI • {latestEnv?.aqi ? (latestEnv.aqi < 50 ? "Good" : latestEnv.aqi < 100 ? "Moderate" : "Unhealthy") : "No data"}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-mono">{latestEnv?.temperature ? `${latestEnv.temperature}°F` : "—"}</div>
