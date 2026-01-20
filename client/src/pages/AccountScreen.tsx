@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { LogOut, ImagePlus, Trash2, Users, MessageSquare, Camera } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { LogOut, ImagePlus, Trash2, Users, MessageSquare, Camera, UserPlus } from "lucide-react";
 import { useState, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,8 @@ export default function AccountScreen({ onLogout, onViewFriend }: AccountScreenP
   const [updateText, setUpdateText] = useState("");
   const [updatePhotos, setUpdatePhotos] = useState<string[]>([]);
   const [shareUpdate, setShareUpdate] = useState(true);
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [inviteValue, setInviteValue] = useState("");
 
   const friends = useMemo<FriendProfile[]>(
     () => [
@@ -200,6 +203,24 @@ export default function AccountScreen({ onLogout, onViewFriend }: AccountScreenP
       title: "Update shared",
       description: "Your latest progress is now visible in the feed.",
     });
+  };
+
+  const handleInviteFriend = () => {
+    if (!inviteValue.trim()) {
+      toast({
+        title: "Enter an email or username",
+        description: "Add a friend by invite to grow your circle.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Invite sent",
+      description: `We sent an invite to ${inviteValue}.`,
+    });
+    setInviteValue("");
+    setShowInviteForm(false);
   };
 
   const publicFeedItems = useMemo(
@@ -391,8 +412,35 @@ export default function AccountScreen({ onLogout, onViewFriend }: AccountScreenP
               </h3>
               <p className="text-xs text-white/50">People you follow.</p>
             </div>
-            <Users className="h-4 w-4 text-white/40" />
+            <button
+              type="button"
+              onClick={() => setShowInviteForm((prev) => !prev)}
+              className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2.5 py-1 text-[10px] text-white/60 hover:text-white"
+              data-testid="button-invite-friend"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              Invite
+            </button>
           </div>
+          {showInviteForm && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                value={inviteValue}
+                onChange={(e) => setInviteValue(e.target.value)}
+                placeholder="Email or username"
+                className="h-10 flex-1 bg-black/40 border-white/10 text-sm"
+                data-testid="input-invite-friend"
+              />
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleInviteFriend}
+                data-testid="button-send-invite"
+              >
+                Send invite
+              </Button>
+            </div>
+          )}
           <div className="space-y-3">
             {friends.map((friend) => (
               <div
