@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MapPin, RefreshCw, Edit } from "lucide-react";
+import { MapPin, RefreshCw, Edit, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -212,6 +212,17 @@ export default function EnvironmentalMap({ onLocationUpdate, onCityNameUpdate }:
               <div className="font-mono text-sm">{location.lng.toFixed(6)}</div>
             </div>
           </div>
+
+          <a
+            href={`https://www.google.com/maps?q=${location.lat},${location.lng}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full p-3 bg-primary/10 border border-primary/30 rounded-lg hover-elevate active-elevate-2 text-sm"
+            data-testid="link-open-maps"
+          >
+            <Navigation className="w-4 h-4" />
+            Open in Google Maps
+          </a>
 
         </div>
       )}
