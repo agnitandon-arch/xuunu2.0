@@ -2,10 +2,13 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { 
   User, 
   signInWithPopup, 
+  signInWithRedirect,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
-  onAuthStateChanged 
+  onAuthStateChanged,
+  getRedirectResult,
+  type AuthError
 } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { apiRequest } from "@/lib/queryClient";
@@ -26,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    googleProvider.setCustomParameters({ prompt: "select_account" });
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         // Sync user to database
@@ -44,8 +48,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    getRedirectResult(auth).catch((error: AuthError) => {
+      console.error("Google redirect sign-in failed:", error);
+    });
+  }, []);
+
   const signInWithGoogle = async () => {
-    await signInWithPopup(auth, googleProvider);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      const authError = error as AuthError | undefined;
+      if (
+        authError?.code === "auth/popup-blocked" ||
+        authError?.code === "auth/operation-not-supported-in-this-environment"
+      ) {
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      }
+      throw error;
+    }
   };
 
   const signInWithEmail = async (email: string, password: string) => {
