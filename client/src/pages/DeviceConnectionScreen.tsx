@@ -180,7 +180,7 @@ export default function DeviceConnectionScreen() {
         <div className="space-y-2">
           <h1 className="text-2xl font-bold tracking-tight">Device Connections</h1>
           <p className="text-sm opacity-60">
-            Apple Health syncs automatically on-device. Terra is used for labs.
+            iOS always pulls Apple Health data. Use Terra for all other devices and labs.
           </p>
         </div>
 
@@ -189,7 +189,7 @@ export default function DeviceConnectionScreen() {
           <CardHeader>
             <CardTitle className="text-lg">Terra API Credentials</CardTitle>
             <CardDescription>
-              Add your Terra API credentials to connect health devices.{" "}
+              Add your Terra API credentials to connect other devices and labs.{" "}
               <a 
                 href="https://tryterra.co" 
                 target="_blank" 
@@ -283,7 +283,7 @@ export default function DeviceConnectionScreen() {
           <CardHeader>
             <CardTitle className="text-lg">Connect Devices</CardTitle>
             <CardDescription>
-              Apple Health syncs directly from your phone.
+              Apple Health syncs directly from your phone on iOS.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -330,7 +330,7 @@ export default function DeviceConnectionScreen() {
                 <div className="text-sm">
                   <p className="font-medium">Terra credentials required</p>
                   <p className="opacity-80 mt-1">
-                    Add Terra API credentials above to connect labs.
+                    Add Terra API credentials above to connect other devices and labs.
                   </p>
                 </div>
               </div>

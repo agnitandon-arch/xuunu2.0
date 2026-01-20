@@ -130,7 +130,7 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
             </h2>
           </div>
           <p className="text-xs text-white/60">
-            Tap to open Apple Health and grant access on your phone.
+            Apple Health data is always available on iOS. Tap to confirm access.
           </p>
           <Button
             type="button"
