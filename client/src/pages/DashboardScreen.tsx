@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { MapPin, Loader2, Plus, Activity, Database, ChevronRight, Pill, Watch, Droplets } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,6 +45,8 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const [showSynergyDialog, setShowSynergyDialog] = useState(false);
   const [showBioSignatureDialog, setShowBioSignatureDialog] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [supportEmail, setSupportEmail] = useState("");
+  const [supportMessage, setSupportMessage] = useState("");
   
   // Dialog states for each metric
   const [glucoseDialog, setGlucoseDialog] = useState(false);
@@ -219,6 +222,43 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
 
   const handleLocationUpdate = (lat: number, lng: number) => {
     setLocation({ lat, lng });
+  };
+
+  useEffect(() => {
+    if (user?.email) {
+      setSupportEmail(user.email);
+    }
+  }, [user?.email]);
+
+  const handleSupportSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!supportEmail.trim() || !supportMessage.trim()) {
+      toast({
+        title: "Missing details",
+        description: "Please add your email and question before sending.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const subject = "Xuunu Support Request";
+    const body = [
+      `From: ${supportEmail}`,
+      `User ID: ${user?.uid || "n/a"}`,
+      "",
+      "Question:",
+      supportMessage.trim(),
+    ].join("\n");
+
+    window.location.href = `mailto:agni@xuunu.com?subject=${encodeURIComponent(
+      subject
+    )}&body=${encodeURIComponent(body)}`;
+
+    toast({
+      title: "Opening email client",
+      description: "Send the email to reach our support team.",
+    });
+    setSupportMessage("");
   };
 
   // Only use real data from database/integrations - no fake values
@@ -734,6 +774,49 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
             </button>
           </div>
         </div>
+
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-widest text-white/70">
+              Support
+            </h3>
+            <p className="text-xs text-white/50">
+              Send a support request to agni@xuunu.com.
+            </p>
+          </div>
+          <form className="space-y-3" onSubmit={handleSupportSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="support-email" className="text-xs text-white/60">
+                Your Email
+              </Label>
+              <Input
+                id="support-email"
+                value={supportEmail}
+                onChange={(event) => setSupportEmail(event.target.value)}
+                placeholder="you@example.com"
+                className="bg-black/40 border-white/10"
+                data-testid="input-support-email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="support-message" className="text-xs text-white/60">
+                Your Question
+              </Label>
+              <Textarea
+                id="support-message"
+                value={supportMessage}
+                onChange={(event) => setSupportMessage(event.target.value)}
+                placeholder="How can we help?"
+                className="bg-black/40 border-white/10 text-white"
+                rows={4}
+                data-testid="input-support-message"
+              />
+            </div>
+            <Button type="submit" className="w-full" data-testid="button-send-support">
+              Email Support
+            </Button>
+          </form>
+        </section>
 
         <div className="pt-4">
           <Button
