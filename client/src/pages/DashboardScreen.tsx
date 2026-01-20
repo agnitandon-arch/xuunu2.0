@@ -3,7 +3,6 @@ import BioSignature from "@/components/BioSignature";
 import SynergyInsightsDialog from "@/components/SynergyInsightsDialog";
 import BioSignatureDialog from "@/components/BioSignatureDialog";
 import MedicationQuickLog from "@/components/MedicationQuickLog";
-import DeviceIntegrationItem from "@/components/DeviceIntegrationItem";
 import IndoorAirQualityCredentials from "@/components/IndoorAirQualityCredentials";
 import EnvironmentalMap from "@/components/EnvironmentalMap";
 import HourlyImpactTracker from "@/components/HourlyImpactTracker";
@@ -21,7 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, Loader2, Plus, Activity, Database, ChevronRight, Pill, Watch, Droplets } from "lucide-react";
+import { MapPin, Loader2, Plus, Database, ChevronRight, Pill, Watch, Droplets, Wind } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEffect, useMemo, useState } from "react";
@@ -52,6 +51,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const [cardioDialog, setCardioDialog] = useState(false);
   const [strengthMinutes, setStrengthMinutes] = useState("");
   const [cardioMinutes, setCardioMinutes] = useState("");
+  const [showIndoorAirQuality, setShowIndoorAirQuality] = useState(false);
 
   const { data: latestHealth, isLoading: healthLoading } = useQuery<HealthEntry | null>({
     queryKey: [`/api/health-entries/latest?userId=${user?.uid}`],
@@ -529,40 +529,6 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
         <div>
           <div className="text-xs uppercase tracking-widest opacity-40 mb-4">INTEGRATIONS</div>
           <div className="space-y-3">
-            <DeviceIntegrationItem
-              name="Health Care Provider Records"
-              icon={<Activity className="w-6 h-6 text-primary" />}
-              connected={true}
-              lastSync="2 hours ago"
-              onClick={() => console.log("Healthcare provider clicked")}
-            />
-            <button
-              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-              onClick={() => console.log("Connect healthcare provider")}
-              data-testid="button-connect-healthcare-provider"
-            >
-              <div className="flex items-center gap-3">
-                <Database className="w-6 h-6 text-primary" />
-                <span className="text-sm">Connect to Health Care Provider</span>
-              </div>
-              <ChevronRight className="w-4 h-4 opacity-60" />
-            </button>
-            <DeviceIntegrationItem
-              name="Bloodwork Upload"
-              icon={<Droplets className="w-6 h-6 text-primary" />}
-              connected={false}
-              onClick={() => connectBloodworkMutation.mutate()}
-            />
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <IndoorAirQualityCredentials />
-        </div>
-
-        <div>
-          <div className="text-xs uppercase tracking-widest opacity-40 mb-4">INTEGRATIONS</div>
-          <div className="space-y-3">
             <button
               className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
               onClick={() => onNavigate?.("medications")}
@@ -585,6 +551,46 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
               </div>
               <ChevronRight className="w-4 h-4 opacity-60" />
             </button>
+            <div className="space-y-3 pl-4">
+              <button
+                className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+                onClick={() => console.log("Connect healthcare provider")}
+                data-testid="button-connect-healthcare-provider"
+              >
+                <div className="flex items-center gap-3">
+                  <Database className="w-5 h-5 text-primary" />
+                  <span className="text-sm">Connect to Health Care Provider</span>
+                </div>
+                <ChevronRight className="w-4 h-4 opacity-60" />
+              </button>
+              <button
+                className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+                onClick={() => connectBloodworkMutation.mutate()}
+                data-testid="button-upload-bloodwork"
+              >
+                <div className="flex items-center gap-3">
+                  <Droplets className="w-5 h-5 text-primary" />
+                  <span className="text-sm">Upload Bloodwork</span>
+                </div>
+                <ChevronRight className="w-4 h-4 opacity-60" />
+              </button>
+              <button
+                className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+                onClick={() => setShowIndoorAirQuality((prev) => !prev)}
+                data-testid="button-connect-indoor-air"
+              >
+                <div className="flex items-center gap-3">
+                  <Wind className="w-5 h-5 text-primary" />
+                  <span className="text-sm">Connect to Indoor Air Quality</span>
+                </div>
+                <ChevronRight className="w-4 h-4 opacity-60" />
+              </button>
+              {showIndoorAirQuality && (
+                <div className="pt-2">
+                  <IndoorAirQualityCredentials />
+                </div>
+              )}
+            </div>
             <button
               className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
               data-testid="button-notifications"
