@@ -6,8 +6,6 @@ import {
   Globe,
   Lock,
   Share2,
-  ImagePlus,
-  Trash2,
   Camera,
   Users,
   MessageSquare,
@@ -23,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { useProfilePhoto } from "@/hooks/useProfilePhoto";
 import type { FriendProfile } from "@/pages/FriendProfileScreen";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type DashboardConfig = {
   id: string;
@@ -278,14 +277,6 @@ export default function DataInsightsScreen({
     setCropZoom(1);
     setCropOffset({ x: 0, y: 0 });
     event.target.value = "";
-  };
-
-  const handleRemovePhoto = () => {
-    setPhotoUrl(null);
-    toast({
-      title: "Profile photo removed",
-      description: "You can upload a new photo anytime.",
-    });
   };
 
   const clampOffset = (next: { x: number; y: number }) => {
@@ -589,11 +580,30 @@ export default function DataInsightsScreen({
             Back to Home
           </button>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold">Share My Progress</h1>
-              <p className="text-sm opacity-60">
-                Share progress snapshots and dashboards with your community.
-              </p>
+            <div className="flex items-center gap-3">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="rounded-full"
+                      data-testid="button-update-profile-photo"
+                    >
+                      <ProfileAvatar className="h-12 w-12" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-black border-white/10 text-white text-xs">
+                    Update image
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <div>
+                <h1 className="text-2xl font-bold">Share My Progress</h1>
+                <p className="text-sm opacity-60">
+                  Share progress snapshots and dashboards with your community.
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -604,9 +614,16 @@ export default function DataInsightsScreen({
                 <Share2 className="h-4 w-4" />
                 Share this page
               </button>
-              <ProfileAvatar className="h-9 w-9" />
             </div>
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePhotoChange}
+            data-testid="input-profile-photo"
+          />
 
           {showShareOptions && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -630,53 +647,6 @@ export default function DataInsightsScreen({
           )}
         </div>
 
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/70">
-                Profile Photo
-              </h2>
-              <p className="text-xs text-white/50">
-                Stored locally on this device only.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-4">
-            <ProfileAvatar className="h-16 w-16" />
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                data-testid="button-upload-profile-photo"
-              >
-                <ImagePlus className="w-4 h-4 mr-2" />
-                {photoUrl ? "Change photo" : "Upload photo"}
-              </Button>
-              {photoUrl && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleRemovePhoto}
-                  data-testid="button-remove-profile-photo"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Remove
-                </Button>
-              )}
-            </div>
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handlePhotoChange}
-            data-testid="input-profile-photo"
-          />
-        </section>
 
         <Dialog
           open={isCropOpen}
