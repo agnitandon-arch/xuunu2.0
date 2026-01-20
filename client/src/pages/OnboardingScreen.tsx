@@ -12,6 +12,7 @@ interface OnboardingScreenProps {
 
 const APPLE_HEALTH_STORAGE_KEY = "xuunu-apple-health-connected";
 const HEALTH_PLATFORM_KEY = "xuunu-health-platform";
+const HEALTH_CONNECTION_SKIPPED_KEY = "xuunu-health-connection-skipped";
 
 export default function OnboardingScreen({ userId, onComplete }: OnboardingScreenProps) {
   const { toast } = useToast();
@@ -19,6 +20,7 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [platform, setPlatform] = useState<"ios" | "android" | null>(null);
+  const [skipConnection, setSkipConnection] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -29,6 +31,10 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
     const storedPlatform = window.localStorage.getItem(HEALTH_PLATFORM_KEY);
     if (storedPlatform === "ios" || storedPlatform === "android") {
       setPlatform(storedPlatform);
+    }
+    const skipped = window.localStorage.getItem(HEALTH_CONNECTION_SKIPPED_KEY);
+    if (skipped === "true") {
+      setSkipConnection(true);
     }
   }, []);
 
@@ -48,8 +54,10 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
     try {
       if (typeof window !== "undefined") {
         window.localStorage.setItem(APPLE_HEALTH_STORAGE_KEY, "true");
+        window.localStorage.removeItem(HEALTH_CONNECTION_SKIPPED_KEY);
         window.location.href = "x-apple-health://";
       }
+      setSkipConnection(false);
       setIsConnected(true);
       toast({
         title: "Apple Health connected",
@@ -82,8 +90,10 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
     try {
       if (typeof window !== "undefined") {
         window.localStorage.setItem(APPLE_HEALTH_STORAGE_KEY, "true");
+        window.localStorage.removeItem(HEALTH_CONNECTION_SKIPPED_KEY);
         window.open("https://fit.google.com/", "_blank");
       }
+      setSkipConnection(false);
       setIsConnected(true);
       toast({
         title: "Google Health connected",
@@ -129,7 +139,7 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
       });
       return;
     }
-    if (!isConnected) {
+    if (!isConnected && !skipConnection) {
       toast({
         title: "Health connection required",
         description: "Connect your health account to continue.",
@@ -240,6 +250,24 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
                 : platform === "android"
                   ? "Connect Google Health"
                   : "Connect Apple Health"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setSkipConnection(true);
+              if (typeof window !== "undefined") {
+                window.localStorage.setItem(HEALTH_CONNECTION_SKIPPED_KEY, "true");
+              }
+              toast({
+                title: "We'll remind you later",
+                description: "You can connect your health account anytime.",
+              });
+            }}
+            className="w-full"
+            data-testid="button-remind-later"
+          >
+            Remind me later
           </Button>
         </div>
 
