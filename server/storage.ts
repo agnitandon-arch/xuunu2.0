@@ -100,9 +100,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createHealthEntry(entry: InsertHealthEntry): Promise<HealthEntry> {
+    const normalizedEntry: typeof healthEntries.$inferInsert = {
+      ...entry,
+      symptoms: Array.isArray(entry.symptoms)
+        ? (entry.symptoms as string[])
+        : entry.symptoms ?? undefined,
+    };
     const [healthEntry] = await db
       .insert(healthEntries)
-      .values(entry as typeof healthEntries.$inferInsert)
+      .values(normalizedEntry)
       .returning();
     return healthEntry;
   }
@@ -287,9 +293,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMedication(medication: InsertMedication): Promise<Medication> {
+    const normalizedMedication: typeof medications.$inferInsert = {
+      ...medication,
+      scheduledTimes: Array.isArray(medication.scheduledTimes)
+        ? (medication.scheduledTimes as string[])
+        : [],
+    };
     const [createdMedication] = await db
       .insert(medications)
-      .values(medication as typeof medications.$inferInsert)
+      .values(normalizedMedication)
       .returning();
     return createdMedication;
   }
