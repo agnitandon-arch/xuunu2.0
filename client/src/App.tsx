@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -14,12 +14,20 @@ import ShowcaseAll from "@/pages/ShowcaseAll";
 import { Loader2 } from "lucide-react";
 import FriendProfileScreen, { FriendProfile } from "@/pages/FriendProfileScreen";
 import PublicProfileScreen from "@/pages/PublicProfileScreen";
+import OnboardingScreen from "@/pages/OnboardingScreen";
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showShowcase, setShowShowcase] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<FriendProfile | null>(null);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (user?.uid) {
+      setHasCompletedOnboarding(false);
+    }
+  }, [user?.uid]);
 
   const handleLogout = async () => {
     await signOut();
@@ -52,6 +60,15 @@ function AppContent() {
 
   if (!user) {
     return <LoginScreen />;
+  }
+
+  if (!hasCompletedOnboarding) {
+    return (
+      <OnboardingScreen
+        userId={user.uid}
+        onComplete={() => setHasCompletedOnboarding(true)}
+      />
+    );
   }
 
   const renderScreen = () => {
