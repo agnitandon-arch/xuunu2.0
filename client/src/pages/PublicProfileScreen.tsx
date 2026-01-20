@@ -1,4 +1,4 @@
-import { ArrowLeft, Globe, Link } from "lucide-react";
+import { ArrowLeft, Globe, Link, Trophy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import ProfileAvatar from "@/components/ProfileAvatar";
@@ -10,6 +10,24 @@ type DashboardConfig = {
   url: string;
 };
 
+type ChallengeRecord = {
+  id: string;
+  userId: string;
+  type: "Hiking" | "Running" | "Biking";
+  startedAt: string;
+  endedAt: string;
+  durationSec: number;
+  stepsStart: number;
+  stepsEnd: number;
+  stepsDelta: number;
+  startLocation: { lat: number; lng: number } | null;
+  endLocation: { lat: number; lng: number } | null;
+  autoStopped?: boolean;
+  shared?: boolean;
+};
+
+const CHALLENGE_STORAGE_KEY = "xuunu-challenges";
+
 interface PublicProfileScreenProps {
   onBack: () => void;
 }
@@ -18,6 +36,7 @@ export default function PublicProfileScreen({ onBack }: PublicProfileScreenProps
   const { user } = useAuth();
   const env = import.meta.env as Record<string, string | undefined>;
   const [publicUrl, setPublicUrl] = useState("");
+  const [sharedChallenges, setSharedChallenges] = useState<ChallengeRecord[]>([]);
 
   const dashboards: DashboardConfig[] = useMemo(
     () => [
@@ -67,6 +86,42 @@ export default function PublicProfileScreen({ onBack }: PublicProfileScreenProps
     }
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const loadChallenges = () => {
+      try {
+        const stored = window.localStorage.getItem(CHALLENGE_STORAGE_KEY);
+        const parsed = stored ? (JSON.parse(stored) as ChallengeRecord[]) : [];
+        setSharedChallenges(parsed.filter((challenge) => challenge.shared));
+      } catch {
+        setSharedChallenges([]);
+      }
+    };
+    loadChallenges();
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === CHALLENGE_STORAGE_KEY) {
+        loadChallenges();
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const leaderboard = useMemo(() => {
+    return [...sharedChallenges]
+      .map((challenge) => ({
+        ...challenge,
+        pace: challenge.stepsDelta > 0 ? challenge.durationSec / challenge.stepsDelta : Infinity,
+      }))
+      .sort((a, b) => a.pace - b.pace);
+  }, [sharedChallenges]);
+
   const sharedDashboards = dashboards;
 
   return (
@@ -108,6 +163,52 @@ export default function PublicProfileScreen({ onBack }: PublicProfileScreenProps
             {publicUrl || "Generating link..."}
           </a>
         </div>
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-white/70">
+              Challenge Leaderboard
+            </h2>
+            <p className="text-xs text-white/50">
+              Ranked by fastest time per step among shared challenges.
+            </p>
+          </div>
+          {leaderboard.length === 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+              No shared challenges yet.
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {leaderboard.map((challenge, index) => (
+                <div
+                  key={challenge.id}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Trophy className="h-4 w-4 text-yellow-400" />
+                        <p className="text-sm font-semibold">
+                          #{index + 1} {challenge.type}
+                        </p>
+                      </div>
+                      <p className="text-xs text-white/60 mt-1">
+                        Time {formatDuration(challenge.durationSec)} • Steps{" "}
+                        {challenge.stepsDelta.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs uppercase tracking-widest text-white/40">Pace</p>
+                      <p className="text-sm font-mono text-white/80">
+                        {challenge.pace === Infinity ? "--" : challenge.pace.toFixed(2)} sec/step
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">

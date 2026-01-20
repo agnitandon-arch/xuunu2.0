@@ -23,13 +23,40 @@ import { MapPin, Loader2, Plus, Database, ChevronRight, Pill, Watch, Droplets, W
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useEffect, useMemo, useState } from "react";
+import { Switch } from "@/components/ui/switch";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { HealthEntry, EnvironmentalReading } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { seedInitialData } from "@/lib/localStore";
+
+type ChallengeType = "Hiking" | "Running" | "Biking";
+
+type ChallengeLocation = {
+  lat: number;
+  lng: number;
+} | null;
+
+type ChallengeRecord = {
+  id: string;
+  userId: string;
+  type: ChallengeType;
+  startedAt: string;
+  endedAt: string;
+  durationSec: number;
+  stepsStart: number;
+  stepsEnd: number;
+  stepsDelta: number;
+  startLocation: ChallengeLocation;
+  endLocation: ChallengeLocation;
+  autoStopped?: boolean;
+  shared?: boolean;
+};
+
+const CHALLENGE_STORAGE_KEY = "xuunu-challenges";
+const FEED_STORAGE_KEY = "xuunu-feed-items";
 
 interface DashboardScreenProps {
   onNavigate?: (tab: string) => void;
@@ -52,6 +79,19 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const [strengthMinutes, setStrengthMinutes] = useState("");
   const [cardioMinutes, setCardioMinutes] = useState("");
   const [refreshingMetric, setRefreshingMetric] = useState<string | null>(null);
+  const [showChallengePicker, setShowChallengePicker] = useState(false);
+  const [activeChallenge, setActiveChallenge] = useState<{
+    id: string;
+    type: ChallengeType;
+    startedAt: string;
+    stepsStart: number;
+    startLocation: ChallengeLocation;
+  } | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [pendingChallenge, setPendingChallenge] = useState<ChallengeRecord | null>(null);
+  const [shareChallenge, setShareChallenge] = useState(true);
+  const lastStepsRef = useRef<number | null>(null);
+  const lastStepChangeAtRef = useRef<number | null>(null);
   const env = import.meta.env as Record<string, string | undefined>;
   const stripePortalUrl = env.VITE_STRIPE_PAYMENT_URL;
   const stripeMonthlyUrl = env.VITE_STRIPE_MONTHLY_URL;
@@ -190,6 +230,176 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
       setRefreshingMetric(null);
     }
   };
+
+  const getCurrentLocation = useCallback(
+    () =>
+      new Promise<ChallengeLocation>((resolve) => {
+        if (typeof navigator === "undefined" || !navigator.geolocation) {
+          resolve(null);
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            });
+          },
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      }),
+    []
+  );
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const saveChallenge = (challenge: ChallengeRecord) => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(CHALLENGE_STORAGE_KEY);
+      const parsed = stored ? (JSON.parse(stored) as ChallengeRecord[]) : [];
+      const updated = [challenge, ...parsed];
+      window.localStorage.setItem(CHALLENGE_STORAGE_KEY, JSON.stringify(updated));
+    } catch {
+      // Ignore storage failures.
+    }
+  };
+
+  const addChallengeToFeed = (challenge: ChallengeRecord) => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(FEED_STORAGE_KEY);
+      const parsed = stored ? (JSON.parse(stored) as any[]) : [];
+      const feedItem = {
+        id: `challenge-${challenge.id}`,
+        authorName: "You",
+        authorAvatar: "",
+        time: "Just now",
+        content: `${challenge.type} challenge completed in ${formatDuration(
+          challenge.durationSec
+        )} (${challenge.stepsDelta.toLocaleString()} steps).`,
+        photos: [],
+        shared: true,
+        source: "you",
+        likesCount: 0,
+        liked: false,
+      };
+      window.localStorage.setItem(FEED_STORAGE_KEY, JSON.stringify([feedItem, ...parsed]));
+    } catch {
+      // Ignore storage failures.
+    }
+  };
+
+  const handleStartChallenge = async (type: ChallengeType) => {
+    if (!user) return;
+    const startedAt = new Date().toISOString();
+    const stepsStart = typeof latestHealth?.steps === "number" ? latestHealth.steps : 0;
+    const startLocation = await getCurrentLocation();
+    const id = `challenge-${Date.now()}`;
+    setActiveChallenge({ id, type, startedAt, stepsStart, startLocation });
+    setElapsedSeconds(0);
+    lastStepsRef.current = stepsStart;
+    lastStepChangeAtRef.current = Date.now();
+    setShowChallengePicker(false);
+    toast({
+      title: `${type} challenge started`,
+      description: "Timer is running. Move to record steps.",
+    });
+  };
+
+  const handleStopChallenge = useCallback(
+    async (autoStopped = false) => {
+      if (!activeChallenge || !user) return;
+      const current = activeChallenge;
+      setActiveChallenge(null);
+      const endLocation = await getCurrentLocation();
+      const stepsEnd =
+        typeof latestHealth?.steps === "number"
+          ? latestHealth.steps
+          : lastStepsRef.current ?? current.stepsStart;
+      const stepsDelta = Math.max(0, stepsEnd - current.stepsStart);
+      const endedAt = new Date().toISOString();
+      const durationSec = Math.max(
+        0,
+        Math.floor((Date.now() - new Date(current.startedAt).getTime()) / 1000)
+      );
+      const record: ChallengeRecord = {
+        id: current.id,
+        userId: user.uid,
+        type: current.type,
+        startedAt: current.startedAt,
+        endedAt,
+        durationSec,
+        stepsStart: current.stepsStart,
+        stepsEnd,
+        stepsDelta,
+        startLocation: current.startLocation,
+        endLocation,
+        autoStopped,
+        shared: false,
+      };
+      lastStepsRef.current = null;
+      lastStepChangeAtRef.current = null;
+      setPendingChallenge(record);
+      setShareChallenge(true);
+      toast({
+        title: autoStopped ? "Challenge auto-stopped" : "Challenge stopped",
+        description: "Review details and choose to share.",
+      });
+    },
+    [activeChallenge, getCurrentLocation, latestHealth?.steps, toast, user]
+  );
+
+  const handleFinalizeChallenge = (shared: boolean) => {
+    if (!pendingChallenge) return;
+    const record = { ...pendingChallenge, shared };
+    saveChallenge(record);
+    if (shared) {
+      addChallengeToFeed(record);
+    }
+    setPendingChallenge(null);
+    setShareChallenge(true);
+  };
+
+  useEffect(() => {
+    if (!activeChallenge) return;
+    const started = new Date(activeChallenge.startedAt).getTime();
+    const interval = window.setInterval(() => {
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - started) / 1000)));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [activeChallenge]);
+
+  useEffect(() => {
+    if (!activeChallenge) return;
+    if (typeof latestHealth?.steps !== "number") return;
+    if (lastStepsRef.current === null) {
+      lastStepsRef.current = latestHealth.steps;
+      lastStepChangeAtRef.current = Date.now();
+      return;
+    }
+    if (latestHealth.steps !== lastStepsRef.current) {
+      lastStepsRef.current = latestHealth.steps;
+      lastStepChangeAtRef.current = Date.now();
+    }
+  }, [activeChallenge, latestHealth?.steps]);
+
+  useEffect(() => {
+    if (!activeChallenge) return;
+    const interval = window.setInterval(() => {
+      refetchHealth();
+      const lastChange = lastStepChangeAtRef.current ?? Date.now();
+      if (Date.now() - lastChange >= 5 * 60 * 1000) {
+        handleStopChallenge(true);
+      }
+    }, 60000);
+    return () => window.clearInterval(interval);
+  }, [activeChallenge, handleStopChallenge, refetchHealth]);
 
   const handleOpenPaymentPortal = (plan?: "monthly" | "yearly") => {
     const planUrl =
@@ -749,6 +959,148 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
         )}
 
         <MedicationQuickLog />
+
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/70">
+                Challenges
+              </h2>
+              <p className="text-xs text-white/50">
+                Join a challenge and track your time and steps.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setShowChallengePicker(true)}
+              data-testid="button-join-challenge"
+              disabled={!!activeChallenge}
+            >
+              Join Challenge
+            </Button>
+          </div>
+          {activeChallenge && (
+            <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">{activeChallenge.type} Challenge</p>
+                  <p className="text-xs text-white/50">
+                    Started {new Date(activeChallenge.startedAt).toLocaleTimeString()}
+                  </p>
+                </div>
+                <div className="text-lg font-mono text-primary">
+                  {formatDuration(elapsedSeconds)}
+                </div>
+              </div>
+              {activeChallenge.startLocation && (
+                <div className="text-xs text-white/50">
+                  Start pin: {activeChallenge.startLocation.lat.toFixed(4)},{" "}
+                  {activeChallenge.startLocation.lng.toFixed(4)}
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-white/50">
+                  Steps recorded: {(lastStepsRef.current ?? activeChallenge.stepsStart).toLocaleString()}
+                </div>
+                <Button
+                  variant="destructive"
+                  onClick={() => handleStopChallenge(false)}
+                  data-testid="button-stop-challenge"
+                >
+                  Stop Challenge
+                </Button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <Dialog open={showChallengePicker} onOpenChange={setShowChallengePicker}>
+          <DialogContent className="bg-black border-white/10 text-white">
+            <DialogHeader>
+              <DialogTitle>Join a challenge</DialogTitle>
+              <DialogDescription className="text-white/60">
+                Pick a challenge type to start your timer.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3">
+              {(["Hiking", "Running", "Biking"] as ChallengeType[]).map((type) => (
+                <Button
+                  key={type}
+                  variant="outline"
+                  onClick={() => handleStartChallenge(type)}
+                  data-testid={`button-start-${type.toLowerCase()}-challenge`}
+                >
+                  {type} Challenge
+                </Button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={!!pendingChallenge}
+          onOpenChange={(open) => {
+            if (!open && pendingChallenge) {
+              handleFinalizeChallenge(false);
+            }
+          }}
+        >
+          <DialogContent className="bg-black border-white/10 text-white">
+            <DialogHeader>
+              <DialogTitle>Challenge complete</DialogTitle>
+              <DialogDescription className="text-white/60">
+                Review your stats and choose whether to share.
+              </DialogDescription>
+            </DialogHeader>
+            {pendingChallenge && (
+              <div className="space-y-3 text-sm">
+                <div className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">{pendingChallenge.type} Challenge</span>
+                    <span className="font-mono text-primary">
+                      {formatDuration(pendingChallenge.durationSec)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-white/60">
+                    Steps: {pendingChallenge.stepsDelta.toLocaleString()}
+                  </div>
+                  {pendingChallenge.autoStopped && (
+                    <div className="text-xs text-yellow-300/80">
+                      Auto-stopped after steps stopped updating.
+                    </div>
+                  )}
+                  {pendingChallenge.startLocation && (
+                    <div className="text-xs text-white/60">
+                      Start pin: {pendingChallenge.startLocation.lat.toFixed(4)},{" "}
+                      {pendingChallenge.startLocation.lng.toFixed(4)}
+                    </div>
+                  )}
+                  {pendingChallenge.endLocation && (
+                    <div className="text-xs text-white/60">
+                      End pin: {pendingChallenge.endLocation.lat.toFixed(4)},{" "}
+                      {pendingChallenge.endLocation.lng.toFixed(4)}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3">
+                  <div>
+                    <p className="text-sm font-medium">Share to public profile</p>
+                    <p className="text-xs text-white/60">Adds this challenge to the leaderboard.</p>
+                  </div>
+                  <Switch checked={shareChallenge} onCheckedChange={setShareChallenge} />
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button variant="outline" onClick={() => handleFinalizeChallenge(false)}>
+                    Keep Private
+                  </Button>
+                  <Button onClick={() => handleFinalizeChallenge(shareChallenge)}>
+                    Save Challenge
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <section className="space-y-4">
           <div>
