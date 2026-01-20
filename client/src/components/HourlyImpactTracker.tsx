@@ -105,13 +105,6 @@ export default function HourlyImpactTracker() {
         ))}
       </div>
 
-      <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
-        <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Correlation Analysis</div>
-        <p className="text-sm">
-          Environmental conditions show increasing impact over the past hour. 
-          PM2.5 and NO₂ levels remain the biggest drivers in the impact score.
-        </p>
-      </div>
     </div>
   );
 }
