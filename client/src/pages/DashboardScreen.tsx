@@ -734,7 +734,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
             </button>
             <div className="space-y-3">
               <button
-                className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+                className="w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
                 onClick={handleOpenPaymentPortal}
                 data-testid="button-connect-healthcare-provider"
               >
@@ -745,7 +745,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                 <ChevronRight className="w-4 h-4 opacity-60" />
               </button>
               <button
-                className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+                className="w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
                 onClick={handleOpenPaymentPortal}
                 data-testid="button-upload-bloodwork"
               >
@@ -756,7 +756,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                 <ChevronRight className="w-4 h-4 opacity-60" />
               </button>
               <button
-                className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+                className="w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
                 onClick={handleOpenPaymentPortal}
                 data-testid="button-connect-indoor-air"
               >
