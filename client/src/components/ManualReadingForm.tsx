@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const INTEGER_FIELDS = [
   "vocs", "aqi", "noiseCurrent", "noisePeak", "noiseAverage",
@@ -55,15 +55,7 @@ export function ManualReadingForm({ category, userId, onSuccess }: ManualReading
         }
       });
 
-      const response = await fetch("/api/environmental-readings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to save reading");
-      }
+      await apiRequest("POST", "/api/environmental-readings", payload);
 
       await queryClient.invalidateQueries({ queryKey: ["/api/environmental-readings"] });
 

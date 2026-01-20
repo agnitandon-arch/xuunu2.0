@@ -8,6 +8,7 @@ import {
   onAuthStateChanged 
 } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
+import { apiRequest } from "@/lib/queryClient";
 
 interface AuthContextType {
   user: User | null;
@@ -29,13 +30,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         // Sync user to database
         try {
-          await fetch('/api/users/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              id: user.uid, 
-              email: user.email 
-            }),
+          await apiRequest("POST", "/api/users/sync", {
+            id: user.uid,
+            email: user.email,
           });
         } catch (error) {
           console.error('Failed to sync user:', error);

@@ -5,6 +5,7 @@ import EnvironmentalCard from "@/components/EnvironmentalCard";
 import HealthEntryCard from "@/components/HealthEntryCard";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest } from "@/lib/queryClient";
 
 interface HomeScreenProps {
   userName?: string;
@@ -18,10 +19,10 @@ export default function HomeScreen({ userName = "User", onLogClick }: HomeScreen
     queryKey: [`/api/environmental-readings/latest?userId=${user?.uid}`],
     queryFn: async () => {
       if (!user?.uid) return null;
-      const response = await fetch(`/api/environmental-readings/latest?userId=${user.uid}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch environmental data: ${response.statusText}`);
-      }
+      const response = await apiRequest(
+        "GET",
+        `/api/environmental-readings/latest?userId=${user.uid}`
+      );
       return response.json();
     },
     enabled: !!user?.uid,
@@ -31,10 +32,10 @@ export default function HomeScreen({ userName = "User", onLogClick }: HomeScreen
     queryKey: [`/api/health-entries?userId=${user?.uid}`],
     queryFn: async () => {
       if (!user?.uid) return [];
-      const response = await fetch(`/api/health-entries?userId=${user.uid}&limit=3`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch health entries: ${response.statusText}`);
-      }
+      const response = await apiRequest(
+        "GET",
+        `/api/health-entries?userId=${user.uid}&limit=3`
+      );
       return response.json();
     },
     enabled: !!user?.uid,

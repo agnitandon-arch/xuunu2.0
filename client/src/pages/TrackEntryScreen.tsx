@@ -9,6 +9,7 @@ import { Loader2, CheckCircle, Minus, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import VoiceNotesInput from "@/components/VoiceNotesInput";
+import { apiRequest } from "@/lib/queryClient";
 
 interface TrackEntryScreenProps {
   onSave?: () => void;
@@ -47,15 +48,7 @@ export default function TrackEntryScreen({ onSave }: TrackEntryScreenProps) {
         notes: notes || null,
       };
 
-      const response = await fetch("/api/health-entries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to save health entry");
-      }
+      await apiRequest("POST", "/api/health-entries", payload);
 
       setIsLoading(false);
       setShowSuccess(true);
