@@ -489,7 +489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/terra/auth", async (req, res) => {
     try {
-      const { userId, mode } = req.body;
+      const { userId, mode, provider } = req.body;
 
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
@@ -511,8 +511,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const widgetMode = mode === "labs" ? "labs" : "wearables";
-      const providers =
+      let providers =
         widgetMode === "labs" ? TERRA_LAB_PROVIDERS : TERRA_WEARABLE_PROVIDERS;
+
+      if (provider && typeof provider === "string") {
+        const normalized = provider.toUpperCase();
+        const allowed = widgetMode === "labs" ? TERRA_LAB_PROVIDERS : TERRA_WEARABLE_PROVIDERS;
+        if (allowed.includes(normalized)) {
+          providers = [normalized];
+        }
+      }
 
       // Generate widget session for Terra providers
       const session = await terra.authentication.generatewidgetsession({

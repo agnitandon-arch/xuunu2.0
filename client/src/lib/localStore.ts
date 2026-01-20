@@ -284,3 +284,37 @@ const maybeCreateBioSignatureSnapshot = (entry: HealthEntry) => {
   const updated = [snapshot, ...snapshots];
   setStore(BIOSIGNATURE_KEY, updated);
 };
+
+export const seedInitialData = (userId: string) => {
+  const existing = getHealthEntries(userId, 1);
+  if (existing.length > 0) return;
+
+  const today = new Date();
+  const baseGlucose = 132;
+  const baseSleep = 6.8;
+  const baseHeartRate = 74;
+  const baseSteps = 6200;
+
+  for (let i = 0; i < 6; i += 1) {
+    const entryDate = new Date(today);
+    entryDate.setDate(today.getDate() - i * 3);
+    createHealthEntry({
+      userId,
+      timestamp: entryDate.toISOString(),
+      glucose: baseGlucose - i * 2,
+      sleepHours: baseSleep + i * 0.2,
+      heartRate: baseHeartRate - i,
+      steps: baseSteps + i * 400,
+      hrv: 52 + i * 2,
+    });
+  }
+
+  createEnvironmentalReading({
+    userId,
+    timestamp: today.toISOString(),
+    aqi: 58,
+    temperature: 72,
+    humidity: 46,
+    locationMode: "auto",
+  });
+};
