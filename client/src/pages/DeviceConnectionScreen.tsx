@@ -161,7 +161,7 @@ export default function DeviceConnectionScreen() {
         <div className="space-y-2">
           <h1 className="text-2xl font-bold tracking-tight">Device Connections</h1>
           <p className="text-sm opacity-60">
-            Connect Apple Health and labs through Terra
+            On iOS, the app pulls Apple Health data automatically after install. Connect labs through Terra.
           </p>
         </div>
 
