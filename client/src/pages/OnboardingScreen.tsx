@@ -38,42 +38,6 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
     }
   }, []);
 
-  const handleConnectAppleHealth = async () => {
-    if (!userId || isConnecting) return;
-    const isIos =
-      typeof navigator !== "undefined" && /iPad|iPhone|iPod/i.test(navigator.userAgent);
-    if (!isIos) {
-      toast({
-        title: "Apple Health requires iPhone",
-        description: "Open onboarding on an iOS device to connect Apple Health.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setIsConnecting(true);
-    try {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(APPLE_HEALTH_STORAGE_KEY, "true");
-        window.localStorage.removeItem(HEALTH_CONNECTION_SKIPPED_KEY);
-        window.location.href = "x-apple-health://";
-      }
-      setSkipConnection(false);
-      setIsConnected(true);
-      toast({
-        title: "Apple Health connected",
-        description: "If prompted, allow access in the Health app.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Connection failed",
-        description: error?.message || "Unable to connect Apple Health right now.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
   const handleConnectGoogleHealth = async () => {
     if (!userId || isConnecting) return;
     const isAndroid =
@@ -116,7 +80,16 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
       window.localStorage.setItem(HEALTH_PLATFORM_KEY, value);
     }
     if (value === "ios") {
-      await handleConnectAppleHealth();
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(APPLE_HEALTH_STORAGE_KEY, "true");
+        window.localStorage.removeItem(HEALTH_CONNECTION_SKIPPED_KEY);
+      }
+      setSkipConnection(false);
+      setIsConnected(true);
+      toast({
+        title: "Apple Health connected",
+        description: "Apple Health syncs automatically on iOS.",
+      });
     } else {
       await handleConnectGoogleHealth();
     }
@@ -200,7 +173,7 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
             </h2>
           </div>
           <p className="text-xs text-white/60">
-            Choose your phone to connect Apple Health or Google Health.
+            iPhone connects to Apple Health automatically. Android uses Google Health.
           </p>
           <div className="grid grid-cols-2 gap-2">
             <Button
@@ -222,35 +195,31 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
               Android
             </Button>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              if (platform === "ios") {
-                handleConnectAppleHealth();
-              } else if (platform === "android") {
-                handleConnectGoogleHealth();
-              } else {
-                toast({
-                  title: "Select your phone type",
-                  description: "Choose iPhone or Android first.",
-                  variant: "destructive",
-                });
-              }
-            }}
-            disabled={isConnecting}
-            data-testid="button-connect-health"
-          >
-            {isConnected
-              ? platform === "android"
+          {platform !== "ios" && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (platform === "android") {
+                  handleConnectGoogleHealth();
+                } else {
+                  toast({
+                    title: "Select your phone type",
+                    description: "Choose iPhone or Android first.",
+                    variant: "destructive",
+                  });
+                }
+              }}
+              disabled={isConnecting}
+              data-testid="button-connect-health"
+            >
+              {isConnected
                 ? "Google Health Connected"
-                : "Apple Health Connected"
-              : isConnecting
-                ? "Connecting..."
-                : platform === "android"
-                  ? "Connect Google Health"
-                  : "Connect Apple Health"}
-          </Button>
+                : isConnecting
+                  ? "Connecting..."
+                  : "Connect Google Health"}
+            </Button>
+          )}
           <Button
             type="button"
             variant="ghost"
