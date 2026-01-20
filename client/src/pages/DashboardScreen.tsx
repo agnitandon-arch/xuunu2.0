@@ -230,6 +230,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     }
 
     if (Notification.permission === "granted") {
+      window.localStorage.setItem("xuunu-notifications-enabled", "true");
       toast({
         title: "Notifications enabled",
         description: "Notifications are already enabled.",
@@ -238,6 +239,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     }
 
     if (Notification.permission === "denied") {
+      window.localStorage.setItem("xuunu-notifications-enabled", "false");
       toast({
         title: "Notifications blocked",
         description: "Enable notifications in your phone settings.",
@@ -249,11 +251,13 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     try {
       const permission = await Notification.requestPermission();
       if (permission === "granted") {
+        window.localStorage.setItem("xuunu-notifications-enabled", "true");
         toast({
           title: "Notifications enabled",
           description: "You're all set to receive alerts.",
         });
       } else {
+        window.localStorage.setItem("xuunu-notifications-enabled", "false");
         toast({
           title: "Notifications disabled",
           description: "Enable notifications in your phone settings.",

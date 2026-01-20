@@ -105,7 +105,7 @@ function AppContent() {
       case "devices":
         return <DeviceConnectionScreen />;
       case "medications":
-        return <MedicationTrackerScreen />;
+        return <MedicationTrackerScreen onBack={() => setActiveTab("dashboard")} />;
       default:
         return (
           <DashboardScreen

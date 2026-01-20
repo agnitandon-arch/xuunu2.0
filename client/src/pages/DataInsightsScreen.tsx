@@ -28,6 +28,9 @@ type ShareTarget = {
 };
 
 const FEED_STORAGE_KEY = "xuunu-feed-items";
+const FEED_DRAFT_KEY = "xuunu-feed-draft";
+const FEED_NOTIFIED_KEY = "xuunu-feed-notified";
+const NOTIFICATIONS_KEY = "xuunu-notifications-enabled";
 
 type NetworkMember = {
   id: string;
@@ -106,6 +109,21 @@ export default function DataInsightsScreen({
   const MAX_PHOTO_SIZE = 100 * 1024 * 1024;
   const displayName = user?.displayName || user?.email?.split("@")[0] || "Member";
 
+  const canNotify = () =>
+    typeof window !== "undefined" &&
+    "Notification" in window &&
+    Notification.permission === "granted" &&
+    window.localStorage.getItem(NOTIFICATIONS_KEY) === "true";
+
+  const sendNotification = (title: string, body: string) => {
+    if (!canNotify()) return;
+    try {
+      new Notification(title, { body });
+    } catch {
+      // Ignore notification errors.
+    }
+  };
+
   const friends = useMemo<FriendProfile[]>(
     () => [
       {
@@ -161,6 +179,30 @@ export default function DataInsightsScreen({
     const profilePath = user?.uid ? `/app/profile/${user.uid}` : "/app/profile/sample";
     setProfileUrl(`${origin}${profilePath}`);
   }, [user?.uid]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storedDraft = window.localStorage.getItem(FEED_DRAFT_KEY);
+    if (!storedDraft) return;
+    try {
+      const parsed = JSON.parse(storedDraft) as {
+        text?: string;
+        photos?: string[];
+        shared?: boolean;
+      };
+      if (typeof parsed.text === "string") {
+        setUpdateText(parsed.text);
+      }
+      if (Array.isArray(parsed.photos)) {
+        setUpdatePhotos(parsed.photos);
+      }
+      if (typeof parsed.shared === "boolean") {
+        setShareUpdate(parsed.shared);
+      }
+    } catch {
+      // Ignore invalid drafts.
+    }
+  }, []);
 
   const copyToClipboard = async (value: string, label: string) => {
     try {
@@ -358,6 +400,27 @@ export default function DataInsightsScreen({
     event.target.value = "";
   };
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const payload = {
+      text: updateText,
+      photos: updatePhotos,
+      shared: shareUpdate,
+    };
+    try {
+      window.localStorage.setItem(FEED_DRAFT_KEY, JSON.stringify(payload));
+    } catch {
+      try {
+        window.localStorage.setItem(
+          FEED_DRAFT_KEY,
+          JSON.stringify({ text: updateText, photos: [], shared: shareUpdate })
+        );
+      } catch {
+        // Ignore storage failures.
+      }
+    }
+  }, [updateText, updatePhotos, shareUpdate]);
+
   const handleRemoveUpdatePhoto = (index: number) => {
     setUpdatePhotos((prev) => {
       const next = [...prev];
@@ -433,7 +496,19 @@ export default function DataInsightsScreen({
     try {
       window.localStorage.setItem(FEED_STORAGE_KEY, JSON.stringify(feedItems));
     } catch (error) {
-      // Ignore storage failures (e.g., quota exceeded).
+      const withoutPhotos = feedItems.map((item) => ({ ...item, photos: [] }));
+      try {
+        window.localStorage.setItem(FEED_STORAGE_KEY, JSON.stringify(withoutPhotos));
+      } catch {
+        try {
+          window.localStorage.setItem(
+            FEED_STORAGE_KEY,
+            JSON.stringify(withoutPhotos.slice(0, 1))
+          );
+        } catch {
+          // Ignore storage failures (e.g., quota exceeded).
+        }
+      }
     }
   }, [feedItems]);
 
@@ -452,6 +527,27 @@ export default function DataInsightsScreen({
       })
     );
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!canNotify()) return;
+    try {
+      const stored = window.localStorage.getItem(FEED_NOTIFIED_KEY);
+      const notified = new Set<string>(stored ? (JSON.parse(stored) as string[]) : []);
+      const newFriendItems = feedItems.filter(
+        (item) => item.source === "friend" && !notified.has(item.id)
+      );
+      if (newFriendItems.length > 0) {
+        newFriendItems.forEach((item) => {
+          sendNotification("Friend update", `${item.authorName} shared an update.`);
+          notified.add(item.id);
+        });
+        window.localStorage.setItem(FEED_NOTIFIED_KEY, JSON.stringify([...notified]));
+      }
+    } catch {
+      // Ignore notification tracking errors.
+    }
+  }, [feedItems]);
 
   const handleShareUpdate = () => {
     if (!updateText.trim() && updatePhotos.length === 0) {
@@ -480,10 +576,14 @@ export default function DataInsightsScreen({
     setUpdateText("");
     setUpdatePhotos([]);
     setShareUpdate(true);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(FEED_DRAFT_KEY);
+    }
     toast({
       title: "Update shared",
       description: "Your latest progress is now visible in the feed.",
     });
+    sendNotification("Update shared", "Your progress update is live.");
   };
 
   const handleInviteFriend = () => {
@@ -509,6 +609,7 @@ export default function DataInsightsScreen({
       title: "Friend request sent",
       description: `Request sent to ${member.name}.`,
     });
+    sendNotification("Friend request sent", `Request sent to ${member.name}.`);
   };
 
   const handleShare = async (target: ShareTarget, url: string, text: string) => {

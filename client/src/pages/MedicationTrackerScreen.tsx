@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Clock, Check } from "lucide-react";
+import { Plus, Trash2, Clock, Check, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -18,7 +18,11 @@ import {
 } from "@/components/ui/dialog";
 import type { Medication, MedicationLog } from "@shared/schema";
 
-export default function MedicationTrackerScreen() {
+interface MedicationTrackerScreenProps {
+  onBack?: () => void;
+}
+
+export default function MedicationTrackerScreen({ onBack }: MedicationTrackerScreenProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -183,6 +187,53 @@ export default function MedicationTrackerScreen() {
     );
   };
 
+  const reminderTimeouts = useRef<number[]>([]);
+
+  useEffect(() => {
+    reminderTimeouts.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    reminderTimeouts.current = [];
+
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    const notificationsEnabled =
+      window.localStorage.getItem("xuunu-notifications-enabled") === "true" &&
+      Notification.permission === "granted";
+    if (!notificationsEnabled) return;
+
+    const now = new Date();
+    medications.forEach((medication) => {
+      medication.scheduledTimes?.forEach((time) => {
+        const [hoursText, minutesText] = time.split(":");
+        const hours = Number(hoursText);
+        const minutes = Number(minutesText);
+        if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return;
+
+        const next = new Date();
+        next.setHours(hours, minutes, 0, 0);
+        if (next <= now) {
+          next.setDate(next.getDate() + 1);
+        }
+        const delay = next.getTime() - now.getTime();
+        if (delay <= 0) return;
+
+        const timeoutId = window.setTimeout(() => {
+          try {
+            new Notification("Medication reminder", {
+              body: `${medication.name} ${medication.dosage}`,
+            });
+          } catch {
+            // Ignore notification errors.
+          }
+        }, delay);
+        reminderTimeouts.current.push(timeoutId);
+      });
+    });
+
+    return () => {
+      reminderTimeouts.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      reminderTimeouts.current = [];
+    };
+  }, [medications]);
+
   if (!user) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
@@ -202,18 +253,29 @@ export default function MedicationTrackerScreen() {
             </p>
           </div>
 
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-add-medication">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Medication
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Add New Medication</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => (onBack ? onBack() : window.history.back())}
+              data-testid="button-exit-medications"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Exit
+            </Button>
+
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-add-medication">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Medication
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Add New Medication</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <Label htmlFor="name">Medication Name</Label>
                   <Input
