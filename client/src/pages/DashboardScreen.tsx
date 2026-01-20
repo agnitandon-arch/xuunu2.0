@@ -23,12 +23,13 @@ import { Label } from "@/components/ui/label";
 import { MapPin, Loader2, Plus, Activity, Database, ChevronRight, Pill, Watch, Droplets } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { HealthEntry, EnvironmentalReading } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { seedInitialData } from "@/lib/localStore";
 
 interface DashboardScreenProps {
   onNavigate?: (tab: string) => void;
@@ -75,6 +76,22 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     queryKey: [`/api/health-entries?userId=${user?.uid}&limit=3`],
     enabled: !!user,
   });
+
+  useEffect(() => {
+    if (!user?.uid || healthLoading || envLoading) return;
+    if (!latestHealth && !latestEnv) {
+      seedInitialData(user.uid);
+      queryClient.invalidateQueries({
+        queryKey: [`/api/health-entries/latest?userId=${user.uid}`],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/health-entries?userId=${user.uid}&limit=3`],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/environmental-readings/latest?userId=${user.uid}`],
+      });
+    }
+  }, [user?.uid, latestHealth, latestEnv, healthLoading, envLoading]);
 
   const createEntryMutation = useMutation({
     mutationFn: async (data: any) => {
