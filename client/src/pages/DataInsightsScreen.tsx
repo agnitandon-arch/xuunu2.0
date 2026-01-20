@@ -731,47 +731,6 @@ export default function DataInsightsScreen({
           )}
         </div>
 
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold uppercase tracking-widest text-white/70">
-                Public Profile
-              </h2>
-              <p className="text-xs text-white/50">Share your public progress profile.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowProfileShare((prev) => !prev)}
-                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/70 transition hover:border-white/40 hover:text-white"
-              >
-                <Share2 className="h-3.5 w-3.5" />
-                Share profile
-              </button>
-            </div>
-          </div>
-          {showProfileShare && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {SHARE_TARGETS.map((target) => (
-                <button
-                  key={target.id}
-                  type="button"
-                  onClick={() =>
-                    handleShare(
-                      target,
-                      profileUrl,
-                      "See my Xuunu public profile and wellness progress."
-                    )
-                  }
-                  className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/70 transition hover:border-white/30 hover:text-white"
-                >
-                  {target.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-
 
         <Dialog
           open={isCropOpen}
