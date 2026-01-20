@@ -102,9 +102,47 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
 
   const handleMetricRefresh = async (metricId: string) => {
     if (!user || refreshingMetric) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const storageKey = `xuunu-terra-refresh-${user.uid}`;
+    let refreshCount = 0;
+
+    if (typeof window !== "undefined") {
+      try {
+        const stored = window.localStorage.getItem(storageKey);
+        if (stored) {
+          const parsed = JSON.parse(stored) as { date?: string; count?: number };
+          if (parsed.date === today && typeof parsed.count === "number") {
+            refreshCount = parsed.count;
+          }
+        }
+      } catch (error) {
+        refreshCount = 0;
+      }
+    }
+
+    if (refreshCount >= 4) {
+      toast({
+        title: "Daily refresh limit reached",
+        description: "Maximum 4 Terra refreshes per day. Using cached data.",
+      });
+      return;
+    }
+
+    const nextCount = refreshCount + 1;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        storageKey,
+        JSON.stringify({ date: today, count: nextCount })
+      );
+    }
+
     setRefreshingMetric(metricId);
     try {
       await Promise.all([refetchHealth(), refetchEnv()]);
+      toast({
+        title: "Data refreshed",
+        description: `Terra refresh ${nextCount}/4 for today.`,
+      });
     } finally {
       setRefreshingMetric(null);
     }
