@@ -5,8 +5,6 @@ interface HourlyDataPoint {
   time: string;
   glucose?: number;
   heartRate?: number;
-  symptoms: string[];
-  severityLevel: number;
   aqi: number;
   pm25: number;
   no2: number;
@@ -26,8 +24,6 @@ export default function HourlyImpactTracker() {
         time: time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         glucose: 115 + Math.random() * 20,
         heartRate: 68 + Math.random() * 10,
-        symptoms: i > 1 ? ["Fatigue"] : [],
-        severityLevel: i > 1 ? 3 : 1,
         aqi: 50 + i * 10,
         pm25: 10 + i * 3,
         no2: 12 + i * 2,
@@ -105,24 +101,6 @@ export default function HourlyImpactTracker() {
               </div>
             </div>
 
-            {point.symptoms.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-white/10">
-                <div className="text-xs opacity-60 mb-1">Symptoms</div>
-                <div className="flex gap-2">
-                  {point.symptoms.map((symptom, i) => (
-                    <span
-                      key={i}
-                      className="px-2 py-1 bg-primary/20 rounded text-xs"
-                    >
-                      {symptom}
-                    </span>
-                  ))}
-                  <span className="px-2 py-1 bg-white/10 rounded text-xs">
-                    Level {point.severityLevel}
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
         ))}
       </div>
@@ -131,7 +109,7 @@ export default function HourlyImpactTracker() {
         <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Correlation Analysis</div>
         <p className="text-sm">
           Environmental conditions show increasing impact over the past hour. 
-          PM2.5 and NO₂ levels correlating with slight fatigue symptoms.
+          PM2.5 and NO₂ levels remain the biggest drivers in the impact score.
         </p>
       </div>
     </div>
