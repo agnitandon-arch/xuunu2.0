@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useProfilePhoto } from "@/hooks/useProfilePhoto";
 import type { FriendProfile } from "@/pages/FriendProfileScreen";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type DashboardConfig = {
   id: string;
@@ -93,8 +94,19 @@ export default function DataInsightsScreen({
   const [shareUpdate, setShareUpdate] = useState(true);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteValue, setInviteValue] = useState("");
+  const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
+  const [isCropOpen, setIsCropOpen] = useState(false);
+  const [cropZoom, setCropZoom] = useState(1);
+  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const dragStateRef = useRef<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
 
   const env = import.meta.env as Record<string, string | undefined>;
+  const CROP_SIZE = 240;
+  const OUTPUT_SIZE = 320;
+  const MAX_PHOTO_SIZE = 4 * 1024 * 1024;
 
   const dashboards: DashboardConfig[] = useMemo(
     () => [
@@ -252,26 +264,20 @@ export default function DataInsightsScreen({
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
+    if (file.size > MAX_PHOTO_SIZE) {
       toast({
         title: "File too large",
-        description: "Please upload an image smaller than 2MB.",
+        description: "Please upload an image smaller than 4MB.",
         variant: "destructive",
       });
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setPhotoUrl(reader.result);
-        toast({
-          title: "Profile photo updated",
-          description: "Your photo will appear across all tabs.",
-        });
-      }
-    };
-    reader.readAsDataURL(file);
+    const objectUrl = URL.createObjectURL(file);
+    setCropImageUrl(objectUrl);
+    setIsCropOpen(true);
+    setCropZoom(1);
+    setCropOffset({ x: 0, y: 0 });
     event.target.value = "";
   };
 
@@ -282,6 +288,107 @@ export default function DataInsightsScreen({
       description: "You can upload a new photo anytime.",
     });
   };
+
+  const clampOffset = (next: { x: number; y: number }) => {
+    if (!imageSize) return next;
+    const baseScale = Math.max(CROP_SIZE / imageSize.width, CROP_SIZE / imageSize.height);
+    const totalScale = baseScale * cropZoom;
+    const maxOffsetX = Math.max(0, (imageSize.width * totalScale - CROP_SIZE) / 2);
+    const maxOffsetY = Math.max(0, (imageSize.height * totalScale - CROP_SIZE) / 2);
+    return {
+      x: Math.max(-maxOffsetX, Math.min(maxOffsetX, next.x)),
+      y: Math.max(-maxOffsetY, Math.min(maxOffsetY, next.y)),
+    };
+  };
+
+  useEffect(() => {
+    if (!imageSize) return;
+    setCropOffset((prev) => clampOffset(prev));
+  }, [imageSize, cropZoom]);
+
+  const handleCropCancel = () => {
+    if (cropImageUrl) {
+      URL.revokeObjectURL(cropImageUrl);
+    }
+    setCropImageUrl(null);
+    setIsCropOpen(false);
+    setImageSize(null);
+  };
+
+  const handleCropSave = () => {
+    if (!cropImageUrl || !imageRef.current || !imageSize) {
+      return;
+    }
+
+    const baseScale = Math.max(CROP_SIZE / imageSize.width, CROP_SIZE / imageSize.height);
+    const totalScale = baseScale * cropZoom;
+    const scaleRatio = OUTPUT_SIZE / CROP_SIZE;
+    const drawWidth = imageSize.width * totalScale * scaleRatio;
+    const drawHeight = imageSize.height * totalScale * scaleRatio;
+    const drawX = (OUTPUT_SIZE - drawWidth) / 2 + cropOffset.x * scaleRatio;
+    const drawY = (OUTPUT_SIZE - drawHeight) / 2 + cropOffset.y * scaleRatio;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = OUTPUT_SIZE;
+    canvas.height = OUTPUT_SIZE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.drawImage(imageRef.current, drawX, drawY, drawWidth, drawHeight);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    setPhotoUrl(dataUrl);
+    toast({
+      title: "Profile photo updated",
+      description: "Your photo will appear across all tabs.",
+    });
+    handleCropCancel();
+  };
+
+  const handleCropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!imageSize) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragStateRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      offsetX: cropOffset.x,
+      offsetY: cropOffset.y,
+    };
+    setIsDragging(true);
+  };
+
+  const handleCropPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStateRef.current) return;
+    const dx = event.clientX - dragStateRef.current.x;
+    const dy = event.clientY - dragStateRef.current.y;
+    const nextOffset = clampOffset({
+      x: dragStateRef.current.offsetX + dx,
+      y: dragStateRef.current.offsetY + dy,
+    });
+    setCropOffset(nextOffset);
+  };
+
+  const handleCropPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStateRef.current) return;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    dragStateRef.current = null;
+    setIsDragging(false);
+  };
+
+  const imageStyle = useMemo(() => {
+    if (!imageSize) {
+      return {
+        transform: `translate(-50%, -50%) scale(${cropZoom})`,
+      };
+    }
+    const baseScale = Math.max(CROP_SIZE / imageSize.width, CROP_SIZE / imageSize.height);
+    const totalScale = baseScale * cropZoom;
+    return {
+      width: imageSize.width,
+      height: imageSize.height,
+      transform: `translate(-50%, -50%) translate(${cropOffset.x}px, ${cropOffset.y}px) scale(${totalScale})`,
+      transformOrigin: "center",
+    };
+  }, [imageSize, cropOffset.x, cropOffset.y, cropZoom, CROP_SIZE]);
 
   const handleAddUpdatePhotos = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -571,6 +678,72 @@ export default function DataInsightsScreen({
             data-testid="input-profile-photo"
           />
         </section>
+
+        <Dialog
+          open={isCropOpen}
+          onOpenChange={(open) => {
+            if (!open) handleCropCancel();
+          }}
+        >
+          <DialogContent className="bg-black border-white/10 text-white max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="text-lg">Crop profile photo</DialogTitle>
+              <DialogDescription className="text-white/60">
+                Drag to reposition and use the slider to zoom.
+              </DialogDescription>
+            </DialogHeader>
+            {cropImageUrl && (
+              <div className="space-y-4">
+                <div
+                  className={`relative mx-auto overflow-hidden rounded-2xl border border-white/10 bg-black/60 ${
+                    isDragging ? "cursor-grabbing" : "cursor-grab"
+                  }`}
+                  style={{ width: CROP_SIZE, height: CROP_SIZE }}
+                  onPointerDown={handleCropPointerDown}
+                  onPointerMove={handleCropPointerMove}
+                  onPointerUp={handleCropPointerUp}
+                  onPointerLeave={handleCropPointerUp}
+                >
+                  <img
+                    ref={imageRef}
+                    src={cropImageUrl}
+                    alt="Crop preview"
+                    onLoad={(event) => {
+                      const target = event.currentTarget;
+                      setImageSize({
+                        width: target.naturalWidth,
+                        height: target.naturalHeight,
+                      });
+                    }}
+                    className="absolute left-1/2 top-1/2 select-none"
+                    style={imageStyle}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-white/60">Zoom</label>
+                  <input
+                    type="range"
+                    min={1}
+                    max={3}
+                    step={0.05}
+                    value={cropZoom}
+                    onChange={(event) => setCropZoom(Number(event.target.value))}
+                    className="w-full accent-[#6fa5ff]"
+                    data-testid="input-crop-zoom"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={handleCropCancel} className="flex-1">
+                    Cancel
+                  </Button>
+                  <Button type="button" onClick={handleCropSave} className="flex-1">
+                    Save
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
           <div className="flex items-center justify-between">
