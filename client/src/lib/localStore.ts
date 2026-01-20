@@ -123,6 +123,7 @@ export const getLatestHealthEntry = (userId: string) => {
 };
 
 export const createHealthEntry = (data: Partial<HealthEntry> & { userId: string }) => {
+  const previous = getLatestHealthEntry(data.userId);
   const entry: HealthEntry = {
     id: createId(),
     userId: data.userId,
@@ -142,11 +143,28 @@ export const createHealthEntry = (data: Partial<HealthEntry> & { userId: string 
     symptoms: data.symptoms || [],
     notes: data.notes,
   };
+  const mergedEntry: HealthEntry = previous
+    ? {
+        ...entry,
+        glucose: entry.glucose ?? previous.glucose,
+        activity: entry.activity ?? previous.activity,
+        recovery: entry.recovery ?? previous.recovery,
+        strain: entry.strain ?? previous.strain,
+        aqi: entry.aqi ?? previous.aqi,
+        heartRate: entry.heartRate ?? previous.heartRate,
+        hrv: entry.hrv ?? previous.hrv,
+        sleepHours: entry.sleepHours ?? previous.sleepHours,
+        bloodPressureSystolic: entry.bloodPressureSystolic ?? previous.bloodPressureSystolic,
+        bloodPressureDiastolic: entry.bloodPressureDiastolic ?? previous.bloodPressureDiastolic,
+        steps: entry.steps ?? previous.steps,
+        symptomSeverity: entry.symptomSeverity ?? previous.symptomSeverity,
+      }
+    : entry;
   const entries = getStore<HealthEntry>(HEALTH_ENTRIES_KEY);
-  const updated = [entry, ...entries];
+  const updated = [mergedEntry, ...entries];
   setStore(HEALTH_ENTRIES_KEY, updated);
-  maybeCreateBioSignatureSnapshot(entry);
-  return entry;
+  maybeCreateBioSignatureSnapshot(mergedEntry);
+  return mergedEntry;
 };
 
 export const getEnvironmentalReadings = (userId: string) => {
