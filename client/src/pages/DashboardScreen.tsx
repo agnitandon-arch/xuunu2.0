@@ -52,8 +52,10 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const [strengthMinutes, setStrengthMinutes] = useState("");
   const [cardioMinutes, setCardioMinutes] = useState("");
   const [refreshingMetric, setRefreshingMetric] = useState<string | null>(null);
-  const stripePortalUrl = (import.meta.env as Record<string, string | undefined>)
-    .VITE_STRIPE_PAYMENT_URL;
+  const env = import.meta.env as Record<string, string | undefined>;
+  const stripePortalUrl = env.VITE_STRIPE_PAYMENT_URL;
+  const stripeMonthlyUrl = env.VITE_STRIPE_MONTHLY_URL;
+  const stripeYearlyUrl = env.VITE_STRIPE_YEARLY_URL;
 
   const { data: latestHealth, isLoading: healthLoading, refetch: refetchHealth } =
     useQuery<HealthEntry | null>({
@@ -148,12 +150,20 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     }
   };
 
-  const handleOpenPaymentPortal = () => {
-    const portalUrl = stripePortalUrl || "https://stripe.com";
+  const handleOpenPaymentPortal = (plan?: "monthly" | "yearly") => {
+    const planUrl =
+      plan === "monthly" ? stripeMonthlyUrl : plan === "yearly" ? stripeYearlyUrl : undefined;
+    const portalUrl =
+      planUrl || stripePortalUrl || stripeMonthlyUrl || stripeYearlyUrl || "https://stripe.com";
     window.open(portalUrl, "_blank");
     toast({
       title: "Premium membership",
-      description: "Powered by Stripe • $10/month or $100/year.",
+      description:
+        plan === "monthly"
+          ? "Stripe monthly • $10/month."
+          : plan === "yearly"
+            ? "Stripe yearly • $100/year."
+            : "Powered by Stripe • $10/month or $100/year.",
     });
   };
 
@@ -708,6 +718,32 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
           </TooltipProvider>
           <div className="text-xs text-white/50 mt-2 mb-4">
             Powered by Stripe • $10/month or $100/year
+          </div>
+          <div className="rounded-lg border border-white/10 bg-white/5 p-4 mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">Stripe Membership</div>
+                <div className="text-xs text-white/50">Choose a plan to unlock integrations.</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleOpenPaymentPortal("monthly")}
+                  data-testid="button-stripe-monthly"
+                >
+                  $10/mo
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleOpenPaymentPortal("yearly")}
+                  data-testid="button-stripe-yearly"
+                >
+                  $100/yr
+                </Button>
+              </div>
+            </div>
           </div>
           <div className="space-y-3">
             <button
