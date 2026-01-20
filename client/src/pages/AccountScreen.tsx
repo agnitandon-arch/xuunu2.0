@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LogOut, ImagePlus, Trash2, Users, MessageSquare, Camera, UserPlus } from "lucide-react";
+import { LogOut, ImagePlus, Trash2, Users, MessageSquare, Camera, UserPlus, Heart } from "lucide-react";
 import { useState, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -63,6 +63,8 @@ export default function AccountScreen({ onLogout, onViewFriend }: AccountScreenP
       photos: ["https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=400&q=80"],
       shared: true,
       source: "friend" as const,
+      likesCount: 12,
+      liked: false,
     },
     {
       id: "feed-2",
@@ -73,6 +75,8 @@ export default function AccountScreen({ onLogout, onViewFriend }: AccountScreenP
       photos: [],
       shared: true,
       source: "friend" as const,
+      likesCount: 7,
+      liked: false,
     },
     {
       id: "feed-3",
@@ -83,6 +87,8 @@ export default function AccountScreen({ onLogout, onViewFriend }: AccountScreenP
       photos: [],
       shared: true,
       source: "you" as const,
+      likesCount: 3,
+      liked: false,
     },
   ]);
 
@@ -193,6 +199,8 @@ export default function AccountScreen({ onLogout, onViewFriend }: AccountScreenP
       photos: updatePhotos,
       shared: shareUpdate,
       source: "you" as const,
+      likesCount: 0,
+      liked: false,
     };
 
     setFeedItems((prev) => [newItem, ...prev]);
@@ -227,6 +235,17 @@ export default function AccountScreen({ onLogout, onViewFriend }: AccountScreenP
     () => feedItems.filter((item) => item.shared),
     [feedItems]
   );
+
+  const handleToggleLike = (id: string) => {
+    setFeedItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const nextLiked = !item.liked;
+        const nextCount = Math.max(0, item.likesCount + (nextLiked ? 1 : -1));
+        return { ...item, liked: nextLiked, likesCount: nextCount };
+      })
+    );
+  };
 
   return (
     <div className="min-h-screen bg-black pb-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
@@ -387,6 +406,26 @@ export default function AccountScreen({ onLogout, onViewFriend }: AccountScreenP
                   </span>
                 </div>
                 <p className="mt-3 text-sm text-white/80">{item.content}</p>
+                {item.source === "friend" && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleLike(item.id)}
+                      className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition ${
+                        item.liked
+                          ? "border-rose-400/50 text-rose-200"
+                          : "border-white/10 text-white/60 hover:text-white"
+                      }`}
+                      data-testid={`button-like-${item.id}`}
+                    >
+                      <Heart className={`h-3.5 w-3.5 ${item.liked ? "fill-rose-300 text-rose-300" : ""}`} />
+                      Like
+                    </button>
+                    <span className="text-xs text-white/50">
+                      {item.likesCount} {item.likesCount === 1 ? "like" : "likes"}
+                    </span>
+                  </div>
+                )}
                 {item.photos.length > 0 && (
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     {item.photos.map((photo, index) => (
