@@ -94,15 +94,19 @@ export default function DeviceConnectionScreen() {
     mutationFn: async () => {
       if (!user?.uid) throw new Error("User not authenticated");
       
-      const response = await apiRequest("POST", "/api/terra/auth", { userId: user.uid, mode: "wearables" });
+      const response = await apiRequest("POST", "/api/terra/auth", {
+        userId: user.uid,
+        mode: "wearables",
+        provider: "APPLE_HEALTH",
+      });
       return await response.json();
     },
     onSuccess: (data: { url: string }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/connected-devices'] });
       window.open(data.url, "_blank");
       toast({
-        title: "Connect Devices",
-        description: "Complete the connection in the new window.",
+        title: "Connect Apple Health",
+        description: "Complete the Apple Health connection in the new window.",
       });
     },
     onError: (error: Error) => {
