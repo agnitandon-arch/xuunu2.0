@@ -15,6 +15,7 @@ import MedicationTrackerScreen from "@/pages/MedicationTrackerScreen";
 import ShowcaseAll from "@/pages/ShowcaseAll";
 import { Loader2 } from "lucide-react";
 import FriendProfileScreen, { FriendProfile } from "@/pages/FriendProfileScreen";
+import PublicProfileScreen from "@/pages/PublicProfileScreen";
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
@@ -60,7 +61,7 @@ function AppContent() {
       case "dashboard":
         return <DashboardScreen onNavigate={setActiveTab} />;
       case "data":
-        return <DataInsightsScreen />;
+        return <DataInsightsScreen onPreviewPublicProfile={() => setActiveTab("public-profile")} />;
       case "environmental":
         return <EnvironmentalScreen />;
       case "account":
@@ -80,6 +81,8 @@ function AppContent() {
             onBack={() => setActiveTab("account")}
           />
         );
+      case "public-profile":
+        return <PublicProfileScreen onBack={() => setActiveTab("data")} />;
       case "devices":
         return <DeviceConnectionScreen />;
       case "medications":
@@ -89,10 +92,12 @@ function AppContent() {
     }
   };
 
+  const navTab = activeTab === "public-profile" ? "data" : activeTab;
+
   return (
     <div className="min-h-screen bg-black text-white">
       {renderScreen()}
-      <MinimalBottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <MinimalBottomNav activeTab={navTab} onTabChange={setActiveTab} />
     </div>
   );
 }

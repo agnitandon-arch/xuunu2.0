@@ -51,7 +51,11 @@ const SHARE_TARGETS: ShareTarget[] = [
   },
 ];
 
-export default function DataInsightsScreen() {
+interface DataInsightsScreenProps {
+  onPreviewPublicProfile?: () => void;
+}
+
+export default function DataInsightsScreen({ onPreviewPublicProfile }: DataInsightsScreenProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const [shareUrl, setShareUrl] = useState("");
@@ -271,7 +275,13 @@ export default function DataInsightsScreen() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => window.open(profileUrl || "/app/profile/sample", "_blank")}
+                onClick={() => {
+                  if (onPreviewPublicProfile) {
+                    onPreviewPublicProfile();
+                    return;
+                  }
+                  window.open(profileUrl || "/app/profile/sample", "_blank");
+                }}
                 className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/70 transition hover:border-white/40 hover:text-white"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
