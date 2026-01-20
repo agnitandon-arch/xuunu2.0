@@ -17,7 +17,6 @@ const HEALTH_CONNECTION_SKIPPED_KEY = "xuunu-health-connection-skipped";
 export default function OnboardingScreen({ userId, onComplete }: OnboardingScreenProps) {
   const { toast } = useToast();
   const [hipaaAccepted, setHipaaAccepted] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [platform, setPlatform] = useState<"ios" | "android" | null>(null);
   const [skipConnection, setSkipConnection] = useState(false);
@@ -38,42 +37,6 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
     }
   }, []);
 
-  const handleConnectGoogleHealth = async () => {
-    if (!userId || isConnecting) return;
-    const isAndroid =
-      typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
-    if (!isAndroid) {
-      toast({
-        title: "Google Health requires Android",
-        description: "Open onboarding on an Android device to connect Google Health.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setIsConnecting(true);
-    try {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(APPLE_HEALTH_STORAGE_KEY, "true");
-        window.localStorage.removeItem(HEALTH_CONNECTION_SKIPPED_KEY);
-        window.open("https://fit.google.com/", "_blank");
-      }
-      setSkipConnection(false);
-      setIsConnected(true);
-      toast({
-        title: "Google Health connected",
-        description: "Allow access if prompted.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Connection failed",
-        description: error?.message || "Unable to connect Google Health right now.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
   const handleSelectPlatform = async (value: "ios" | "android") => {
     setPlatform(value);
     if (typeof window !== "undefined") {
@@ -91,7 +54,27 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
         description: "Apple Health syncs automatically on iOS.",
       });
     } else {
-      await handleConnectGoogleHealth();
+      const isAndroid =
+        typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+      if (!isAndroid) {
+        toast({
+          title: "Google Health requires Android",
+          description: "Open onboarding on an Android device to connect Google Health.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(APPLE_HEALTH_STORAGE_KEY, "true");
+        window.localStorage.removeItem(HEALTH_CONNECTION_SKIPPED_KEY);
+        window.open("https://fit.google.com/", "_blank");
+      }
+      setSkipConnection(false);
+      setIsConnected(true);
+      toast({
+        title: "Google Health connection started",
+        description: "Complete the connection on your Android device.",
+      });
     }
   };
 
@@ -180,7 +163,6 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
               type="button"
               variant={platform === "ios" ? "default" : "outline"}
               onClick={() => handleSelectPlatform("ios")}
-              disabled={isConnecting}
               data-testid="button-select-ios"
             >
               iPhone
@@ -189,36 +171,20 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
               type="button"
               variant={platform === "android" ? "default" : "outline"}
               onClick={() => handleSelectPlatform("android")}
-              disabled={isConnecting}
               data-testid="button-select-android"
             >
               Android
             </Button>
           </div>
-          {platform !== "ios" && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                if (platform === "android") {
-                  handleConnectGoogleHealth();
-                } else {
-                  toast({
-                    title: "Select your phone type",
-                    description: "Choose iPhone or Android first.",
-                    variant: "destructive",
-                  });
-                }
-              }}
-              disabled={isConnecting}
-              data-testid="button-connect-health"
-            >
-              {isConnected
-                ? "Google Health Connected"
-                : isConnecting
-                  ? "Connecting..."
-                  : "Connect Google Health"}
-            </Button>
+          {platform === "ios" && (
+            <div className="text-xs text-green-400">
+              Apple Health connected automatically.
+            </div>
+          )}
+          {platform === "android" && (
+            <div className="text-xs text-green-400">
+              Google Health connection started.
+            </div>
           )}
           <Button
             type="button"
