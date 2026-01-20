@@ -70,11 +70,13 @@ const SHARE_TARGETS: ShareTarget[] = [
 ];
 
 interface DataInsightsScreenProps {
+  onBack?: () => void;
   onPreviewPublicProfile?: () => void;
   onViewFriend?: (friend: FriendProfile) => void;
 }
 
 export default function DataInsightsScreen({
+  onBack,
   onPreviewPublicProfile,
   onViewFriend,
 }: DataInsightsScreenProps) {
@@ -472,6 +474,14 @@ export default function DataInsightsScreen({
     <div className="min-h-screen bg-black pb-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       <div className="max-w-3xl mx-auto px-6 py-8 space-y-8">
         <div className="space-y-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-2 text-xs text-white/70 hover:text-white"
+            data-testid="button-back-to-home"
+          >
+            Back to Home
+          </button>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold">Share My Progress</h1>

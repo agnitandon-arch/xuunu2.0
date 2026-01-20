@@ -32,10 +32,11 @@ import { useToast } from "@/hooks/use-toast";
 
 interface DashboardScreenProps {
   onNavigate?: (tab: string) => void;
+  onOpenProfile?: () => void;
   onTrackClick?: () => void;
 }
 
-export default function DashboardScreen({ onNavigate }: DashboardScreenProps) {
+export default function DashboardScreen({ onNavigate, onOpenProfile }: DashboardScreenProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [showBioSignature, setShowBioSignature] = useState(false);
@@ -211,7 +212,14 @@ export default function DashboardScreen({ onNavigate }: DashboardScreenProps) {
     <div className="min-h-screen bg-black pb-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       <div className="max-w-lg mx-auto px-6 py-8 space-y-8">
         <div className="flex items-center justify-between">
-          <ProfileAvatar className="h-10 w-10" />
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            className="rounded-full"
+            data-testid="button-open-profile"
+          >
+            <ProfileAvatar className="h-10 w-10" />
+          </button>
           <button
             onClick={() => setShowBioSignature(!showBioSignature)}
             className="text-xs uppercase tracking-widest text-primary hover-elevate active-elevate-2 px-4 py-2 rounded-full border border-primary/30"

@@ -4,7 +4,6 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import MinimalBottomNav from "@/components/MinimalBottomNav";
 import LoginScreen from "@/pages/LoginScreen";
 import DashboardScreen from "@/pages/DashboardScreen";
 import DataInsightsScreen from "@/pages/DataInsightsScreen";
@@ -58,10 +57,16 @@ function AppContent() {
   const renderScreen = () => {
     switch (activeTab) {
       case "dashboard":
-        return <DashboardScreen onNavigate={setActiveTab} />;
+        return (
+          <DashboardScreen
+            onNavigate={setActiveTab}
+            onOpenProfile={() => setActiveTab("data")}
+          />
+        );
       case "data":
         return (
           <DataInsightsScreen
+            onBack={() => setActiveTab("dashboard")}
             onPreviewPublicProfile={() => setActiveTab("public-profile")}
             onViewFriend={(friend) => {
               setSelectedFriend(friend);
@@ -70,20 +75,12 @@ function AppContent() {
           />
         );
       case "account":
-        return (
-          <AccountScreen
-            onLogout={handleLogout}
-            onViewFriend={(friend) => {
-              setSelectedFriend(friend);
-              setActiveTab("friend-profile");
-            }}
-          />
-        );
+        return <AccountScreen onLogout={handleLogout} />;
       case "friend-profile":
         return (
           <FriendProfileScreen
             friend={selectedFriend}
-            onBack={() => setActiveTab("account")}
+            onBack={() => setActiveTab("data")}
           />
         );
       case "public-profile":
@@ -93,16 +90,18 @@ function AppContent() {
       case "medications":
         return <MedicationTrackerScreen />;
       default:
-        return <DashboardScreen onNavigate={setActiveTab} />;
+        return (
+          <DashboardScreen
+            onNavigate={setActiveTab}
+            onOpenProfile={() => setActiveTab("data")}
+          />
+        );
     }
   };
-
-  const navTab = activeTab === "public-profile" ? "data" : activeTab;
 
   return (
     <div className="min-h-screen bg-black text-white">
       {renderScreen()}
-      <MinimalBottomNav activeTab={navTab} onTabChange={setActiveTab} />
     </div>
   );
 }
