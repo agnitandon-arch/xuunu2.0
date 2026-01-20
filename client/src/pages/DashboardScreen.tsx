@@ -63,20 +63,12 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     enabled: !!user,
   });
 
-  const { data: recentEntries, isLoading: entriesLoading } = useQuery<HealthEntry[]>({
-    queryKey: [`/api/health-entries?userId=${user?.uid}&limit=3`],
-    enabled: !!user,
-  });
-
   useEffect(() => {
     if (!user?.uid || healthLoading || envLoading) return;
     if (!latestHealth && !latestEnv) {
       seedInitialData(user.uid);
       queryClient.invalidateQueries({
         queryKey: [`/api/health-entries/latest?userId=${user.uid}`],
-      });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/health-entries?userId=${user.uid}&limit=3`],
       });
       queryClient.invalidateQueries({
         queryKey: [`/api/environmental-readings/latest?userId=${user.uid}`],
@@ -90,7 +82,6 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/health-entries/latest?userId=${user?.uid}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/health-entries?userId=${user?.uid}&limit=3`] });
       toast({
         title: "Health data saved",
         description: "Your entry has been recorded successfully.",
@@ -534,40 +525,6 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
         )}
 
         <MedicationQuickLog />
-
-        <div>
-          <div className="text-xs uppercase tracking-widest opacity-40 mb-4">RECENT ACTIVITY</div>
-          {entriesLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 text-primary animate-spin" />
-            </div>
-          ) : recentEntries && recentEntries.length > 0 ? (
-            <div className="space-y-3">
-              {recentEntries.map((entry, index) => (
-                <button
-                  key={entry.id}
-                  className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-                  data-testid={`button-entry-${index}`}
-                >
-                  <div className="text-left">
-                    <div className="text-sm opacity-60">{new Date(entry.timestamp).toLocaleString()}</div>
-                    <div className="text-xs opacity-40 mt-1">
-                      {entry.glucose && `Glucose: ${entry.glucose} • `}
-                      {entry.heartRate && `HR: ${entry.heartRate} • `}
-                      {entry.sleepHours && `Sleep: ${entry.sleepHours}h • `}
-                      {entry.steps && `Steps: ${entry.steps.toLocaleString()}`}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 opacity-40">
-              <p className="text-sm">No recent entries</p>
-              <p className="text-xs mt-2">Tap any metric above to log your first entry</p>
-            </div>
-          )}
-        </div>
 
         <div>
           <div className="text-xs uppercase tracking-widest opacity-40 mb-4">INTEGRATIONS</div>
