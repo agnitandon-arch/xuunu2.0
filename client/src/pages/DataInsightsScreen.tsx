@@ -340,20 +340,23 @@ export default function DataInsightsScreen() {
                       <h3 className="text-base font-semibold">{dashboard.title}</h3>
                       <p className="text-xs text-white/60">{dashboard.description}</p>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-white/60">
-                      {isPublic ? (
-                        <span className="flex items-center gap-1 text-green-400">
-                          <Globe className="h-3.5 w-3.5" /> Public
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-white/50">
-                          <Lock className="h-3.5 w-3.5" /> Private
-                        </span>
-                      )}
+                    <div className="flex items-center gap-3 text-xs text-white/60">
+                      <span className="uppercase tracking-widest text-[10px] text-white/40">
+                        Public
+                      </span>
                       <Switch
                         checked={isPublic}
                         onCheckedChange={(value) => toggleDashboardVisibility(dashboard.id, value)}
                       />
+                      {isPublic ? (
+                        <span className="flex items-center gap-1 text-green-400">
+                          <Globe className="h-3.5 w-3.5" /> Visible
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-white/50">
+                          <Lock className="h-3.5 w-3.5" /> Hidden
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3">
