@@ -39,7 +39,7 @@ interface DashboardScreenProps {
 export default function DashboardScreen({ onNavigate, onOpenProfile }: DashboardScreenProps) {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
-  const [showBioSignature, setShowBioSignature] = useState(false);
+  const [showBioSignature, setShowBioSignature] = useState(true);
   const [showSynergyDialog, setShowSynergyDialog] = useState(false);
   const [showBioSignatureDialog, setShowBioSignatureDialog] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
