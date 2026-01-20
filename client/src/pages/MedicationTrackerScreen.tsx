@@ -383,6 +383,7 @@ export default function MedicationTrackerScreen({ onBack }: MedicationTrackerScr
                 </form>
               </DialogContent>
             </Dialog>
+          </div>
         </div>
 
         {medicationsLoading ? (
