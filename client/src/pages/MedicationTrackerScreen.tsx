@@ -276,113 +276,113 @@ export default function MedicationTrackerScreen({ onBack }: MedicationTrackerScr
                   <DialogTitle>Add New Medication</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Medication Name</Label>
-                  <Input
-                    id="name"
-                    data-testid="input-medication-name"
-                    value={newMedication.name}
-                    onChange={(e) =>
-                      setNewMedication({ ...newMedication, name: e.target.value })
-                    }
-                    placeholder="e.g., Metformin"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="dosage">Dosage</Label>
-                  <Input
-                    id="dosage"
-                    data-testid="input-medication-dosage"
-                    value={newMedication.dosage}
-                    onChange={(e) =>
-                      setNewMedication({ ...newMedication, dosage: e.target.value })
-                    }
-                    placeholder="e.g., 500mg"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="frequency">Frequency</Label>
-                  <Input
-                    id="frequency"
-                    data-testid="input-medication-frequency"
-                    value={newMedication.frequency}
-                    onChange={(e) =>
-                      setNewMedication({ ...newMedication, frequency: e.target.value })
-                    }
-                    placeholder="e.g., Twice daily"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <Label>Reminder Times</Label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleAddTime}
-                      data-testid="button-add-time"
-                    >
-                      <Plus className="w-3 h-3 mr-1" />
-                      Add Time
-                    </Button>
+                  <div>
+                    <Label htmlFor="name">Medication Name</Label>
+                    <Input
+                      id="name"
+                      data-testid="input-medication-name"
+                      value={newMedication.name}
+                      onChange={(e) =>
+                        setNewMedication({ ...newMedication, name: e.target.value })
+                      }
+                      placeholder="e.g., Metformin"
+                      required
+                    />
                   </div>
-                  <div className="space-y-2">
-                    {newMedication.scheduledTimes.map((time, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <Input
-                          type="time"
-                          data-testid={`input-time-${index}`}
-                          value={time}
-                          onChange={(e) => handleTimeChange(index, e.target.value)}
-                          className="flex-1"
-                        />
-                        {newMedication.scheduledTimes.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveTime(index)}
-                            data-testid={`button-remove-time-${index}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+
+                  <div>
+                    <Label htmlFor="dosage">Dosage</Label>
+                    <Input
+                      id="dosage"
+                      data-testid="input-medication-dosage"
+                      value={newMedication.dosage}
+                      onChange={(e) =>
+                        setNewMedication({ ...newMedication, dosage: e.target.value })
+                      }
+                      placeholder="e.g., 500mg"
+                      required
+                    />
                   </div>
-                </div>
 
-                <div>
-                  <Label htmlFor="notes">Notes (Optional)</Label>
-                  <Textarea
-                    id="notes"
-                    data-testid="input-medication-notes"
-                    value={newMedication.notes}
-                    onChange={(e) =>
-                      setNewMedication({ ...newMedication, notes: e.target.value })
-                    }
-                    placeholder="Any additional notes..."
-                    rows={3}
-                  />
-                </div>
+                  <div>
+                    <Label htmlFor="frequency">Frequency</Label>
+                    <Input
+                      id="frequency"
+                      data-testid="input-medication-frequency"
+                      value={newMedication.frequency}
+                      onChange={(e) =>
+                        setNewMedication({ ...newMedication, frequency: e.target.value })
+                      }
+                      placeholder="e.g., Twice daily"
+                      required
+                    />
+                  </div>
 
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={createMedication.isPending}
-                  data-testid="button-submit-medication"
-                >
-                  {createMedication.isPending ? "Adding..." : "Add Medication"}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>Reminder Times</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleAddTime}
+                        data-testid="button-add-time"
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add Time
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {newMedication.scheduledTimes.map((time, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Input
+                            type="time"
+                            data-testid={`input-time-${index}`}
+                            value={time}
+                            onChange={(e) => handleTimeChange(index, e.target.value)}
+                            className="flex-1"
+                          />
+                          {newMedication.scheduledTimes.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveTime(index)}
+                              data-testid={`button-remove-time-${index}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="notes">Notes (Optional)</Label>
+                    <Textarea
+                      id="notes"
+                      data-testid="input-medication-notes"
+                      value={newMedication.notes}
+                      onChange={(e) =>
+                        setNewMedication({ ...newMedication, notes: e.target.value })
+                      }
+                      placeholder="Any additional notes..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={createMedication.isPending}
+                    data-testid="button-submit-medication"
+                  >
+                    {createMedication.isPending ? "Adding..." : "Add Medication"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
         </div>
 
         {medicationsLoading ? (
