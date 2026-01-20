@@ -324,9 +324,6 @@ export default function DataInsightsScreen() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold">Looker Studio Dashboards</h2>
-              <p className="text-xs text-white/50">
-                Toggle public visibility. Sample data is shown until dashboards load.
-              </p>
             </div>
           </div>
 
