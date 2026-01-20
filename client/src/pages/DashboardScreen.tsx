@@ -37,7 +37,7 @@ interface DashboardScreenProps {
 }
 
 export default function DashboardScreen({ onNavigate, onOpenProfile }: DashboardScreenProps) {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { toast } = useToast();
   const [showBioSignature, setShowBioSignature] = useState(false);
   const [showSynergyDialog, setShowSynergyDialog] = useState(false);
@@ -96,6 +96,18 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
       });
     },
   });
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Unable to sign out. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const connectBloodworkMutation = useMutation({
     mutationFn: async () => {
@@ -704,6 +716,17 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
               <span className="text-xs opacity-60">→</span>
             </button>
           </div>
+        </div>
+
+        <div className="pt-4">
+          <Button
+            variant="destructive"
+            onClick={handleLogout}
+            className="w-full h-13 rounded-full"
+            data-testid="button-logout"
+          >
+            Logout
+          </Button>
         </div>
       </div>
     </div>
