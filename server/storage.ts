@@ -102,7 +102,7 @@ export class DatabaseStorage implements IStorage {
   async createHealthEntry(entry: InsertHealthEntry): Promise<HealthEntry> {
     const [healthEntry] = await db
       .insert(healthEntries)
-      .values(entry)
+      .values(entry as typeof healthEntries.$inferInsert)
       .returning();
     return healthEntry;
   }
@@ -289,7 +289,7 @@ export class DatabaseStorage implements IStorage {
   async createMedication(medication: InsertMedication): Promise<Medication> {
     const [createdMedication] = await db
       .insert(medications)
-      .values(medication)
+      .values(medication as typeof medications.$inferInsert)
       .returning();
     return createdMedication;
   }
