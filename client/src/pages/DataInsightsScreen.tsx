@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Copy,
   ExternalLink,
@@ -8,6 +8,7 @@ import {
   UserPlus,
   Heart,
   Plus,
+  MapPin,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -19,6 +20,8 @@ import { useProfilePhoto } from "@/hooks/useProfilePhoto";
 import type { FriendProfile } from "@/pages/FriendProfileScreen";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useQuery } from "@tanstack/react-query";
+import type { HealthEntry } from "@shared/schema";
 
 type ShareTarget = {
   id: "tiktok" | "facebook" | "x" | "instagram" | "whatsapp";
@@ -31,6 +34,52 @@ const FEED_STORAGE_KEY = "xuunu-feed-items";
 const FEED_DRAFT_KEY = "xuunu-feed-draft";
 const FEED_NOTIFIED_KEY = "xuunu-feed-notified";
 const NOTIFICATIONS_KEY = "xuunu-notifications-enabled";
+const CHALLENGE_STORAGE_KEY = "xuunu-challenges";
+
+type ChallengeType = "Hiking" | "Running" | "Biking";
+
+type ChallengeLocation = {
+  lat: number;
+  lng: number;
+} | null;
+
+type ChallengeRecord = {
+  id: string;
+  userId: string;
+  type: ChallengeType;
+  startedAt: string;
+  endedAt: string;
+  durationSec: number;
+  stepsStart: number;
+  stepsEnd: number;
+  stepsDelta: number;
+  startLocation: ChallengeLocation;
+  endLocation: ChallengeLocation;
+  autoStopped?: boolean;
+  shared?: boolean;
+};
+
+type ChallengeSummary = {
+  type: ChallengeType;
+  durationSec: number;
+  stepsDelta: number;
+  startLocation: ChallengeLocation;
+  endLocation: ChallengeLocation;
+};
+
+type FeedItem = {
+  id: string;
+  authorName: string;
+  authorAvatar: string;
+  time: string;
+  content: string;
+  photos: string[];
+  shared: boolean;
+  source: "friend" | "you";
+  likesCount: number;
+  liked: boolean;
+  challenge?: ChallengeSummary;
+};
 
 type NetworkMember = {
   id: string;
@@ -91,6 +140,19 @@ export default function DataInsightsScreen({
   const [updateText, setUpdateText] = useState("");
   const [updatePhotos, setUpdatePhotos] = useState<string[]>([]);
   const [shareUpdate, setShareUpdate] = useState(true);
+  const [showChallengePicker, setShowChallengePicker] = useState(false);
+  const [activeChallenge, setActiveChallenge] = useState<{
+    id: string;
+    type: ChallengeType;
+    startedAt: string;
+    stepsStart: number;
+    startLocation: ChallengeLocation;
+  } | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [pendingChallenge, setPendingChallenge] = useState<ChallengeRecord | null>(null);
+  const [shareChallenge, setShareChallenge] = useState(true);
+  const lastStepsRef = useRef<number | null>(null);
+  const lastStepChangeAtRef = useRef<number | null>(null);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteValue, setInviteValue] = useState("");
   const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
@@ -108,6 +170,11 @@ export default function DataInsightsScreen({
   const OUTPUT_SIZE = 320;
   const MAX_PHOTO_SIZE = 100 * 1024 * 1024;
   const displayName = user?.displayName || user?.email?.split("@")[0] || "Member";
+
+  const { data: latestHealth, refetch: refetchHealth } = useQuery<HealthEntry | null>({
+    queryKey: [`/api/health-entries/latest?userId=${user?.uid}`],
+    enabled: !!user?.uid,
+  });
 
   const canNotify = () =>
     typeof window !== "undefined" &&
@@ -429,7 +496,7 @@ export default function DataInsightsScreen({
     });
   };
 
-  const buildDefaultFeedItems = (avatar: string) => [
+  const buildDefaultFeedItems = (avatar: string): FeedItem[] => [
     {
       id: "feed-1",
       authorName: "Ava Martinez",
@@ -468,14 +535,14 @@ export default function DataInsightsScreen({
     },
   ];
 
-  const [feedItems, setFeedItems] = useState(() => {
+  const [feedItems, setFeedItems] = useState<FeedItem[]>(() => {
     if (typeof window === "undefined") {
       return buildDefaultFeedItems(photoUrl || "");
     }
     const stored = window.localStorage.getItem(FEED_STORAGE_KEY);
     if (stored) {
       try {
-        return JSON.parse(stored) as ReturnType<typeof buildDefaultFeedItems>;
+        return JSON.parse(stored) as FeedItem[];
       } catch {
         return buildDefaultFeedItems(photoUrl || "");
       }
@@ -585,6 +652,208 @@ export default function DataInsightsScreen({
     });
     sendNotification("Update shared", "Your progress update is live.");
   };
+
+  const getCurrentLocation = useCallback(
+    () =>
+      new Promise<ChallengeLocation>((resolve) => {
+        if (typeof navigator === "undefined" || !navigator.geolocation) {
+          resolve(null);
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            });
+          },
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      }),
+    []
+  );
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const formatCoord = (value: number) => value.toFixed(6);
+
+  const getDistanceKm = (start: ChallengeLocation, end: ChallengeLocation) => {
+    if (!start || !end) return 0;
+    const toRad = (value: number) => (value * Math.PI) / 180;
+    const dLat = toRad(end.lat - start.lat);
+    const dLng = toRad(end.lng - start.lng);
+    const lat1 = toRad(start.lat);
+    const lat2 = toRad(end.lat);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return 2 * 6371 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
+  const getZoomForDistance = (distanceKm: number) => {
+    if (distanceKm < 0.5) return 15;
+    if (distanceKm < 2) return 14;
+    if (distanceKm < 5) return 13;
+    if (distanceKm < 10) return 12;
+    if (distanceKm < 20) return 11;
+    return 10;
+  };
+
+  const buildChallengeMapUrl = (start: ChallengeLocation, end: ChallengeLocation) => {
+    if (!start || !end) return "";
+    const distanceKm = getDistanceKm(start, end);
+    const zoom = getZoomForDistance(distanceKm);
+    const centerLat = (start.lat + end.lat) / 2;
+    const centerLng = (start.lng + end.lng) / 2;
+    const markers = `markers=${formatCoord(start.lat)},${formatCoord(start.lng)},red-pushpin|${formatCoord(
+      end.lat
+    )},${formatCoord(end.lng)},blue-pushpin`;
+    return `https://staticmap.openstreetmap.de/staticmap.php?center=${formatCoord(
+      centerLat
+    )},${formatCoord(centerLng)}&zoom=${zoom}&size=640x320&maptype=mapnik&${markers}`;
+  };
+
+  const saveChallenge = (challenge: ChallengeRecord) => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(CHALLENGE_STORAGE_KEY);
+      const parsed = stored ? (JSON.parse(stored) as ChallengeRecord[]) : [];
+      const updated = [challenge, ...parsed];
+      window.localStorage.setItem(CHALLENGE_STORAGE_KEY, JSON.stringify(updated));
+    } catch {
+      // Ignore storage failures.
+    }
+  };
+
+  const handleStartChallenge = async (type: ChallengeType) => {
+    if (!user) return;
+    const startedAt = new Date().toISOString();
+    const stepsStart = typeof latestHealth?.steps === "number" ? latestHealth.steps : 0;
+    const startLocation = await getCurrentLocation();
+    const id = `challenge-${Date.now()}`;
+    setActiveChallenge({ id, type, startedAt, stepsStart, startLocation });
+    setElapsedSeconds(0);
+    lastStepsRef.current = stepsStart;
+    lastStepChangeAtRef.current = Date.now();
+    setShowChallengePicker(false);
+    toast({
+      title: `${type} challenge started`,
+      description: "Timer is running. Move to record steps.",
+    });
+  };
+
+  const handleStopChallenge = useCallback(
+    async (autoStopped = false) => {
+      if (!activeChallenge || !user) return;
+      const current = activeChallenge;
+      setActiveChallenge(null);
+      const endLocation = await getCurrentLocation();
+      const stepsEnd =
+        typeof latestHealth?.steps === "number"
+          ? latestHealth.steps
+          : lastStepsRef.current ?? current.stepsStart;
+      const stepsDelta = Math.max(0, stepsEnd - current.stepsStart);
+      const endedAt = new Date().toISOString();
+      const durationSec = Math.max(
+        0,
+        Math.floor((Date.now() - new Date(current.startedAt).getTime()) / 1000)
+      );
+      const record: ChallengeRecord = {
+        id: current.id,
+        userId: user.uid,
+        type: current.type,
+        startedAt: current.startedAt,
+        endedAt,
+        durationSec,
+        stepsStart: current.stepsStart,
+        stepsEnd,
+        stepsDelta,
+        startLocation: current.startLocation,
+        endLocation,
+        autoStopped,
+        shared: false,
+      };
+      lastStepsRef.current = null;
+      lastStepChangeAtRef.current = null;
+      setPendingChallenge(record);
+      setShareChallenge(true);
+      toast({
+        title: autoStopped ? "Challenge auto-stopped" : "Challenge stopped",
+        description: "Review details and choose to share.",
+      });
+    },
+    [activeChallenge, getCurrentLocation, latestHealth?.steps, toast, user]
+  );
+
+  const handleFinalizeChallenge = (shared: boolean) => {
+    if (!pendingChallenge) return;
+    const record = { ...pendingChallenge, shared };
+    saveChallenge(record);
+    if (shared) {
+      const feedItem: FeedItem = {
+        id: `challenge-${record.id}`,
+        authorName: "You",
+        authorAvatar: photoUrl || "",
+        time: "Just now",
+        content: `${record.type} challenge completed in ${formatDuration(record.durationSec)} (${record.stepsDelta.toLocaleString()} steps).`,
+        photos: [],
+        shared,
+        source: "you",
+        likesCount: 0,
+        liked: false,
+        challenge: {
+          type: record.type,
+          durationSec: record.durationSec,
+          stepsDelta: record.stepsDelta,
+          startLocation: record.startLocation,
+          endLocation: record.endLocation,
+        },
+      };
+      setFeedItems((prev) => [feedItem, ...prev]);
+    }
+    setPendingChallenge(null);
+    setShareChallenge(true);
+  };
+
+  useEffect(() => {
+    if (!activeChallenge) return;
+    const started = new Date(activeChallenge.startedAt).getTime();
+    const interval = window.setInterval(() => {
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - started) / 1000)));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [activeChallenge]);
+
+  useEffect(() => {
+    if (!activeChallenge) return;
+    if (typeof latestHealth?.steps !== "number") return;
+    if (lastStepsRef.current === null) {
+      lastStepsRef.current = latestHealth.steps;
+      lastStepChangeAtRef.current = Date.now();
+      return;
+    }
+    if (latestHealth.steps !== lastStepsRef.current) {
+      lastStepsRef.current = latestHealth.steps;
+      lastStepChangeAtRef.current = Date.now();
+    }
+  }, [activeChallenge, latestHealth?.steps]);
+
+  useEffect(() => {
+    if (!activeChallenge) return;
+    const interval = window.setInterval(() => {
+      refetchHealth();
+      const lastChange = lastStepChangeAtRef.current ?? Date.now();
+      if (Date.now() - lastChange >= 5 * 60 * 1000) {
+        handleStopChallenge(true);
+      }
+    }, 60000);
+    return () => window.clearInterval(interval);
+  }, [activeChallenge, handleStopChallenge, refetchHealth]);
 
   const handleInviteFriend = () => {
     if (!inviteValue.trim()) {
@@ -852,6 +1121,152 @@ export default function DataInsightsScreen({
           )}
         </section>
 
+      <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-widest text-white/70">
+              Challenges
+            </h3>
+            <p className="text-xs text-white/50">
+              Join a challenge to track your time, steps, and pins.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setShowChallengePicker(true)}
+            data-testid="button-join-challenge"
+            disabled={!user || !!activeChallenge}
+          >
+            Join Challenge
+          </Button>
+        </div>
+        {activeChallenge && (
+          <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold">{activeChallenge.type} Challenge</p>
+                <p className="text-xs text-white/50">
+                  Started {new Date(activeChallenge.startedAt).toLocaleTimeString()}
+                </p>
+              </div>
+              <div className="text-lg font-mono text-primary">
+                {formatDuration(elapsedSeconds)}
+              </div>
+            </div>
+            {activeChallenge.startLocation && (
+              <div className="text-xs text-white/50">
+                Start pin: {activeChallenge.startLocation.lat.toFixed(4)},{" "}
+                {activeChallenge.startLocation.lng.toFixed(4)}
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-white/50">
+                Steps recorded:{" "}
+                {(lastStepsRef.current ?? activeChallenge.stepsStart).toLocaleString()}
+              </div>
+              <Button
+                variant="destructive"
+                onClick={() => handleStopChallenge(false)}
+                data-testid="button-stop-challenge"
+              >
+                Stop Challenge
+              </Button>
+            </div>
+            <p className="text-[11px] text-white/40">
+              Auto-stops after 5 minutes with no step updates.
+            </p>
+          </div>
+        )}
+      </section>
+
+      <Dialog open={showChallengePicker} onOpenChange={setShowChallengePicker}>
+        <DialogContent className="bg-black border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle>Join a challenge</DialogTitle>
+            <DialogDescription className="text-white/60">
+              Pick a challenge type to start your timer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            {(["Hiking", "Running", "Biking"] as ChallengeType[]).map((type) => (
+              <Button
+                key={type}
+                variant="outline"
+                onClick={() => handleStartChallenge(type)}
+                data-testid={`button-start-${type.toLowerCase()}-challenge`}
+              >
+                {type} Challenge
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!pendingChallenge}
+        onOpenChange={(open) => {
+          if (!open && pendingChallenge) {
+            handleFinalizeChallenge(false);
+          }
+        }}
+      >
+        <DialogContent className="bg-black border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle>Challenge complete</DialogTitle>
+            <DialogDescription className="text-white/60">
+              Review your stats and choose whether to share.
+            </DialogDescription>
+          </DialogHeader>
+          {pendingChallenge && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">{pendingChallenge.type} Challenge</span>
+                  <span className="font-mono text-primary">
+                    {formatDuration(pendingChallenge.durationSec)}
+                  </span>
+                </div>
+                <div className="text-xs text-white/60">
+                  Steps: {pendingChallenge.stepsDelta.toLocaleString()}
+                </div>
+                {pendingChallenge.autoStopped && (
+                  <div className="text-xs text-yellow-300/80">
+                    Auto-stopped after steps stopped updating.
+                  </div>
+                )}
+                {pendingChallenge.startLocation && (
+                  <div className="text-xs text-white/60">
+                    Start pin: {pendingChallenge.startLocation.lat.toFixed(4)},{" "}
+                    {pendingChallenge.startLocation.lng.toFixed(4)}
+                  </div>
+                )}
+                {pendingChallenge.endLocation && (
+                  <div className="text-xs text-white/60">
+                    Stop pin: {pendingChallenge.endLocation.lat.toFixed(4)},{" "}
+                    {pendingChallenge.endLocation.lng.toFixed(4)}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3">
+                <div>
+                  <p className="text-sm font-medium">Share to public profile</p>
+                  <p className="text-xs text-white/60">Adds this challenge to the leaderboard.</p>
+                </div>
+                <Switch checked={shareChallenge} onCheckedChange={setShareChallenge} />
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="outline" onClick={() => handleFinalizeChallenge(false)}>
+                  Keep Private
+                </Button>
+                <Button onClick={() => handleFinalizeChallenge(shareChallenge)}>
+                  Save Challenge
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -957,6 +1372,41 @@ export default function DataInsightsScreen({
                   </span>
                 </div>
                 <p className="mt-3 text-sm text-white/80">{item.content}</p>
+                {item.challenge && (
+                  <div className="mt-3 space-y-2">
+                    {item.challenge.startLocation && item.challenge.endLocation ? (
+                      <>
+                        <div className="overflow-hidden rounded-lg border border-white/10 bg-black/40">
+                          <img
+                            src={buildChallengeMapUrl(
+                              item.challenge.startLocation,
+                              item.challenge.endLocation
+                            )}
+                            alt="Challenge map with start and stop pins"
+                            className="h-40 w-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-[11px] text-white/60">
+                          <span className="inline-flex items-center gap-1">
+                            <MapPin className="h-3 w-3 text-rose-300" />
+                            Start {item.challenge.startLocation.lat.toFixed(4)},{" "}
+                            {item.challenge.startLocation.lng.toFixed(4)}
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <MapPin className="h-3 w-3 text-sky-300" />
+                            Stop {item.challenge.endLocation.lat.toFixed(4)},{" "}
+                            {item.challenge.endLocation.lng.toFixed(4)}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-white/50">
+                        Challenge location pins unavailable.
+                      </div>
+                    )}
+                  </div>
+                )}
                 {item.source === "friend" && (
                   <div className="mt-3 flex items-center gap-2">
                     <button
