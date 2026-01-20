@@ -24,7 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MapPin, Loader2, Plus, Activity, Database, ChevronRight, Pill, Watch, Droplets } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { HealthEntry, EnvironmentalReading } from "@shared/schema";
@@ -47,23 +47,11 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [supportEmail, setSupportEmail] = useState("");
   const [supportMessage, setSupportMessage] = useState("");
-  
-  // Dialog states for each metric
-  const [glucoseDialog, setGlucoseDialog] = useState(false);
-  const [hrvDialog, setHrvDialog] = useState(false);
-  const [sleepDialog, setSleepDialog] = useState(false);
-  const [bpDialog, setBpDialog] = useState(false);
-  const [heartRateDialog, setHeartRateDialog] = useState(false);
-  const [stepsDialog, setStepsDialog] = useState(false);
-  
-  // Form states
-  const [glucose, setGlucose] = useState("");
-  const [hrv, setHrv] = useState("");
-  const [sleepHours, setSleepHours] = useState("");
-  const [systolic, setSystolic] = useState("");
-  const [diastolic, setDiastolic] = useState("");
-  const [heartRate, setHeartRate] = useState("");
-  const [steps, setSteps] = useState("");
+
+  const [strengthDialog, setStrengthDialog] = useState(false);
+  const [cardioDialog, setCardioDialog] = useState(false);
+  const [strengthMinutes, setStrengthMinutes] = useState("");
+  const [cardioMinutes, setCardioMinutes] = useState("");
 
   const { data: latestHealth, isLoading: healthLoading } = useQuery<HealthEntry | null>({
     queryKey: [`/api/health-entries/latest?userId=${user?.uid}`],
@@ -158,66 +146,24 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     },
   });
 
-  const handleGlucoseSubmit = () => {
-    if (!glucose || !user) return;
+  const handleStrengthSubmit = () => {
+    if (!strengthMinutes || !user) return;
     createEntryMutation.mutate({
       userId: user.uid,
-      glucose: parseInt(glucose),
+      strain: parseFloat(strengthMinutes),
     });
-    setGlucose("");
-    setGlucoseDialog(false);
+    setStrengthMinutes("");
+    setStrengthDialog(false);
   };
 
-  const handleHrvSubmit = () => {
-    if (!hrv || !user) return;
+  const handleCardioSubmit = () => {
+    if (!cardioMinutes || !user) return;
     createEntryMutation.mutate({
       userId: user.uid,
-      hrv: parseInt(hrv),
+      activity: parseFloat(cardioMinutes),
     });
-    setHrv("");
-    setHrvDialog(false);
-  };
-
-  const handleSleepSubmit = () => {
-    if (!sleepHours || !user) return;
-    createEntryMutation.mutate({
-      userId: user.uid,
-      sleepHours: parseFloat(sleepHours),
-    });
-    setSleepHours("");
-    setSleepDialog(false);
-  };
-
-  const handleBpSubmit = () => {
-    if (!systolic || !diastolic || !user) return;
-    createEntryMutation.mutate({
-      userId: user.uid,
-      bloodPressureSystolic: parseInt(systolic),
-      bloodPressureDiastolic: parseInt(diastolic),
-    });
-    setSystolic("");
-    setDiastolic("");
-    setBpDialog(false);
-  };
-
-  const handleHeartRateSubmit = () => {
-    if (!heartRate || !user) return;
-    createEntryMutation.mutate({
-      userId: user.uid,
-      heartRate: parseInt(heartRate),
-    });
-    setHeartRate("");
-    setHeartRateDialog(false);
-  };
-
-  const handleStepsSubmit = () => {
-    if (!steps || !user) return;
-    createEntryMutation.mutate({
-      userId: user.uid,
-      steps: parseInt(steps),
-    });
-    setSteps("");
-    setStepsDialog(false);
+    setCardioMinutes("");
+    setCardioDialog(false);
   };
 
   const handleLocationUpdate = (lat: number, lng: number) => {
@@ -264,13 +210,22 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   // Only use real data from database/integrations - no fake values
   const healthData = {
     glucose: latestHealth?.glucose || 0,
-    activity: 0, // Will come from Terra API integration
-    recovery: 0, // Will come from Terra API integration
-    strain: 0, // Will come from Terra API integration
+    activity: latestHealth?.activity ? Number(latestHealth.activity) : 0,
+    recovery: latestHealth?.recovery ? Number(latestHealth.recovery) : 0,
+    strain: latestHealth?.strain ? Number(latestHealth.strain) : 0,
     aqi: latestEnv?.aqi || 0,
     heartRate: latestHealth?.heartRate || 0,
     sleep: latestHealth?.sleepHours ? parseFloat(latestHealth.sleepHours.toString()) : 0,
   };
+
+  const formattedDate = useMemo(() => {
+    const now = new Date();
+    return now.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    });
+  }, []);
 
   // Calculate synergy level from real data only
   const synergyLevel = latestHealth && latestEnv && latestHealth.glucose && latestEnv.aqi ? 
@@ -281,14 +236,22 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     <div className="min-h-screen bg-black pb-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       <div className="max-w-lg mx-auto px-6 py-8 space-y-8">
         <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={onOpenProfile}
-            className="rounded-full"
-            data-testid="button-open-profile"
-          >
-            <ProfileAvatar className="h-10 w-10" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onOpenProfile}
+              className="rounded-full"
+              data-testid="button-open-profile"
+            >
+              <div className="flex flex-col items-center gap-1">
+                <ProfileAvatar className="h-10 w-10" />
+                <span className="text-[10px] uppercase tracking-widest text-white/50">
+                  Member
+                </span>
+              </div>
+            </button>
+            <div className="text-xs text-white/60">{formattedDate}</div>
+          </div>
           <button
             onClick={() => setShowBioSignature(!showBioSignature)}
             className="text-xs uppercase tracking-widest text-primary hover-elevate active-elevate-2 px-4 py-2 rounded-full border border-primary/30"
@@ -350,260 +313,167 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
             <div>
               <div className="text-xs uppercase tracking-widest opacity-40 mb-4">HEALTH METRICS</div>
               <div className="grid grid-cols-2 gap-3">
-                {/* Glucose */}
-                <Dialog open={glucoseDialog} onOpenChange={setGlucoseDialog}>
+                <Card data-testid="card-glucose">
+                  <CardContent className="p-4">
+                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Glucose</div>
+                    <div className="text-3xl font-bold font-mono text-primary">
+                      {latestHealth?.glucose || "--"}
+                    </div>
+                    {latestHealth?.glucose && <div className="text-xs opacity-60 mt-1">mg/dL</div>}
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-hrv">
+                  <CardContent className="p-4">
+                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">HRV</div>
+                    <div className="text-3xl font-bold font-mono text-primary">
+                      {latestHealth?.hrv || "--"}
+                    </div>
+                    {latestHealth?.hrv && <div className="text-xs opacity-60 mt-1">ms</div>}
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-sleep">
+                  <CardContent className="p-4">
+                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Sleep</div>
+                    <div className="text-3xl font-bold font-mono text-primary">
+                      {latestHealth?.sleepHours ? parseFloat(latestHealth.sleepHours.toString()).toFixed(1) : "--"}
+                    </div>
+                    {latestHealth?.sleepHours && <div className="text-xs opacity-60 mt-1">hours</div>}
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-bp">
+                  <CardContent className="p-4">
+                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Blood Pressure</div>
+                    <div className="text-2xl font-bold font-mono text-primary">
+                      {latestHealth?.bloodPressureSystolic && latestHealth?.bloodPressureDiastolic
+                        ? `${latestHealth.bloodPressureSystolic}/${latestHealth.bloodPressureDiastolic}`
+                        : "--"}
+                    </div>
+                    {latestHealth?.bloodPressureSystolic && <div className="text-xs opacity-60 mt-1">mmHg</div>}
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-heart-rate">
+                  <CardContent className="p-4">
+                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Heart Rate</div>
+                    <div className="text-3xl font-bold font-mono text-primary">
+                      {latestHealth?.heartRate || "--"}
+                    </div>
+                    {latestHealth?.heartRate && <div className="text-xs opacity-60 mt-1">bpm</div>}
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-steps">
+                  <CardContent className="p-4">
+                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Steps</div>
+                    <div className="text-3xl font-bold font-mono text-primary">
+                      {latestHealth?.steps ? latestHealth.steps.toLocaleString() : "--"}
+                    </div>
+                    {latestHealth?.steps && <div className="text-xs opacity-60 mt-1">today</div>}
+                  </CardContent>
+                </Card>
+
+                <Dialog open={strengthDialog} onOpenChange={setStrengthDialog}>
                   <DialogTrigger asChild>
-                    <Card className="cursor-pointer hover-elevate active-elevate-2" data-testid="card-glucose">
+                    <Card className="cursor-pointer hover-elevate active-elevate-2" data-testid="card-strength">
                       <CardContent className="p-4">
-                        <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Glucose</div>
+                        <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Strength Training</div>
                         <div className="text-3xl font-bold font-mono text-primary">
-                          {latestHealth?.glucose || "--"}
+                          {latestHealth?.strain ? Number(latestHealth.strain).toFixed(0) : "--"}
                         </div>
-                        {latestHealth?.glucose && <div className="text-xs opacity-60 mt-1">mg/dL</div>}
+                        {latestHealth?.strain && <div className="text-xs opacity-60 mt-1">min</div>}
                       </CardContent>
                     </Card>
                   </DialogTrigger>
                   <DialogContent className="bg-black border-white/10">
                     <DialogHeader>
-                      <DialogTitle>Log Glucose</DialogTitle>
-                      <DialogDescription>Enter your current blood glucose level</DialogDescription>
+                      <DialogTitle>Log Strength Training</DialogTitle>
+                      <DialogDescription>Enter your minutes of strength training</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                       <div>
-                        <Label htmlFor="glucose">Glucose (mg/dL)</Label>
+                        <Label htmlFor="strength">Strength Training (min)</Label>
                         <Input
-                          id="glucose"
+                          id="strength"
                           type="number"
-                          value={glucose}
-                          onChange={(e) => setGlucose(e.target.value)}
-                          placeholder="120"
+                          value={strengthMinutes}
+                          onChange={(e) => setStrengthMinutes(e.target.value)}
+                          placeholder="45"
                           className="bg-black border-white/20 mt-2"
-                          data-testid="input-glucose"
+                          data-testid="input-strength"
                         />
                       </div>
                     </div>
                     <DialogFooter>
-                      <Button onClick={handleGlucoseSubmit} disabled={createEntryMutation.isPending} data-testid="button-submit-glucose">
+                      <Button onClick={handleStrengthSubmit} disabled={createEntryMutation.isPending} data-testid="button-submit-strength">
                         {createEntryMutation.isPending ? "Saving..." : "Save"}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
 
-                {/* HRV */}
-                <Dialog open={hrvDialog} onOpenChange={setHrvDialog}>
+                <Dialog open={cardioDialog} onOpenChange={setCardioDialog}>
                   <DialogTrigger asChild>
-                    <Card className="cursor-pointer hover-elevate active-elevate-2" data-testid="card-hrv">
+                    <Card className="cursor-pointer hover-elevate active-elevate-2" data-testid="card-cardio">
                       <CardContent className="p-4">
-                        <div className="text-xs uppercase tracking-widest opacity-60 mb-2">HRV</div>
+                        <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Cardio</div>
                         <div className="text-3xl font-bold font-mono text-primary">
-                          {latestHealth?.hrv || "--"}
+                          {latestHealth?.activity ? Number(latestHealth.activity).toFixed(0) : "--"}
                         </div>
-                        {latestHealth?.hrv && <div className="text-xs opacity-60 mt-1">ms</div>}
+                        {latestHealth?.activity && <div className="text-xs opacity-60 mt-1">min</div>}
                       </CardContent>
                     </Card>
                   </DialogTrigger>
                   <DialogContent className="bg-black border-white/10">
                     <DialogHeader>
-                      <DialogTitle>Log HRV</DialogTitle>
-                      <DialogDescription>Enter your Heart Rate Variability</DialogDescription>
+                      <DialogTitle>Log Cardio</DialogTitle>
+                      <DialogDescription>Enter your minutes of cardio activity</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                       <div>
-                        <Label htmlFor="hrv">HRV (ms)</Label>
+                        <Label htmlFor="cardio">Cardio (min)</Label>
                         <Input
-                          id="hrv"
+                          id="cardio"
                           type="number"
-                          value={hrv}
-                          onChange={(e) => setHrv(e.target.value)}
-                          placeholder="65"
+                          value={cardioMinutes}
+                          onChange={(e) => setCardioMinutes(e.target.value)}
+                          placeholder="30"
                           className="bg-black border-white/20 mt-2"
-                          data-testid="input-hrv"
+                          data-testid="input-cardio"
                         />
                       </div>
                     </div>
                     <DialogFooter>
-                      <Button onClick={handleHrvSubmit} disabled={createEntryMutation.isPending} data-testid="button-submit-hrv">
+                      <Button onClick={handleCardioSubmit} disabled={createEntryMutation.isPending} data-testid="button-submit-cardio">
                         {createEntryMutation.isPending ? "Saving..." : "Save"}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
 
-                {/* Sleep */}
-                <Dialog open={sleepDialog} onOpenChange={setSleepDialog}>
-                  <DialogTrigger asChild>
-                    <Card className="cursor-pointer hover-elevate active-elevate-2" data-testid="card-sleep">
-                      <CardContent className="p-4">
-                        <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Sleep</div>
-                        <div className="text-3xl font-bold font-mono text-primary">
-                          {latestHealth?.sleepHours ? parseFloat(latestHealth.sleepHours.toString()).toFixed(1) : "--"}
-                        </div>
-                        {latestHealth?.sleepHours && <div className="text-xs opacity-60 mt-1">hours</div>}
-                      </CardContent>
-                    </Card>
-                  </DialogTrigger>
-                  <DialogContent className="bg-black border-white/10">
-                    <DialogHeader>
-                      <DialogTitle>Log Sleep</DialogTitle>
-                      <DialogDescription>Enter your sleep duration</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div>
-                        <Label htmlFor="sleep">Sleep Duration (hours)</Label>
-                        <Input
-                          id="sleep"
-                          type="number"
-                          step="0.5"
-                          value={sleepHours}
-                          onChange={(e) => setSleepHours(e.target.value)}
-                          placeholder="7.5"
-                          className="bg-black border-white/20 mt-2"
-                          data-testid="input-sleep"
-                        />
-                      </div>
+                <Card data-testid="card-aqi">
+                  <CardContent className="p-4">
+                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">AQI</div>
+                    <div className="text-3xl font-bold font-mono text-primary">
+                      {latestEnv?.aqi || "--"}
                     </div>
-                    <DialogFooter>
-                      <Button onClick={handleSleepSubmit} disabled={createEntryMutation.isPending} data-testid="button-submit-sleep">
-                        {createEntryMutation.isPending ? "Saving..." : "Save"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                    {latestEnv?.aqi && <div className="text-xs opacity-60 mt-1">AQI</div>}
+                  </CardContent>
+                </Card>
 
-                {/* Blood Pressure */}
-                <Dialog open={bpDialog} onOpenChange={setBpDialog}>
-                  <DialogTrigger asChild>
-                    <Card className="cursor-pointer hover-elevate active-elevate-2" data-testid="card-bp">
-                      <CardContent className="p-4">
-                        <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Blood Pressure</div>
-                        <div className="text-2xl font-bold font-mono text-primary">
-                          {latestHealth?.bloodPressureSystolic && latestHealth?.bloodPressureDiastolic
-                            ? `${latestHealth.bloodPressureSystolic}/${latestHealth.bloodPressureDiastolic}`
-                            : "--"}
-                        </div>
-                        {latestHealth?.bloodPressureSystolic && <div className="text-xs opacity-60 mt-1">mmHg</div>}
-                      </CardContent>
-                    </Card>
-                  </DialogTrigger>
-                  <DialogContent className="bg-black border-white/10">
-                    <DialogHeader>
-                      <DialogTitle>Log Blood Pressure</DialogTitle>
-                      <DialogDescription>Enter your blood pressure reading</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div>
-                        <Label htmlFor="systolic">Systolic (mmHg)</Label>
-                        <Input
-                          id="systolic"
-                          type="number"
-                          value={systolic}
-                          onChange={(e) => setSystolic(e.target.value)}
-                          placeholder="120"
-                          className="bg-black border-white/20 mt-2"
-                          data-testid="input-systolic"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="diastolic">Diastolic (mmHg)</Label>
-                        <Input
-                          id="diastolic"
-                          type="number"
-                          value={diastolic}
-                          onChange={(e) => setDiastolic(e.target.value)}
-                          placeholder="80"
-                          className="bg-black border-white/20 mt-2"
-                          data-testid="input-diastolic"
-                        />
-                      </div>
+                <Card data-testid="card-noise">
+                  <CardContent className="p-4">
+                    <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Headphone Noise</div>
+                    <div className="text-3xl font-bold font-mono text-primary">
+                      {latestEnv?.noiseAverage || latestEnv?.noiseCurrent || "--"}
                     </div>
-                    <DialogFooter>
-                      <Button onClick={handleBpSubmit} disabled={createEntryMutation.isPending} data-testid="button-submit-bp">
-                        {createEntryMutation.isPending ? "Saving..." : "Save"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-
-                {/* Heart Rate */}
-                <Dialog open={heartRateDialog} onOpenChange={setHeartRateDialog}>
-                  <DialogTrigger asChild>
-                    <Card className="cursor-pointer hover-elevate active-elevate-2" data-testid="card-heart-rate">
-                      <CardContent className="p-4">
-                        <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Heart Rate</div>
-                        <div className="text-3xl font-bold font-mono text-primary">
-                          {latestHealth?.heartRate || "--"}
-                        </div>
-                        {latestHealth?.heartRate && <div className="text-xs opacity-60 mt-1">bpm</div>}
-                      </CardContent>
-                    </Card>
-                  </DialogTrigger>
-                  <DialogContent className="bg-black border-white/10">
-                    <DialogHeader>
-                      <DialogTitle>Log Heart Rate</DialogTitle>
-                      <DialogDescription>Enter your current heart rate</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div>
-                        <Label htmlFor="heartRate">Heart Rate (bpm)</Label>
-                        <Input
-                          id="heartRate"
-                          type="number"
-                          value={heartRate}
-                          onChange={(e) => setHeartRate(e.target.value)}
-                          placeholder="72"
-                          className="bg-black border-white/20 mt-2"
-                          data-testid="input-heart-rate"
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button onClick={handleHeartRateSubmit} disabled={createEntryMutation.isPending} data-testid="button-submit-heart-rate">
-                        {createEntryMutation.isPending ? "Saving..." : "Save"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-
-                {/* Steps */}
-                <Dialog open={stepsDialog} onOpenChange={setStepsDialog}>
-                  <DialogTrigger asChild>
-                    <Card className="cursor-pointer hover-elevate active-elevate-2" data-testid="card-steps">
-                      <CardContent className="p-4">
-                        <div className="text-xs uppercase tracking-widest opacity-60 mb-2">Steps</div>
-                        <div className="text-3xl font-bold font-mono text-primary">
-                          {latestHealth?.steps ? latestHealth.steps.toLocaleString() : "--"}
-                        </div>
-                        {latestHealth?.steps && <div className="text-xs opacity-60 mt-1">today</div>}
-                      </CardContent>
-                    </Card>
-                  </DialogTrigger>
-                  <DialogContent className="bg-black border-white/10">
-                    <DialogHeader>
-                      <DialogTitle>Log Steps</DialogTitle>
-                      <DialogDescription>Enter your step count</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div>
-                        <Label htmlFor="steps">Steps</Label>
-                        <Input
-                          id="steps"
-                          type="number"
-                          value={steps}
-                          onChange={(e) => setSteps(e.target.value)}
-                          placeholder="10000"
-                          className="bg-black border-white/20 mt-2"
-                          data-testid="input-steps"
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button onClick={handleStepsSubmit} disabled={createEntryMutation.isPending} data-testid="button-submit-steps">
-                        {createEntryMutation.isPending ? "Saving..." : "Save"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                    {(latestEnv?.noiseAverage || latestEnv?.noiseCurrent) && (
+                      <div className="text-xs opacity-60 mt-1">dB</div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             </div>
 
