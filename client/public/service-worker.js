@@ -1,4 +1,4 @@
-const CACHE_NAME = 'xuunu-v1';
+const CACHE_NAME = 'xuunu-v2';
 const urlsToCache = [
   '/',
   '/index.html',
