@@ -732,7 +732,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
               </div>
               <ChevronRight className="w-4 h-4 opacity-60" />
             </button>
-            <div className="space-y-3 pl-4">
+            <div className="space-y-3">
               <button
                 className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
                 onClick={handleOpenPaymentPortal}
