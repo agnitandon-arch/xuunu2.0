@@ -697,11 +697,11 @@ export default function DataInsightsScreen({
     const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
 
-    const remainingSlots = 4 - updatePhotos.length;
+    const remainingSlots = 1 - updatePhotos.length;
     if (remainingSlots <= 0) {
       toast({
         title: "Photo limit reached",
-        description: "You can add up to 4 photos per update.",
+        description: "You can add up to 1 photo per update.",
         variant: "destructive",
       });
       return;
@@ -1926,7 +1926,7 @@ export default function DataInsightsScreen({
                 Share an Update
               </h3>
               <p className="text-xs text-white/50">
-                Post progress updates to your friends feed (max 4 photos).
+                Post progress updates to your friends feed.
               </p>
             </div>
           </div>
@@ -1951,14 +1951,13 @@ export default function DataInsightsScreen({
               <input
                 type="file"
                 accept="image/*"
-                multiple
                 className="hidden"
                 onChange={handleAddUpdatePhotos}
                 data-testid="input-update-photos"
               />
             </label>
             <span className="text-xs text-white/40">
-              {updatePhotos.length}/4 photos
+              {updatePhotos.length}/1 photo
             </span>
             <div className="ml-auto flex items-center gap-2 text-xs text-white/60">
               <span>{shareUpdate ? "Shared" : "Private"}</span>
