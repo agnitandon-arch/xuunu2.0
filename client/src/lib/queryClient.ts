@@ -13,7 +13,13 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const localRes = await handleLocalApi({ method, url, data });
+  let localRes: Response | null = null;
+  try {
+    localRes = await handleLocalApi({ method, url, data });
+  } catch (error) {
+    console.error("Local API failed, falling back to server:", error);
+    localRes = null;
+  }
   if (localRes) {
     await throwIfResNotOk(localRes);
     return localRes;
@@ -37,7 +43,13 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const url = queryKey.join("/") as string;
-    const localRes = await handleLocalApi({ method: "GET", url });
+    let localRes: Response | null = null;
+    try {
+      localRes = await handleLocalApi({ method: "GET", url });
+    } catch (error) {
+      console.error("Local API failed, falling back to server:", error);
+      localRes = null;
+    }
     const res =
       localRes ??
       (await fetch(url, {

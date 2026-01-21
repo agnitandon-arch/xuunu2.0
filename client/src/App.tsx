@@ -15,6 +15,7 @@ import { Loader2 } from "lucide-react";
 import FriendProfileScreen, { FriendProfile } from "@/pages/FriendProfileScreen";
 import PublicProfileScreen from "@/pages/PublicProfileScreen";
 import OnboardingScreen from "@/pages/OnboardingScreen";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
@@ -127,9 +128,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </ErrorBoundary>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
