@@ -121,14 +121,29 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   useEffect(() => {
     if (!user?.uid || healthLoading || envLoading) return;
     if (!latestHealth && !latestEnv) {
-      void seedInitialData(user.uid);
-      queryClient.invalidateQueries({
-        queryKey: [`/api/health-entries/latest?userId=${user.uid}`],
-      });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/environmental-readings/latest?userId=${user.uid}`],
-      });
+      let isActive = true;
+      const seedAndRefresh = async () => {
+        try {
+          await seedInitialData(user.uid);
+        } catch (error) {
+          console.error("Failed to seed initial data:", error);
+        }
+        if (!isActive) return;
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: [`/api/health-entries/latest?userId=${user.uid}`],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: [`/api/environmental-readings/latest?userId=${user.uid}`],
+          }),
+        ]);
+      };
+      void seedAndRefresh();
+      return () => {
+        isActive = false;
+      };
     }
+    return undefined;
   }, [user?.uid, latestHealth, latestEnv, healthLoading, envLoading]);
 
   const createEntryMutation = useMutation({

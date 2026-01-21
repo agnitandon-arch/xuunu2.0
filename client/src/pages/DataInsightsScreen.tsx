@@ -1370,9 +1370,12 @@ export default function DataInsightsScreen({
 
   const buildChallengeMapUrl = (start: ChallengeLocation, end: ChallengeLocation) => {
     const points = [start, end].filter(Boolean) as { lat: number; lng: number }[];
-    const validPoints = points.filter(
-      (point) => Number.isFinite(point.lat) && Number.isFinite(point.lng)
-    );
+    const validPoints = points
+      .map((point) => ({
+        lat: Number(point.lat),
+        lng: Number(point.lng),
+      }))
+      .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
     if (validPoints.length === 0) return "";
     const distanceKm =
       validPoints.length === 2 ? getDistanceKm(validPoints[0], validPoints[1]) : 0.3;
