@@ -464,13 +464,19 @@ export default function DataInsightsScreen({
     const unsubscribe = onSnapshot(
       scheduleQuery,
       (snapshot) => {
-        const schedules = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...(docSnap.data() as Omit<ChallengeSchedule, "id">),
-          invitedFriends: Array.isArray(docSnap.data().invitedFriends)
-            ? docSnap.data().invitedFriends
-            : [],
-        }));
+        const schedules = snapshot.docs
+          .map((docSnap) => {
+            const data = docSnap.data() as Omit<ChallengeSchedule, "id">;
+            const scheduledFor = normalizeDateValue(data.scheduledFor);
+            if (!scheduledFor) return null;
+            return {
+              id: docSnap.id,
+              ...data,
+              scheduledFor,
+              invitedFriends: Array.isArray(data.invitedFriends) ? data.invitedFriends : [],
+            };
+          })
+          .filter(Boolean) as ChallengeSchedule[];
         setScheduledChallenges(schedules);
       },
       () => setScheduledChallenges([])
@@ -487,7 +493,10 @@ export default function DataInsightsScreen({
     scheduleTimeoutsRef.current = {};
 
     scheduledChallenges.forEach((challenge) => {
-      const scheduledTime = new Date(challenge.scheduledFor).getTime();
+      const scheduledTime = getDateMs(challenge.scheduledFor);
+      if (!scheduledTime) {
+        return;
+      }
       const now = Date.now();
       if (notified.has(challenge.id)) {
         return;
@@ -790,10 +799,7 @@ export default function DataInsightsScreen({
         if (!item || typeof item !== "object") return null;
         const entry = item as Partial<FeedItem>;
         const authorName = entry.authorName || "You";
-        const postedAtValue =
-          typeof entry.postedAt === "string" && !Number.isNaN(new Date(entry.postedAt).getTime())
-            ? entry.postedAt
-            : undefined;
+        const postedAtValue = normalizeDateValue(entry.postedAt) ?? undefined;
         const challenge =
           entry.challenge && typeof entry.challenge === "object"
             ? {
@@ -807,6 +813,8 @@ export default function DataInsightsScreen({
           entry.challengeSchedule && typeof entry.challengeSchedule === "object"
             ? {
                 ...entry.challengeSchedule,
+                scheduledFor:
+                  normalizeDateValue(entry.challengeSchedule.scheduledFor) ?? "",
                 invitedFriends: Array.isArray(entry.challengeSchedule.invitedFriends)
                   ? entry.challengeSchedule.invitedFriends
                   : [],
@@ -1212,11 +1220,46 @@ export default function DataInsightsScreen({
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   };
 
-  const formatOptionalDate = (value: string | undefined, fallback: string) => {
-    if (!value) return fallback;
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return fallback;
-    return parsed.toLocaleString();
+  const normalizeDateValue = (value: unknown) => {
+    if (!value) return null;
+    if (typeof value === "string" || typeof value === "number") {
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.toISOString();
+    }
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) return null;
+      return value.toISOString();
+    }
+    if (typeof value === "object" && value && "toDate" in value) {
+      try {
+        const date = (value as { toDate: () => Date }).toDate();
+        if (!Number.isNaN(date.getTime())) return date.toISOString();
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const getDateMs = (value: unknown) => {
+    const normalized = normalizeDateValue(value);
+    if (!normalized) return null;
+    const parsed = new Date(normalized);
+    const time = parsed.getTime();
+    return Number.isNaN(time) ? null : time;
+  };
+
+  const formatOptionalDate = (value: unknown, fallback: string) => {
+    const normalized = normalizeDateValue(value);
+    if (!normalized) return fallback;
+    return new Date(normalized).toLocaleString();
+  };
+
+  const formatOptionalDateOnly = (value: unknown, fallback: string) => {
+    const normalized = normalizeDateValue(value);
+    if (!normalized) return fallback;
+    return new Date(normalized).toLocaleDateString();
   };
 
   const getLongevityConfig = (type: LongevityChallengeType) =>
@@ -1466,7 +1509,15 @@ export default function DataInsightsScreen({
   };
 
   const handleStartScheduledChallenge = async (challenge: ChallengeSchedule) => {
-    const startTime = new Date(challenge.scheduledFor).getTime();
+    const startTime = getDateMs(challenge.scheduledFor);
+    if (!startTime) {
+      toast({
+        title: "Missing schedule time",
+        description: "This challenge is missing a valid start time.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (Date.now() < startTime) {
       toast({
         title: "Too early",
@@ -1559,7 +1610,7 @@ export default function DataInsightsScreen({
       });
       return;
     }
-    const startedAt = new Date(longevityChallenge.startedAt).getTime();
+    const startedAt = getDateMs(longevityChallenge.startedAt) ?? Date.now();
     const daysSinceStart = Math.floor((Date.now() - startedAt) / (24 * 60 * 60 * 1000)) + 1;
     if (daysSinceStart > 7) {
       toast({
@@ -1811,16 +1862,15 @@ export default function DataInsightsScreen({
   const longevityRequiredDays = longevityConfig?.requiredDays ?? 7;
   const longevityLoggedDays = longevityChallenge?.logs.length ?? 0;
   const longevityStartedAtLabel = longevityChallenge
-    ? new Date(longevityChallenge.startedAt).toLocaleDateString()
+    ? formatOptionalDateOnly(longevityChallenge.startedAt, "")
     : "";
   const longevityTodayKey = getLocalDateKey(new Date());
   const longevityHasLoggedToday = longevityChallenge
     ? longevityChallenge.logs.some((log) => log.date === longevityTodayKey)
     : false;
-  const longevityDaysSinceStart = longevityChallenge
-    ? Math.floor(
-        (Date.now() - new Date(longevityChallenge.startedAt).getTime()) / (24 * 60 * 60 * 1000)
-      ) + 1
+  const longevityStartMs = longevityChallenge ? getDateMs(longevityChallenge.startedAt) : null;
+  const longevityDaysSinceStart = longevityChallenge && longevityStartMs
+    ? Math.floor((Date.now() - longevityStartMs) / (24 * 60 * 60 * 1000)) + 1
     : 0;
   const longevityDaysRemaining = longevityChallenge
     ? Math.max(0, 7 - longevityDaysSinceStart)
@@ -1841,15 +1891,18 @@ export default function DataInsightsScreen({
     let updated = false;
 
     scheduledChallenges.forEach((challenge) => {
-      const scheduledTime = new Date(challenge.scheduledFor).getTime();
-      if (scheduledTime <= Date.now()) {
+      const scheduledTime = getDateMs(challenge.scheduledFor);
+      if (!scheduledTime || scheduledTime <= Date.now()) {
         return;
       }
       const notifyKey = `scheduled-${challenge.id}`;
       if (dailyNotified[notifyKey] === todayKey) return;
       sendNotification(
         "Challenge reminder",
-        `${challenge.type} challenge starts ${new Date(challenge.scheduledFor).toLocaleString()}.`
+        `${challenge.type} challenge starts ${formatOptionalDate(
+          challenge.scheduledFor,
+          "soon"
+        )}.`
       );
       dailyNotified[notifyKey] = todayKey;
       updated = true;
@@ -2300,8 +2353,8 @@ export default function DataInsightsScreen({
           <div className="space-y-3">
             <p className="text-xs uppercase tracking-widest text-white/40">Scheduled Challenges</p>
             {scheduledChallenges.map((challenge) => {
-              const startTime = new Date(challenge.scheduledFor).getTime();
-              const isReady = scheduleNow >= startTime;
+              const startTime = getDateMs(challenge.scheduledFor);
+              const isReady = startTime !== null && scheduleNow >= startTime;
               return (
                 <div
                   key={challenge.id}
