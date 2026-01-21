@@ -1929,7 +1929,6 @@ export default function DataInsightsScreen({
                 Post progress updates to your friends feed (max 4 photos).
               </p>
             </div>
-            <span className="text-xs text-white/40">No photo storage</span>
           </div>
           <textarea
             value={updateText}
