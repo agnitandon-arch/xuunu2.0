@@ -10,6 +10,7 @@ import {
   Plus,
   MapPin,
   Flag,
+  Medal,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -43,6 +44,7 @@ const LONGEVITY_STORAGE_KEY = "xuunu-longevity-challenge";
 const CHALLENGE_SCHEDULE_NOTIFIED_KEY = "xuunu-challenge-schedule-notified";
 const CHALLENGE_DAILY_NOTIFIED_KEY = "xuunu-challenge-daily-notified";
 const DISPLAY_NAME_STORAGE_KEY = "xuunu-display-name";
+const TEAM_CHALLENGE_COMPLETED_KEY = "xuunu-team-challenge-completed";
 
 type ChallengeType = "Hiking" | "Running" | "Biking";
 
@@ -220,6 +222,7 @@ export default function DataInsightsScreen({
   const [isSavingName, setIsSavingName] = useState(false);
   const [editingFeedItemId, setEditingFeedItemId] = useState<string | null>(null);
   const [editingFeedTimestamp, setEditingFeedTimestamp] = useState("");
+  const [teamChallengeCount, setTeamChallengeCount] = useState(0);
   const [longevityChallenge, setLongevityChallenge] = useState<LongevityChallenge | null>(null);
   const [selectedLongevityType, setSelectedLongevityType] =
     useState<LongevityChallengeType | null>(null);
@@ -446,6 +449,20 @@ export default function DataInsightsScreen({
       setDisplayNameOverride(parsed[user.uid] ?? null);
     } catch {
       setDisplayNameOverride(null);
+    }
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !user?.uid) {
+      setTeamChallengeCount(0);
+      return;
+    }
+    try {
+      const stored = window.localStorage.getItem(TEAM_CHALLENGE_COMPLETED_KEY);
+      const parsed = stored ? (JSON.parse(stored) as Record<string, number>) : {};
+      setTeamChallengeCount(parsed[user.uid] ?? 0);
+    } catch {
+      setTeamChallengeCount(0);
     }
   }, [user?.uid]);
 
@@ -1539,6 +1556,20 @@ export default function DataInsightsScreen({
     if (!pendingChallenge) return;
     const record = { ...pendingChallenge, shared };
     saveChallenge(record);
+    if (record.invitedFriends && record.invitedFriends.length > 0 && user) {
+      if (typeof window !== "undefined") {
+        try {
+          const stored = window.localStorage.getItem(TEAM_CHALLENGE_COMPLETED_KEY);
+          const parsed = stored ? (JSON.parse(stored) as Record<string, number>) : {};
+          const nextCount = (parsed[user.uid] ?? 0) + 1;
+          parsed[user.uid] = nextCount;
+          window.localStorage.setItem(TEAM_CHALLENGE_COMPLETED_KEY, JSON.stringify(parsed));
+          setTeamChallengeCount(nextCount);
+        } catch {
+          // Ignore storage failures.
+        }
+      }
+    }
     if (shared) {
       const feedItem: FeedItem = {
         id: `challenge-${record.id}`,
@@ -1760,10 +1791,21 @@ export default function DataInsightsScreen({
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-                {hasUserChallengePost && (
-                  <div className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-primary/80">
-                    <Flag className="h-3 w-3" />
-                    Challenge
+                {(hasUserChallengePost || teamChallengeCount > 0) && (
+                  <div className="inline-flex items-center gap-2 text-primary/80">
+                    {hasUserChallengePost && (
+                      <span className="inline-flex items-center" aria-label="Challenge active">
+                        <Flag className="h-3 w-3" />
+                      </span>
+                    )}
+                    {teamChallengeCount > 0 && (
+                      <span
+                        className="inline-flex items-center text-yellow-300"
+                        aria-label="Team challenge completed"
+                      >
+                        <Medal className="h-3 w-3" />
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
