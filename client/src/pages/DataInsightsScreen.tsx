@@ -1398,7 +1398,17 @@ export default function DataInsightsScreen({
     return () => window.clearInterval(interval);
   }, []);
 
-  const formatCoord = (value: number) => value.toFixed(6);
+  const formatCoord = (value: number) => {
+    const parsed = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    return parsed.toFixed(6);
+  };
+
+  const formatCoordDisplay = (value: number) => {
+    const parsed = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(parsed)) return "--";
+    return parsed.toFixed(4);
+  };
 
   const getDistanceKm = (start: ChallengeLocation, end: ChallengeLocation) => {
     if (!start || !end) return 0;
@@ -1424,21 +1434,35 @@ export default function DataInsightsScreen({
 
   const buildChallengeMapUrl = (start: ChallengeLocation, end: ChallengeLocation) => {
     const points = [start, end].filter(Boolean) as { lat: number; lng: number }[];
-    if (points.length === 0) return "";
-    const distanceKm = points.length === 2 ? getDistanceKm(points[0], points[1]) : 0.3;
+    const validPoints = points.filter(
+      (point) => Number.isFinite(point.lat) && Number.isFinite(point.lng)
+    );
+    if (validPoints.length === 0) return "";
+    const distanceKm =
+      validPoints.length === 2 ? getDistanceKm(validPoints[0], validPoints[1]) : 0.3;
     const zoom = getZoomForDistance(distanceKm);
     const centerLat =
-      points.length === 2 ? (points[0].lat + points[1].lat) / 2 : points[0].lat;
+      validPoints.length === 2
+        ? (validPoints[0].lat + validPoints[1].lat) / 2
+        : validPoints[0].lat;
     const centerLng =
-      points.length === 2 ? (points[0].lng + points[1].lng) / 2 : points[0].lng;
-    const markers = points
-      .map((point, index) =>
-        `${formatCoord(point.lat)},${formatCoord(point.lng)},${index === 0 ? "red" : "blue"}`
-      )
+      validPoints.length === 2
+        ? (validPoints[0].lng + validPoints[1].lng) / 2
+        : validPoints[0].lng;
+    const markers = validPoints
+      .map((point, index) => {
+        const lat = formatCoord(point.lat);
+        const lng = formatCoord(point.lng);
+        if (!lat || !lng) return null;
+        return `${lat},${lng},${index === 0 ? "red" : "blue"}`;
+      })
+      .filter(Boolean)
       .join("|");
-    return `https://staticmap.openstreetmap.de/staticmap.php?center=${formatCoord(
-      centerLat
-    )},${formatCoord(centerLng)}&zoom=${zoom}&size=640x320&maptype=mapnik&markers=${encodeURIComponent(
+    if (!markers) return "";
+    const centerLatValue = formatCoord(centerLat);
+    const centerLngValue = formatCoord(centerLng);
+    if (!centerLatValue || !centerLngValue) return "";
+    return `https://staticmap.openstreetmap.de/staticmap.php?center=${centerLatValue},${centerLngValue}&zoom=${zoom}&size=640x320&maptype=mapnik&markers=${encodeURIComponent(
       markers
     )}`;
   };
@@ -2372,8 +2396,8 @@ export default function DataInsightsScreen({
             </div>
             {activeChallenge.startLocation && (
               <div className="text-xs text-white/50">
-                Start pin: {activeChallenge.startLocation.lat.toFixed(4)},{" "}
-                {activeChallenge.startLocation.lng.toFixed(4)}
+                Start pin: {formatCoordDisplay(activeChallenge.startLocation.lat)},{" "}
+                {formatCoordDisplay(activeChallenge.startLocation.lng)}
               </div>
             )}
             {activeChallenge.invitedFriends.length > 0 && (
@@ -2637,14 +2661,14 @@ export default function DataInsightsScreen({
                 )}
                 {pendingChallenge.startLocation && (
                   <div className="text-xs text-white/60">
-                    Start pin: {pendingChallenge.startLocation.lat.toFixed(4)},{" "}
-                    {pendingChallenge.startLocation.lng.toFixed(4)}
+                    Start pin: {formatCoordDisplay(pendingChallenge.startLocation.lat)},{" "}
+                    {formatCoordDisplay(pendingChallenge.startLocation.lng)}
                   </div>
                 )}
                 {pendingChallenge.endLocation && (
                   <div className="text-xs text-white/60">
-                    Stop pin: {pendingChallenge.endLocation.lat.toFixed(4)},{" "}
-                    {pendingChallenge.endLocation.lng.toFixed(4)}
+                    Stop pin: {formatCoordDisplay(pendingChallenge.endLocation.lat)},{" "}
+                    {formatCoordDisplay(pendingChallenge.endLocation.lng)}
                   </div>
                 )}
               </div>
@@ -3083,15 +3107,15 @@ export default function DataInsightsScreen({
                           {item.challenge.startLocation && (
                             <span className="inline-flex items-center gap-1">
                               <MapPin className="h-3 w-3 text-rose-300" />
-                              Start {item.challenge.startLocation.lat.toFixed(4)},{" "}
-                              {item.challenge.startLocation.lng.toFixed(4)}
+                              Start {formatCoordDisplay(item.challenge.startLocation.lat)},{" "}
+                              {formatCoordDisplay(item.challenge.startLocation.lng)}
                             </span>
                           )}
                           {item.challenge.endLocation && (
                             <span className="inline-flex items-center gap-1">
                               <MapPin className="h-3 w-3 text-sky-300" />
-                              Stop {item.challenge.endLocation.lat.toFixed(4)},{" "}
-                              {item.challenge.endLocation.lng.toFixed(4)}
+                              Stop {formatCoordDisplay(item.challenge.endLocation.lat)},{" "}
+                              {formatCoordDisplay(item.challenge.endLocation.lng)}
                             </span>
                           )}
                         </div>
