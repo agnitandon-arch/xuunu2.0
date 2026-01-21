@@ -11,8 +11,9 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword } = useAuth();
   const { toast } = useToast();
 
   const handleEmailAuth = async () => {
@@ -51,6 +52,33 @@ export default function LoginScreen() {
         variant: "destructive",
       });
       setIsLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!email) {
+      toast({
+        title: "Email required",
+        description: "Enter your email to reset your password.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsResetting(true);
+    try {
+      await resetPassword(email);
+      toast({
+        title: "Reset email sent",
+        description: "Check your inbox for password reset instructions.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Reset failed",
+        description: error.message || "Unable to send reset email.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -106,6 +134,18 @@ export default function LoginScreen() {
               isSignUp ? "Create Account" : "Sign In"
             )}
           </Button>
+
+          {!isSignUp && (
+            <button
+              type="button"
+              onClick={handlePasswordReset}
+              disabled={isLoading || isResetting}
+              className="w-full text-xs text-primary hover-elevate active-elevate-2 py-1"
+              data-testid="button-forgot-password"
+            >
+              {isResetting ? "Sending reset email..." : "Forgot password?"}
+            </button>
+          )}
 
           <Button
             onClick={handleGoogleSignIn}

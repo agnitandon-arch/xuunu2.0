@@ -5,6 +5,7 @@ import {
   signInWithRedirect,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   getRedirectResult,
@@ -19,6 +20,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -78,12 +80,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await createUserWithEmailAndPassword(auth, email, password);
   };
 
+  const resetPassword = async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
+  };
+
   const signOut = async () => {
     await firebaseSignOut(auth);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        signInWithGoogle,
+        signInWithEmail,
+        signUpWithEmail,
+        resetPassword,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
