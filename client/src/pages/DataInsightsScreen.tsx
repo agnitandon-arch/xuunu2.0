@@ -546,8 +546,9 @@ export default function DataInsightsScreen({
     if (typeof window === "undefined") return;
     try {
       const stored = window.localStorage.getItem(CHALLENGE_SCHEDULE_KEY);
-      const parsed = stored ? (JSON.parse(stored) as ChallengeSchedule[]) : [];
-      setScheduledChallenges(parsed.filter((challenge) => challenge.userId === user?.uid));
+      const parsed = stored ? JSON.parse(stored) : [];
+      const schedules = Array.isArray(parsed) ? parsed : [];
+      setScheduledChallenges(schedules.filter((challenge) => challenge.userId === user?.uid));
     } catch {
       setScheduledChallenges([]);
     }
@@ -891,6 +892,32 @@ export default function DataInsightsScreen({
     });
   };
 
+  const normalizeFeedItems = (items: unknown): FeedItem[] => {
+    if (!Array.isArray(items)) return [];
+    return items
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const entry = item as Partial<FeedItem>;
+        const authorName = entry.authorName || "You";
+        return {
+          id: entry.id || `feed-${Date.now()}`,
+          authorName,
+          authorAvatar: entry.authorAvatar || "",
+          postedAt: entry.postedAt,
+          time: entry.time || "Just now",
+          content: entry.content || "",
+          photos: Array.isArray(entry.photos) ? entry.photos : [],
+          shared: typeof entry.shared === "boolean" ? entry.shared : true,
+          source: entry.source === "friend" ? "friend" : "you",
+          likesCount: typeof entry.likesCount === "number" ? entry.likesCount : 0,
+          liked: typeof entry.liked === "boolean" ? entry.liked : false,
+          challenge: entry.challenge,
+          challengeSchedule: entry.challengeSchedule,
+        };
+      })
+      .filter(Boolean) as FeedItem[];
+  };
+
   const buildDefaultFeedItems = (avatar: string): FeedItem[] => [
     {
       id: "feed-1",
@@ -937,7 +964,9 @@ export default function DataInsightsScreen({
     const stored = window.localStorage.getItem(FEED_STORAGE_KEY);
     if (stored) {
       try {
-        return JSON.parse(stored) as FeedItem[];
+        const parsed = JSON.parse(stored);
+        const normalized = normalizeFeedItems(parsed);
+        return normalized.length > 0 ? normalized : buildDefaultFeedItems(photoUrl || "");
       } catch {
         return buildDefaultFeedItems(photoUrl || "");
       }
