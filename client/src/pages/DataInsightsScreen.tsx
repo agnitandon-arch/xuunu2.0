@@ -908,6 +908,10 @@ export default function DataInsightsScreen({
         if (!item || typeof item !== "object") return null;
         const entry = item as Partial<FeedItem>;
         const authorName = entry.authorName || "You";
+        const postedAtValue =
+          typeof entry.postedAt === "string" && !Number.isNaN(new Date(entry.postedAt).getTime())
+            ? entry.postedAt
+            : undefined;
         const challenge =
           entry.challenge && typeof entry.challenge === "object"
             ? {
@@ -930,7 +934,7 @@ export default function DataInsightsScreen({
           id: entry.id || `feed-${Date.now()}`,
           authorName,
           authorAvatar: entry.authorAvatar || "",
-          postedAt: entry.postedAt,
+          postedAt: postedAtValue,
           time: entry.time || "Just now",
           content: entry.content || "",
           photos: Array.isArray(entry.photos) ? entry.photos : [],
@@ -1093,8 +1097,9 @@ export default function DataInsightsScreen({
 
   const handleStartEditFeedTime = (item: FeedItem) => {
     const baseDate = item.postedAt ? new Date(item.postedAt) : new Date();
+    const safeDate = Number.isNaN(baseDate.getTime()) ? new Date() : baseDate;
     setEditingFeedItemId(item.id);
-    setEditingFeedTimestamp(formatDateTimeLocal(baseDate));
+    setEditingFeedTimestamp(formatDateTimeLocal(safeDate));
   };
 
   const handleSaveFeedTime = () => {
@@ -1341,6 +1346,13 @@ export default function DataInsightsScreen({
   const getLocalDateKey = (date: Date) => {
     const pad = (value: number) => value.toString().padStart(2, "0");
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  };
+
+  const formatOptionalDate = (value: string | undefined, fallback: string) => {
+    if (!value) return fallback;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return fallback;
+    return parsed.toLocaleString();
   };
 
   const getLongevityConfig = (type: LongevityChallengeType) =>
@@ -2402,7 +2414,7 @@ export default function DataInsightsScreen({
                     <div>
                       <p className="text-sm font-semibold">{challenge.type} Challenge</p>
                       <p className="text-xs text-white/50">
-                        Starts {new Date(challenge.scheduledFor).toLocaleString()}
+                        Starts {formatOptionalDate(challenge.scheduledFor, "Scheduled")}
                       </p>
                     </div>
                     <Button
@@ -2970,7 +2982,7 @@ export default function DataInsightsScreen({
                     <div>
                       <p className="text-sm font-semibold">{item.authorName}</p>
                       <p className="text-xs text-white/40">
-                        {item.postedAt ? new Date(item.postedAt).toLocaleString() : item.time}
+                        {formatOptionalDate(item.postedAt, item.time)}
                       </p>
                     </div>
                   </div>
@@ -3024,9 +3036,9 @@ export default function DataInsightsScreen({
                   <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-white/70">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold">{item.challengeSchedule.type} Challenge</span>
-                      <span>
-                        {new Date(item.challengeSchedule.scheduledFor).toLocaleString()}
-                      </span>
+                    <span>
+                      {formatOptionalDate(item.challengeSchedule.scheduledFor, "Scheduled")}
+                    </span>
                     </div>
                     <p className="mt-1 text-[11px] text-white/50">
                       Scheduled start (24 hours to 7 days in advance).
