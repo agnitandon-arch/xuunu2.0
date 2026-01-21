@@ -37,6 +37,7 @@ const NOTIFICATIONS_KEY = "xuunu-notifications-enabled";
 const CHALLENGE_STORAGE_KEY = "xuunu-challenges";
 const CHALLENGE_SCHEDULE_KEY = "xuunu-challenge-schedules";
 const LONGEVITY_STORAGE_KEY = "xuunu-longevity-challenge";
+const CHALLENGE_SCHEDULE_NOTIFIED_KEY = "xuunu-challenge-schedule-notified";
 
 type ChallengeType = "Hiking" | "Running" | "Biking";
 
@@ -231,6 +232,7 @@ export default function DataInsightsScreen({
   const [shareChallenge, setShareChallenge] = useState(true);
   const [scheduledChallenges, setScheduledChallenges] = useState<ChallengeSchedule[]>([]);
   const [scheduleTick, setScheduleTick] = useState(0);
+  const scheduleTimeoutsRef = useRef<Record<string, number>>({});
   const lastStepsRef = useRef<number | null>(null);
   const lastStepChangeAtRef = useRef<number | null>(null);
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -268,6 +270,49 @@ export default function DataInsightsScreen({
       new Notification(title, { body });
     } catch {
       // Ignore notification errors.
+    }
+  };
+
+  const ensureNotificationsEnabled = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) return false;
+    if (Notification.permission === "granted") {
+      window.localStorage.setItem(NOTIFICATIONS_KEY, "true");
+      return true;
+    }
+    if (Notification.permission === "default") {
+      try {
+        const result = await Notification.requestPermission();
+        if (result === "granted") {
+          window.localStorage.setItem(NOTIFICATIONS_KEY, "true");
+          return true;
+        }
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  };
+
+  const loadNotifiedSchedules = () => {
+    if (typeof window === "undefined") return new Set<string>();
+    try {
+      const stored = window.localStorage.getItem(CHALLENGE_SCHEDULE_NOTIFIED_KEY);
+      const parsed = stored ? (JSON.parse(stored) as string[]) : [];
+      return new Set(parsed);
+    } catch {
+      return new Set<string>();
+    }
+  };
+
+  const saveNotifiedSchedules = (ids: Set<string>) => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        CHALLENGE_SCHEDULE_NOTIFIED_KEY,
+        JSON.stringify([...ids])
+      );
+    } catch {
+      // Ignore storage failures.
     }
   };
 
@@ -399,6 +444,53 @@ export default function DataInsightsScreen({
     } catch {
       // Ignore storage failures.
     }
+  }, [scheduledChallenges]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const notified = loadNotifiedSchedules();
+    Object.values(scheduleTimeoutsRef.current).forEach((timeoutId) => {
+      window.clearTimeout(timeoutId);
+    });
+    scheduleTimeoutsRef.current = {};
+
+    scheduledChallenges.forEach((challenge) => {
+      const scheduledTime = new Date(challenge.scheduledFor).getTime();
+      const now = Date.now();
+      if (notified.has(challenge.id)) {
+        return;
+      }
+      if (scheduledTime <= now) {
+        if (canNotify()) {
+          sendNotification(
+            "Challenge ready to start",
+            `${challenge.type} challenge is ready to begin.`
+          );
+          notified.add(challenge.id);
+        }
+        return;
+      }
+      const delay = scheduledTime - now;
+      scheduleTimeoutsRef.current[challenge.id] = window.setTimeout(() => {
+        if (canNotify()) {
+          sendNotification(
+            "Challenge starting",
+            `${challenge.type} challenge starts now.`
+          );
+          const updated = loadNotifiedSchedules();
+          updated.add(challenge.id);
+          saveNotifiedSchedules(updated);
+        }
+      }, delay);
+    });
+
+    saveNotifiedSchedules(notified);
+    return () => {
+      Object.values(scheduleTimeoutsRef.current).forEach((timeoutId) => {
+        window.clearTimeout(timeoutId);
+      });
+      scheduleTimeoutsRef.current = {};
+    };
   }, [scheduledChallenges]);
 
   const copyToClipboard = async (value: string, label: string) => {
@@ -998,7 +1090,7 @@ export default function DataInsightsScreen({
     });
   };
 
-  const handleScheduleChallenge = () => {
+  const handleScheduleChallenge = async () => {
     if (!user || !selectedChallengeType) return;
     if (!scheduledStart) {
       toast({
@@ -1036,6 +1128,13 @@ export default function DataInsightsScreen({
       shared: shareScheduledChallenge,
     };
     setScheduledChallenges((prev) => [record, ...prev]);
+    const notificationsEnabled = await ensureNotificationsEnabled();
+    if (!notificationsEnabled) {
+      toast({
+        title: "Notifications disabled",
+        description: "Enable notifications to get challenge reminders.",
+      });
+    }
     if (shareScheduledChallenge) {
       const feedItem: FeedItem = {
         id: `challenge-schedule-${record.id}`,
@@ -1661,6 +1760,11 @@ export default function DataInsightsScreen({
                       Invited: {challenge.invitedFriends.join(", ")}
                     </p>
                   )}
+                  <p className="text-[11px] text-white/40">
+                    {canNotify()
+                      ? "Reminder notification scheduled."
+                      : "Enable notifications to get a reminder."}
+                  </p>
                 </div>
               );
             })}
