@@ -279,10 +279,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   };
 
   const handleOpenProfile = () => {
-    if (onOpenProfile) {
-      onOpenProfile();
-      return;
-    }
+    onOpenProfile?.();
     onNavigate?.("data");
   };
 
