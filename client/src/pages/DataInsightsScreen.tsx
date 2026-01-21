@@ -828,6 +828,7 @@ export default function DataInsightsScreen({
     }
     return buildDefaultFeedItems(photoUrl || "");
   });
+  const [showDeleteFeedDialog, setShowDeleteFeedDialog] = useState(false);
 
   useEffect(() => {
     setFeedItems((prev) =>
@@ -872,6 +873,23 @@ export default function DataInsightsScreen({
         return { ...item, liked: nextLiked, likesCount: nextCount };
       })
     );
+  };
+
+  const handleClearFeed = () => {
+    setFeedItems([]);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(FEED_STORAGE_KEY);
+        window.localStorage.removeItem(FEED_NOTIFIED_KEY);
+      } catch {
+        // Ignore storage failures.
+      }
+    }
+    setShowDeleteFeedDialog(false);
+    toast({
+      title: "Feed cleared",
+      description: "Your feed has been deleted.",
+    });
   };
 
   useEffect(() => {
@@ -2179,6 +2197,14 @@ export default function DataInsightsScreen({
                 <p className="text-xs text-white/50">Latest shared updates from friends.</p>
               </div>
             </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowDeleteFeedDialog(true)}
+              data-testid="button-delete-feed"
+            >
+              Delete feed
+            </Button>
           </div>
           {showNetworkMembers && (
             <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-4">
@@ -2360,6 +2386,25 @@ export default function DataInsightsScreen({
             ))}
           </div>
         </section>
+
+        <Dialog open={showDeleteFeedDialog} onOpenChange={setShowDeleteFeedDialog}>
+          <DialogContent className="bg-black border-white/10 text-white">
+            <DialogHeader>
+              <DialogTitle>Delete feed?</DialogTitle>
+              <DialogDescription className="text-white/60">
+                This removes all posts from your feed. You can still create new updates later.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowDeleteFeedDialog(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleClearFeed}>
+                Delete feed
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
           <div className="flex items-center justify-between">
