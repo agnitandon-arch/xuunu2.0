@@ -45,6 +45,7 @@ const CHALLENGE_SCHEDULE_NOTIFIED_KEY = "xuunu-challenge-schedule-notified";
 const CHALLENGE_DAILY_NOTIFIED_KEY = "xuunu-challenge-daily-notified";
 const DISPLAY_NAME_STORAGE_KEY = "xuunu-display-name";
 const TEAM_CHALLENGE_COMPLETED_KEY = "xuunu-team-challenge-completed";
+const PROFILE_VISIBILITY_KEY = "xuunu-profile-visibility";
 
 type ChallengeType = "Hiking" | "Running" | "Biking";
 
@@ -218,8 +219,10 @@ export default function DataInsightsScreen({
   const [shareUpdate, setShareUpdate] = useState(true);
   const [displayNameOverride, setDisplayNameOverride] = useState<string | null>(null);
   const [usernameDraft, setUsernameDraft] = useState("");
-  const [isEditingName, setIsEditingName] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
+  const [showEditProfileDialog, setShowEditProfileDialog] = useState(false);
+  const [isProfileInvisible, setIsProfileInvisible] = useState(false);
+  const [profileVisibilityDraft, setProfileVisibilityDraft] = useState(false);
   const [editingFeedItemId, setEditingFeedItemId] = useState<string | null>(null);
   const [editingFeedTimestamp, setEditingFeedTimestamp] = useState("");
   const [teamChallengeCount, setTeamChallengeCount] = useState(0);
@@ -433,10 +436,10 @@ export default function DataInsightsScreen({
   }, []);
 
   useEffect(() => {
-    if (!user || isEditingName) return;
+    if (!user || showEditProfileDialog) return;
     const baseName = user.displayName || user.email?.split("@")[0] || "";
     setUsernameDraft(baseName);
-  }, [user?.uid, user?.displayName, user?.email, isEditingName]);
+  }, [user?.uid, user?.displayName, user?.email, showEditProfileDialog]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !user?.uid) {
@@ -449,6 +452,24 @@ export default function DataInsightsScreen({
       setDisplayNameOverride(parsed[user.uid] ?? null);
     } catch {
       setDisplayNameOverride(null);
+    }
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !user?.uid) {
+      setIsProfileInvisible(false);
+      setProfileVisibilityDraft(false);
+      return;
+    }
+    try {
+      const stored = window.localStorage.getItem(PROFILE_VISIBILITY_KEY);
+      const parsed = stored ? (JSON.parse(stored) as Record<string, boolean>) : {};
+      const value = parsed[user.uid] ?? false;
+      setIsProfileInvisible(value);
+      setProfileVisibilityDraft(value);
+    } catch {
+      setIsProfileInvisible(false);
+      setProfileVisibilityDraft(false);
     }
   }, [user?.uid]);
 
@@ -1080,7 +1101,7 @@ export default function DataInsightsScreen({
     setFeedItems((prev) => [newItem, ...prev]);
     setUpdateText("");
     setUpdatePhotos([]);
-    setShareUpdate(true);
+    setShareUpdate(isProfileInvisible ? false : true);
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(FEED_DRAFT_KEY);
     }
@@ -1098,7 +1119,7 @@ export default function DataInsightsScreen({
         description: "Please sign in to update your username.",
         variant: "destructive",
       });
-      return;
+      return false;
     }
     const nextName = usernameDraft.trim();
     if (!nextName) {
@@ -1107,7 +1128,7 @@ export default function DataInsightsScreen({
         description: "Your username cannot be empty.",
         variant: "destructive",
       });
-      return;
+      return false;
     }
     setIsSavingName(true);
     try {
@@ -1128,25 +1149,58 @@ export default function DataInsightsScreen({
           item.source === "you" ? { ...item, authorName: nextName } : item
         )
       );
-      setIsEditingName(false);
       toast({
         title: "Username updated",
         description: "Your profile name has been saved.",
       });
+      return true;
     } catch {
       toast({
         title: "Update failed",
         description: "Unable to update your username right now.",
         variant: "destructive",
       });
+      return false;
     } finally {
       setIsSavingName(false);
     }
   };
 
-  const handleCancelEditName = () => {
-    setUsernameDraft(displayName);
-    setIsEditingName(false);
+  const handleSaveProfileSettings = async () => {
+    const trimmedName = usernameDraft.trim();
+    if (trimmedName && trimmedName !== displayName) {
+      const saved = await handleSaveDisplayName();
+      if (!saved) {
+        return;
+      }
+    }
+    if (user && profileVisibilityDraft !== isProfileInvisible) {
+      setIsProfileInvisible(profileVisibilityDraft);
+      if (profileVisibilityDraft) {
+        setFeedItems((prev) =>
+          prev.map((item) =>
+            item.source === "you" ? { ...item, shared: false } : item
+          )
+        );
+      }
+      if (typeof window !== "undefined") {
+        try {
+          const stored = window.localStorage.getItem(PROFILE_VISIBILITY_KEY);
+          const parsed = stored ? (JSON.parse(stored) as Record<string, boolean>) : {};
+          parsed[user.uid] = profileVisibilityDraft;
+          window.localStorage.setItem(PROFILE_VISIBILITY_KEY, JSON.stringify(parsed));
+        } catch {
+          // Ignore storage failures.
+        }
+      }
+      toast({
+        title: profileVisibilityDraft ? "Profile hidden" : "Profile visible",
+        description: profileVisibilityDraft
+          ? "Your profile is now invisible to everyone."
+          : "Your profile is visible again.",
+      });
+    }
+    setShowEditProfileDialog(false);
   };
 
   const getCurrentLocation = useCallback(
@@ -1235,6 +1289,14 @@ export default function DataInsightsScreen({
     setScheduleDate(min);
     setScheduleTime(formatTime(min));
   }, [scheduleChallenge, scheduleDate, scheduleTime]);
+
+  useEffect(() => {
+    if (!isProfileInvisible) return;
+    setShareUpdate(false);
+    setShareScheduledChallenge(false);
+    setShareChallenge(false);
+    setShowShareOptions(false);
+  }, [isProfileInvisible]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -1811,52 +1873,36 @@ export default function DataInsightsScreen({
               </div>
               <div>
                 <h1 className="text-2xl font-bold">{displayName}</h1>
-                {isEditingName ? (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <Input
-                      value={usernameDraft}
-                      onChange={(event) => setUsernameDraft(event.target.value)}
-                      className="h-9 w-full max-w-[220px] bg-black/40 border-white/10 text-sm"
-                      placeholder="Update username"
-                      data-testid="input-username"
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleSaveDisplayName}
-                      disabled={isSavingName}
-                      data-testid="button-save-username"
-                    >
-                      {isSavingName ? "Saving" : "Save"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleCancelEditName}
-                      data-testid="button-cancel-username"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUsernameDraft(displayName);
-                      setIsEditingName(true);
-                    }}
-                    className="mt-1 text-xs text-white/50 hover:text-white"
-                    data-testid="button-edit-username"
-                  >
-                    Edit name
-                  </button>
+                {isProfileInvisible && (
+                  <p className="text-xs text-white/50">Profile invisible</p>
                 )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsernameDraft(displayName);
+                    setProfileVisibilityDraft(isProfileInvisible);
+                    setShowEditProfileDialog(true);
+                  }}
+                  className="mt-1 text-xs text-white/50 hover:text-white"
+                  data-testid="button-edit-profile"
+                >
+                  Edit
+                </button>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => setShowShareOptions((prev) => !prev)}
-                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-[11px] text-white/70 transition hover:border-white/40 hover:text-white"
+                onClick={() => {
+                  if (isProfileInvisible) return;
+                  setShowShareOptions((prev) => !prev);
+                }}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] transition ${
+                  isProfileInvisible
+                    ? "border-white/10 text-white/30 cursor-not-allowed"
+                    : "border-white/20 text-white/70 hover:border-white/40 hover:text-white"
+                }`}
+                disabled={isProfileInvisible}
               >
                 <Share2 className="h-4 w-4" />
                 Share this page
@@ -1893,6 +1939,82 @@ export default function DataInsightsScreen({
             </div>
           )}
         </div>
+
+      <Dialog
+        open={showEditProfileDialog}
+        onOpenChange={(open) => {
+          setShowEditProfileDialog(open);
+          if (!open) {
+            setProfileVisibilityDraft(isProfileInvisible);
+          }
+        }}
+      >
+        <DialogContent className="bg-black border-white/10 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-lg">Edit profile</DialogTitle>
+            <DialogDescription className="text-white/60">
+              Update your photo, name, and visibility.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/40 p-3">
+              <div>
+                <p className="text-sm font-medium">Profile photo</p>
+                <p className="text-xs text-white/60">Tap to update your avatar.</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="button-edit-profile-photo"
+              >
+                Change
+              </Button>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-white/60">Username</Label>
+              <Input
+                value={usernameDraft}
+                onChange={(event) => setUsernameDraft(event.target.value)}
+                className="h-10 bg-black/40 border-white/10 text-sm"
+                data-testid="input-edit-username"
+              />
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/40 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Visibility</p>
+                  <p className="text-xs text-white/60">
+                    Hide your profile from everyone.
+                  </p>
+                </div>
+                <Switch
+                  checked={profileVisibilityDraft}
+                  onCheckedChange={setProfileVisibilityDraft}
+                  data-testid="switch-profile-visibility"
+                />
+              </div>
+              {profileVisibilityDraft && (
+                <p className="text-xs text-white/50">
+                  Sharing is disabled while your profile is invisible.
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowEditProfileDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveProfileSettings}
+                disabled={isSavingName}
+                data-testid="button-save-profile"
+              >
+                {isSavingName ? "Saving" : "Save"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
 
         <Dialog
@@ -2002,8 +2124,12 @@ export default function DataInsightsScreen({
               {updatePhotos.length}/1 photo
             </span>
             <div className="ml-auto flex items-center gap-2 text-xs text-white/60">
-              <span>{shareUpdate ? "Shared" : "Private"}</span>
-              <Switch checked={shareUpdate} onCheckedChange={setShareUpdate} />
+              <span>{isProfileInvisible ? "Invisible" : shareUpdate ? "Shared" : "Private"}</span>
+              <Switch
+                checked={shareUpdate}
+                onCheckedChange={setShareUpdate}
+                disabled={isProfileInvisible}
+              />
             </div>
           </div>
           {updatePhotos.length > 0 && (
@@ -2236,12 +2362,15 @@ export default function DataInsightsScreen({
                     <div>
                       <p className="text-xs font-medium text-white/80">Share scheduled challenge</p>
                       <p className="text-[11px] text-white/50">
-                        Posts the invite to your public profile.
+                        {isProfileInvisible
+                          ? "Profile is invisible. Sharing is disabled."
+                          : "Posts the invite to your public profile."}
                       </p>
                     </div>
                     <Switch
                       checked={shareScheduledChallenge}
                       onCheckedChange={setShareScheduledChallenge}
+                      disabled={isProfileInvisible}
                     />
                   </div>
                 </div>
@@ -2330,9 +2459,17 @@ export default function DataInsightsScreen({
               <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-3">
                 <div>
                   <p className="text-sm font-medium">Share to public profile</p>
-                  <p className="text-xs text-white/60">Adds this challenge to the leaderboard.</p>
+                  <p className="text-xs text-white/60">
+                    {isProfileInvisible
+                      ? "Profile is invisible. Sharing is disabled."
+                      : "Adds this challenge to the leaderboard."}
+                  </p>
                 </div>
-                <Switch checked={shareChallenge} onCheckedChange={setShareChallenge} />
+                <Switch
+                  checked={shareChallenge}
+                  onCheckedChange={setShareChallenge}
+                  disabled={isProfileInvisible}
+                />
               </div>
               <div className="flex flex-wrap justify-end gap-2">
                 <Button variant="outline" onClick={() => handleFinalizeChallenge(false)}>
