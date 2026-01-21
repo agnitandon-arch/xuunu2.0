@@ -1047,17 +1047,26 @@ export default function DataInsightsScreen({
   };
 
   const buildChallengeMapUrl = (start: ChallengeLocation, end: ChallengeLocation) => {
-    if (!start || !end) return "";
-    const distanceKm = getDistanceKm(start, end);
+    const points = [start, end].filter(Boolean) as { lat: number; lng: number }[];
+    if (points.length === 0) return "";
+    const distanceKm = points.length === 2 ? getDistanceKm(points[0], points[1]) : 0.3;
     const zoom = getZoomForDistance(distanceKm);
-    const centerLat = (start.lat + end.lat) / 2;
-    const centerLng = (start.lng + end.lng) / 2;
-    const markers = `markers=${formatCoord(start.lat)},${formatCoord(start.lng)},red-pushpin|${formatCoord(
-      end.lat
-    )},${formatCoord(end.lng)},blue-pushpin`;
+    const centerLat =
+      points.length === 2 ? (points[0].lat + points[1].lat) / 2 : points[0].lat;
+    const centerLng =
+      points.length === 2 ? (points[0].lng + points[1].lng) / 2 : points[0].lng;
+    const markers = points
+      .map((point, index) =>
+        `${formatCoord(point.lat)},${formatCoord(point.lng)},${
+          index === 0 ? "red-pushpin" : "blue-pushpin"
+        }`
+      )
+      .join("|");
     return `https://staticmap.openstreetmap.de/staticmap.php?center=${formatCoord(
       centerLat
-    )},${formatCoord(centerLng)}&zoom=${zoom}&size=640x320&maptype=mapnik&${markers}`;
+    )},${formatCoord(centerLng)}&zoom=${zoom}&size=640x320&maptype=mapnik&markers=${encodeURIComponent(
+      markers
+    )}`;
   };
 
   const saveChallenge = (challenge: ChallengeRecord) => {
@@ -2317,37 +2326,47 @@ export default function DataInsightsScreen({
                         Invited: {item.challenge.invitedFriends.join(", ")}
                       </div>
                     )}
-                    {item.challenge.startLocation && item.challenge.endLocation ? (
+                    {(() => {
+                      const mapUrl = buildChallengeMapUrl(
+                        item.challenge.startLocation ?? null,
+                        item.challenge.endLocation ?? null
+                      );
+                      if (!mapUrl) {
+                        return (
+                          <div className="text-xs text-white/50">
+                            Challenge location pins unavailable. Enable location access to show maps.
+                          </div>
+                        );
+                      }
+                      return (
                       <>
                         <div className="overflow-hidden rounded-lg border border-white/10 bg-black/40">
                           <img
-                            src={buildChallengeMapUrl(
-                              item.challenge.startLocation,
-                              item.challenge.endLocation
-                            )}
+                            src={mapUrl}
                             alt="Challenge map with start and stop pins"
                             className="h-40 w-full object-cover"
                             loading="lazy"
                           />
                         </div>
                         <div className="flex flex-wrap items-center gap-3 text-[11px] text-white/60">
-                          <span className="inline-flex items-center gap-1">
-                            <MapPin className="h-3 w-3 text-rose-300" />
-                            Start {item.challenge.startLocation.lat.toFixed(4)},{" "}
-                            {item.challenge.startLocation.lng.toFixed(4)}
-                          </span>
-                          <span className="inline-flex items-center gap-1">
-                            <MapPin className="h-3 w-3 text-sky-300" />
-                            Stop {item.challenge.endLocation.lat.toFixed(4)},{" "}
-                            {item.challenge.endLocation.lng.toFixed(4)}
-                          </span>
+                          {item.challenge.startLocation && (
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-rose-300" />
+                              Start {item.challenge.startLocation.lat.toFixed(4)},{" "}
+                              {item.challenge.startLocation.lng.toFixed(4)}
+                            </span>
+                          )}
+                          {item.challenge.endLocation && (
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-sky-300" />
+                              Stop {item.challenge.endLocation.lat.toFixed(4)},{" "}
+                              {item.challenge.endLocation.lng.toFixed(4)}
+                            </span>
+                          )}
                         </div>
                       </>
-                    ) : (
-                      <div className="text-xs text-white/50">
-                        Challenge location pins unavailable.
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 )}
                 {item.source === "friend" && (
