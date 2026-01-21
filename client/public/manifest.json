@@ -2,7 +2,7 @@
   "name": "Xuunu Health Tracker",
   "short_name": "Xuunu",
   "description": "Production-quality health tracking for people with diabetes and chronic illness",
-  "start_url": "/",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#0066FF",
@@ -10,13 +10,13 @@
   "categories": ["health", "medical", "lifestyle"],
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -24,7 +24,7 @@
   ],
   "screenshots": [
     {
-      "src": "/screenshot-mobile.png",
+      "src": "screenshot-mobile.png",
       "sizes": "750x1334",
       "type": "image/png",
       "form_factor": "narrow"
@@ -36,15 +36,15 @@
       "name": "Track Entry",
       "short_name": "Track",
       "description": "Quick health entry",
-      "url": "/track",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "url": "track",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
     },
     {
       "name": "View Pollutants",
       "short_name": "Environment",
       "description": "Check environmental data",
-      "url": "/pollutants",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "url": "pollutants",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

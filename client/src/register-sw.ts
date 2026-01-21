@@ -1,8 +1,9 @@
 export function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
+      const baseUrl = import.meta.env.BASE_URL || "/";
       navigator.serviceWorker
-        .register('/service-worker.js')
+        .register(`${baseUrl}service-worker.js`)
         .then((registration) => {
           console.log('Service Worker registered:', registration);
         })
