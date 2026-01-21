@@ -1237,9 +1237,7 @@ export default function DataInsightsScreen({
       points.length === 2 ? (points[0].lng + points[1].lng) / 2 : points[0].lng;
     const markers = points
       .map((point, index) =>
-        `${formatCoord(point.lat)},${formatCoord(point.lng)},${
-          index === 0 ? "red-pushpin" : "blue-pushpin"
-        }`
+        `${formatCoord(point.lat)},${formatCoord(point.lng)},${index === 0 ? "red" : "blue"}`
       )
       .join("|");
     return `https://staticmap.openstreetmap.de/staticmap.php?center=${formatCoord(
