@@ -548,7 +548,16 @@ export default function DataInsightsScreen({
       const stored = window.localStorage.getItem(CHALLENGE_SCHEDULE_KEY);
       const parsed = stored ? JSON.parse(stored) : [];
       const schedules = Array.isArray(parsed) ? parsed : [];
-      setScheduledChallenges(schedules.filter((challenge) => challenge.userId === user?.uid));
+      const normalized = schedules
+        .filter((challenge) => challenge && typeof challenge === "object")
+        .map((challenge) => ({
+          ...challenge,
+          invitedFriends: Array.isArray(challenge.invitedFriends)
+            ? challenge.invitedFriends
+            : [],
+        }))
+        .filter((challenge) => challenge.userId === user?.uid);
+      setScheduledChallenges(normalized);
     } catch {
       setScheduledChallenges([]);
     }
@@ -899,6 +908,24 @@ export default function DataInsightsScreen({
         if (!item || typeof item !== "object") return null;
         const entry = item as Partial<FeedItem>;
         const authorName = entry.authorName || "You";
+        const challenge =
+          entry.challenge && typeof entry.challenge === "object"
+            ? {
+                ...entry.challenge,
+                invitedFriends: Array.isArray(entry.challenge.invitedFriends)
+                  ? entry.challenge.invitedFriends
+                  : [],
+              }
+            : undefined;
+        const challengeSchedule =
+          entry.challengeSchedule && typeof entry.challengeSchedule === "object"
+            ? {
+                ...entry.challengeSchedule,
+                invitedFriends: Array.isArray(entry.challengeSchedule.invitedFriends)
+                  ? entry.challengeSchedule.invitedFriends
+                  : [],
+              }
+            : undefined;
         return {
           id: entry.id || `feed-${Date.now()}`,
           authorName,
@@ -911,8 +938,8 @@ export default function DataInsightsScreen({
           source: entry.source === "friend" ? "friend" : "you",
           likesCount: typeof entry.likesCount === "number" ? entry.likesCount : 0,
           liked: typeof entry.liked === "boolean" ? entry.liked : false,
-          challenge: entry.challenge,
-          challengeSchedule: entry.challengeSchedule,
+          challenge,
+          challengeSchedule,
         };
       })
       .filter(Boolean) as FeedItem[];
@@ -2388,7 +2415,7 @@ export default function DataInsightsScreen({
                       {isReady ? "Start Challenge" : "Scheduled"}
                     </Button>
                   </div>
-                  {challenge.invitedFriends.length > 0 && (
+                  {challenge.invitedFriends?.length > 0 && (
                     <p className="text-xs text-white/50">
                       Invited: {challenge.invitedFriends.join(", ")}
                     </p>
@@ -3004,7 +3031,7 @@ export default function DataInsightsScreen({
                     <p className="mt-1 text-[11px] text-white/50">
                       Scheduled start (24 hours to 7 days in advance).
                     </p>
-                    {item.challengeSchedule.invitedFriends.length > 0 && (
+                    {item.challengeSchedule.invitedFriends?.length > 0 && (
                       <p className="mt-2 text-[11px] text-white/60">
                         Invited: {item.challengeSchedule.invitedFriends.join(", ")}
                       </p>
