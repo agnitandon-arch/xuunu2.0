@@ -255,6 +255,8 @@ export default function DataInsightsScreen({
   const [scheduledChallenges, setScheduledChallenges] = useState<ChallengeSchedule[]>([]);
   const [scheduleTick, setScheduleTick] = useState(0);
   const scheduleTimeoutsRef = useRef<Record<string, number>>({});
+  const liveLocationRef = useRef<ChallengeLocation>(null);
+  const locationWatchIdRef = useRef<number | null>(null);
   const lastStepsRef = useRef<number | null>(null);
   const lastStepChangeAtRef = useRef<number | null>(null);
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -1598,7 +1600,7 @@ export default function DataInsightsScreen({
       if (!activeChallenge || !user) return;
       const current = activeChallenge;
       setActiveChallenge(null);
-      const endLocation = await getCurrentLocation();
+      const endLocation = liveLocationRef.current ?? (await getCurrentLocation());
       const stepsEnd =
         typeof latestHealth?.steps === "number"
           ? latestHealth.steps
@@ -1705,6 +1707,41 @@ export default function DataInsightsScreen({
       lastStepChangeAtRef.current = Date.now();
     }
   }, [activeChallenge, latestHealth?.steps]);
+
+  useEffect(() => {
+    if (!activeChallenge) {
+      if (locationWatchIdRef.current !== null && typeof navigator !== "undefined") {
+        navigator.geolocation.clearWatch(locationWatchIdRef.current);
+      }
+      locationWatchIdRef.current = null;
+      liveLocationRef.current = null;
+      return;
+    }
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      return;
+    }
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const nextLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        liveLocationRef.current = nextLocation;
+        setActiveChallenge((prev) =>
+          prev && !prev.startLocation ? { ...prev, startLocation: nextLocation } : prev
+        );
+      },
+      () => {
+        // Ignore location watch errors.
+      },
+      { enableHighAccuracy: true, maximumAge: 10000 }
+    );
+    locationWatchIdRef.current = watchId;
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      locationWatchIdRef.current = null;
+    };
+  }, [activeChallenge]);
 
   useEffect(() => {
     if (!activeChallenge) return;
