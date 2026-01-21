@@ -278,6 +278,14 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     }
   };
 
+  const handleOpenProfile = () => {
+    if (onOpenProfile) {
+      onOpenProfile();
+      return;
+    }
+    onNavigate?.("data");
+  };
+
   const handleStrengthSubmit = () => {
     if (!strengthMinutes || !user) return;
     createEntryMutation.mutate({
@@ -409,7 +417,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={onOpenProfile}
+              onClick={handleOpenProfile}
               className="rounded-full"
               data-testid="button-open-profile"
             >
