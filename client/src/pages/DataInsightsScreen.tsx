@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useProfilePhoto } from "@/hooks/useProfilePhoto";
 import type { FriendProfile } from "@/pages/FriendProfileScreen";
+import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { updateProfile } from "firebase/auth";
@@ -228,7 +229,8 @@ export default function DataInsightsScreen({
   const [selectedChallengeType, setSelectedChallengeType] = useState<ChallengeType | null>(null);
   const [invitedFriends, setInvitedFriends] = useState<string[]>([]);
   const [scheduleChallenge, setScheduleChallenge] = useState(false);
-  const [scheduledStart, setScheduledStart] = useState("");
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>();
+  const [scheduleTime, setScheduleTime] = useState("");
   const [shareScheduledChallenge, setShareScheduledChallenge] = useState(true);
   const [activeChallenge, setActiveChallenge] = useState<{
     id: string;
@@ -1164,6 +1166,26 @@ export default function DataInsightsScreen({
     )}:${pad(date.getMinutes())}`;
   };
 
+  const formatTime = (date: Date) => {
+    const pad = (value: number) => value.toString().padStart(2, "0");
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  const buildScheduledDate = (date: Date, timeValue: string) => {
+    const [hours, minutes] = timeValue.split(":").map((value) => Number(value));
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+      return null;
+    }
+    const next = new Date(date);
+    next.setHours(hours, minutes, 0, 0);
+    return next;
+  };
+
+  const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  const endOfDay = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+
   const getLocalDateKey = (date: Date) => {
     const pad = (value: number) => value.toString().padStart(2, "0");
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -1184,16 +1206,18 @@ export default function DataInsightsScreen({
     setSelectedChallengeType(null);
     setInvitedFriends([]);
     setScheduleChallenge(false);
-    setScheduledStart("");
+    setScheduleDate(undefined);
+    setScheduleTime("");
     setShareScheduledChallenge(true);
   };
 
   useEffect(() => {
     if (!scheduleChallenge) return;
-    if (scheduledStart) return;
+    if (scheduleDate && scheduleTime) return;
     const { min } = getScheduleBounds();
-    setScheduledStart(formatDateTimeLocal(min));
-  }, [scheduleChallenge, scheduledStart]);
+    setScheduleDate(min);
+    setScheduleTime(formatTime(min));
+  }, [scheduleChallenge, scheduleDate, scheduleTime]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -1297,7 +1321,7 @@ export default function DataInsightsScreen({
 
   const handleScheduleChallenge = async () => {
     if (!user || !selectedChallengeType) return;
-    if (!scheduledStart) {
+    if (!scheduleDate || !scheduleTime) {
       toast({
         title: "Pick a start time",
         description: "Schedule at least 24 hours ahead.",
@@ -1305,8 +1329,8 @@ export default function DataInsightsScreen({
       });
       return;
     }
-    const scheduledDate = new Date(scheduledStart);
-    if (Number.isNaN(scheduledDate.getTime())) {
+    const scheduledDate = buildScheduledDate(scheduleDate, scheduleTime);
+    if (!scheduledDate || Number.isNaN(scheduledDate.getTime())) {
       toast({
         title: "Invalid time",
         description: "Please choose a valid start date and time.",
@@ -1632,8 +1656,6 @@ export default function DataInsightsScreen({
   };
 
   const scheduleBounds = getScheduleBounds();
-  const scheduleMin = formatDateTimeLocal(scheduleBounds.min);
-  const scheduleMax = formatDateTimeLocal(scheduleBounds.max);
   const scheduleNow = useMemo(() => Date.now(), [scheduleTick]);
   const longevityConfig = longevityChallenge ? getLongevityConfig(longevityChallenge.type) : null;
   const longevityRequiredDays = longevityConfig?.requiredDays ?? 7;
@@ -2142,16 +2164,34 @@ export default function DataInsightsScreen({
               </div>
               {scheduleChallenge && (
                 <div className="space-y-2">
-                  <label className="text-xs text-white/60">Start time</label>
-                  <Input
-                    type="datetime-local"
-                    value={scheduledStart}
-                    min={scheduleMin}
-                    max={scheduleMax}
-                    onChange={(event) => setScheduledStart(event.target.value)}
-                    className="bg-black/40 border-white/10 text-sm"
-                    data-testid="input-schedule-challenge"
-                  />
+                  <div className="space-y-2">
+                    <label className="text-xs text-white/60">Pick a date</label>
+                    <div className="rounded-lg border border-white/10 bg-black/40 p-2">
+                      <Calendar
+                        mode="single"
+                        selected={scheduleDate}
+                        onSelect={setScheduleDate}
+                        disabled={(date) =>
+                          date < startOfDay(scheduleBounds.min) ||
+                          date > endOfDay(scheduleBounds.max)
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-white/60">Pick a time</label>
+                    <Input
+                      type="time"
+                      value={scheduleTime}
+                      onChange={(event) => setScheduleTime(event.target.value)}
+                      className="bg-black/40 border-white/10 text-sm"
+                      data-testid="input-schedule-challenge"
+                    />
+                    <p className="text-[11px] text-white/40">
+                      Earliest: {scheduleBounds.min.toLocaleString()} • Latest:{" "}
+                      {scheduleBounds.max.toLocaleString()}
+                    </p>
+                  </div>
                   <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/30 px-3 py-2">
                     <div>
                       <p className="text-xs font-medium text-white/80">Share scheduled challenge</p>
