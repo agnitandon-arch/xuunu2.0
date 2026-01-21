@@ -31,6 +31,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { seedInitialData } from "@/lib/localStore";
 
+const DISPLAY_NAME_STORAGE_KEY = "xuunu-display-name";
+
 interface DashboardScreenProps {
   onNavigate?: (tab: string) => void;
   onOpenProfile?: () => void;
@@ -52,6 +54,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const [strengthMinutes, setStrengthMinutes] = useState("");
   const [cardioMinutes, setCardioMinutes] = useState("");
   const [refreshingMetric, setRefreshingMetric] = useState<string | null>(null);
+  const [displayNameOverride, setDisplayNameOverride] = useState<string | null>(null);
   const env = import.meta.env as Record<string, string | undefined>;
   const stripePortalUrl = env.VITE_STRIPE_PAYMENT_URL;
   const stripeMonthlyUrl = env.VITE_STRIPE_MONTHLY_URL;
@@ -352,6 +355,23 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     });
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !user?.uid) {
+      setDisplayNameOverride(null);
+      return;
+    }
+    try {
+      const stored = window.localStorage.getItem(DISPLAY_NAME_STORAGE_KEY);
+      const parsed = stored ? (JSON.parse(stored) as Record<string, string>) : {};
+      setDisplayNameOverride(parsed[user.uid] ?? null);
+    } catch {
+      setDisplayNameOverride(null);
+    }
+  }, [user?.uid]);
+
+  const displayName =
+    displayNameOverride || user?.displayName || user?.email?.split("@")[0] || "Member";
+
   // Calculate synergy level from real data only
   const synergyLevel = latestHealth && latestEnv && latestHealth.glucose && latestEnv.aqi ? 
     Math.min(100, Math.round(((latestHealth.glucose > 0 ? 30 : 0) + (latestEnv.aqi > 0 ? 30 : 0)) / 0.6)) : 
@@ -370,9 +390,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
             >
               <div className="flex flex-col items-center gap-1">
                 <ProfileAvatar className="h-20 w-20" />
-                <span className="text-[10px] uppercase tracking-widest text-white/50">
-                  Member
-                </span>
+                <span className="text-2xl font-bold">{displayName}</span>
               </div>
             </button>
             <div className="text-xs text-white/60">{formattedDate}</div>

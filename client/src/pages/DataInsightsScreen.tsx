@@ -40,6 +40,7 @@ const CHALLENGE_SCHEDULE_KEY = "xuunu-challenge-schedules";
 const LONGEVITY_STORAGE_KEY = "xuunu-longevity-challenge";
 const CHALLENGE_SCHEDULE_NOTIFIED_KEY = "xuunu-challenge-schedule-notified";
 const CHALLENGE_DAILY_NOTIFIED_KEY = "xuunu-challenge-daily-notified";
+const DISPLAY_NAME_STORAGE_KEY = "xuunu-display-name";
 
 type ChallengeType = "Hiking" | "Running" | "Biking";
 
@@ -429,7 +430,17 @@ export default function DataInsightsScreen({
   }, [user?.uid, user?.displayName, user?.email, isEditingName]);
 
   useEffect(() => {
-    setDisplayNameOverride(null);
+    if (typeof window === "undefined" || !user?.uid) {
+      setDisplayNameOverride(null);
+      return;
+    }
+    try {
+      const stored = window.localStorage.getItem(DISPLAY_NAME_STORAGE_KEY);
+      const parsed = stored ? (JSON.parse(stored) as Record<string, string>) : {};
+      setDisplayNameOverride(parsed[user.uid] ?? null);
+    } catch {
+      setDisplayNameOverride(null);
+    }
   }, [user?.uid]);
 
   useEffect(() => {
@@ -1007,6 +1018,16 @@ export default function DataInsightsScreen({
     setIsSavingName(true);
     try {
       await updateProfile(user, { displayName: nextName });
+      if (typeof window !== "undefined") {
+        try {
+          const stored = window.localStorage.getItem(DISPLAY_NAME_STORAGE_KEY);
+          const parsed = stored ? (JSON.parse(stored) as Record<string, string>) : {};
+          parsed[user.uid] = nextName;
+          window.localStorage.setItem(DISPLAY_NAME_STORAGE_KEY, JSON.stringify(parsed));
+        } catch {
+          // Ignore storage failures.
+        }
+      }
       setDisplayNameOverride(nextName);
       setFeedItems((prev) =>
         prev.map((item) =>
