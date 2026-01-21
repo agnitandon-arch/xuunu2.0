@@ -2414,6 +2414,12 @@ export default function DataInsightsScreen({
                     <textarea
                       value={longevityNote}
                       onChange={(event) => setLongevityNote(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          handleLogLongevityDay();
+                        }
+                      }}
                       className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/80 focus:outline-none focus:ring-2 focus:ring-primary/40"
                       rows={2}
                       placeholder="Activity note (optional)"
@@ -2432,9 +2438,6 @@ export default function DataInsightsScreen({
                           data-testid="input-longevity-photos"
                         />
                       </label>
-                      <span className="text-xs text-white/40">
-                        {longevityPhotos.length}/4 photos
-                      </span>
                     </div>
                     {longevityPhotos.length > 0 && (
                       <div className="grid grid-cols-2 gap-2">
