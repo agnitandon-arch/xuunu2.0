@@ -20,6 +20,7 @@ import { useProfilePhoto } from "@/hooks/useProfilePhoto";
 import type { FriendProfile } from "@/pages/FriendProfileScreen";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { updateProfile } from "firebase/auth";
 import { useQuery } from "@tanstack/react-query";
 import type { HealthEntry } from "@shared/schema";
 
@@ -209,6 +210,10 @@ export default function DataInsightsScreen({
   const [updateText, setUpdateText] = useState("");
   const [updatePhotos, setUpdatePhotos] = useState<string[]>([]);
   const [shareUpdate, setShareUpdate] = useState(true);
+  const [displayNameOverride, setDisplayNameOverride] = useState<string | null>(null);
+  const [usernameDraft, setUsernameDraft] = useState("");
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [isSavingName, setIsSavingName] = useState(false);
   const [longevityChallenge, setLongevityChallenge] = useState<LongevityChallenge | null>(null);
   const [selectedLongevityType, setSelectedLongevityType] =
     useState<LongevityChallengeType | null>(null);
@@ -252,7 +257,8 @@ export default function DataInsightsScreen({
   const CROP_SIZE = 240;
   const OUTPUT_SIZE = 320;
   const MAX_PHOTO_SIZE = 100 * 1024 * 1024;
-  const displayName = user?.displayName || user?.email?.split("@")[0] || "Member";
+  const displayName =
+    displayNameOverride || user?.displayName || user?.email?.split("@")[0] || "Member";
 
   const { data: latestHealth, refetch: refetchHealth } = useQuery<HealthEntry | null>({
     queryKey: [`/api/health-entries/latest?userId=${user?.uid}`],
@@ -415,6 +421,16 @@ export default function DataInsightsScreen({
       // Ignore invalid drafts.
     }
   }, []);
+
+  useEffect(() => {
+    if (!user || isEditingName) return;
+    const baseName = user.displayName || user.email?.split("@")[0] || "";
+    setUsernameDraft(baseName);
+  }, [user?.uid, user?.displayName, user?.email, isEditingName]);
+
+  useEffect(() => {
+    setDisplayNameOverride(null);
+  }, [user?.uid]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !user?.uid) return;
@@ -968,6 +984,54 @@ export default function DataInsightsScreen({
       description: "Your latest progress is now visible in the feed.",
     });
     sendNotification("Update shared", "Your progress update is live.");
+  };
+
+  const handleSaveDisplayName = async () => {
+    if (!user) {
+      toast({
+        title: "Not signed in",
+        description: "Please sign in to update your username.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const nextName = usernameDraft.trim();
+    if (!nextName) {
+      toast({
+        title: "Enter a username",
+        description: "Your username cannot be empty.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSavingName(true);
+    try {
+      await updateProfile(user, { displayName: nextName });
+      setDisplayNameOverride(nextName);
+      setFeedItems((prev) =>
+        prev.map((item) =>
+          item.source === "you" ? { ...item, authorName: nextName } : item
+        )
+      );
+      setIsEditingName(false);
+      toast({
+        title: "Username updated",
+        description: "Your profile name has been saved.",
+      });
+    } catch {
+      toast({
+        title: "Update failed",
+        description: "Unable to update your username right now.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleCancelEditName = () => {
+    setUsernameDraft(displayName);
+    setIsEditingName(false);
   };
 
   const getCurrentLocation = useCallback(
@@ -1579,6 +1643,45 @@ export default function DataInsightsScreen({
               </TooltipProvider>
               <div>
                 <h1 className="text-2xl font-bold">{displayName}</h1>
+                {isEditingName ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Input
+                      value={usernameDraft}
+                      onChange={(event) => setUsernameDraft(event.target.value)}
+                      className="h-9 w-full max-w-[220px] bg-black/40 border-white/10 text-sm"
+                      placeholder="Update username"
+                      data-testid="input-username"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleSaveDisplayName}
+                      disabled={isSavingName}
+                      data-testid="button-save-username"
+                    >
+                      {isSavingName ? "Saving" : "Save"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleCancelEditName}
+                      data-testid="button-cancel-username"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUsernameDraft(displayName);
+                      setIsEditingName(true);
+                    }}
+                    className="mt-1 text-xs text-white/50 hover:text-white"
+                    data-testid="button-edit-username"
+                  >
+                    Edit name
+                  </button>
+                )}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
