@@ -46,6 +46,8 @@ const CHALLENGE_DAILY_NOTIFIED_KEY = "xuunu-challenge-daily-notified";
 const DISPLAY_NAME_STORAGE_KEY = "xuunu-display-name";
 const TEAM_CHALLENGE_COMPLETED_KEY = "xuunu-team-challenge-completed";
 const PROFILE_VISIBILITY_KEY = "xuunu-profile-visibility";
+const PAID_ACCOUNT_EMAIL = "agnishikha@yahoo.com";
+const PAID_STATUS_STORAGE_KEY = "xuunu-paid-account";
 
 type ChallengeType = "Hiking" | "Running" | "Biking";
 
@@ -223,6 +225,7 @@ export default function DataInsightsScreen({
   const [showEditProfileDialog, setShowEditProfileDialog] = useState(false);
   const [isProfileInvisible, setIsProfileInvisible] = useState(false);
   const [profileVisibilityDraft, setProfileVisibilityDraft] = useState(false);
+  const [isPaidAccount, setIsPaidAccount] = useState(false);
   const [editingFeedItemId, setEditingFeedItemId] = useState<string | null>(null);
   const [editingFeedTimestamp, setEditingFeedTimestamp] = useState("");
   const [teamChallengeCount, setTeamChallengeCount] = useState(0);
@@ -454,6 +457,26 @@ export default function DataInsightsScreen({
       setDisplayNameOverride(null);
     }
   }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setIsPaidAccount(false);
+      return;
+    }
+    const emailPaid =
+      user.email?.toLowerCase() === PAID_ACCOUNT_EMAIL.toLowerCase();
+    let localPaid = false;
+    if (typeof window !== "undefined") {
+      try {
+        const stored = window.localStorage.getItem(PAID_STATUS_STORAGE_KEY);
+        const parsed = stored ? (JSON.parse(stored) as Record<string, boolean>) : {};
+        localPaid = !!parsed[user.uid];
+      } catch {
+        localPaid = false;
+      }
+    }
+    setIsPaidAccount(emailPaid || localPaid);
+  }, [user?.uid, user?.email]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !user?.uid) {
@@ -1845,7 +1868,11 @@ export default function DataInsightsScreen({
                         className="rounded-full"
                         data-testid="button-update-profile-photo"
                       >
-                        <ProfileAvatar className="h-20 w-20" />
+                        <ProfileAvatar
+                          className={`h-20 w-20 ${
+                            isPaidAccount ? "ring-2 ring-white ring-offset-2 ring-offset-black" : ""
+                          }`}
+                        />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent className="bg-black border-white/10 text-white text-xs">

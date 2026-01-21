@@ -31,6 +31,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { seedInitialData } from "@/lib/localStore";
 
+const PAID_ACCOUNT_EMAIL = "agnishikha@yahoo.com";
+const PAID_STATUS_STORAGE_KEY = "xuunu-paid-account";
+
 const DISPLAY_NAME_STORAGE_KEY = "xuunu-display-name";
 
 interface DashboardScreenProps {
@@ -55,6 +58,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const [cardioMinutes, setCardioMinutes] = useState("");
   const [refreshingMetric, setRefreshingMetric] = useState<string | null>(null);
   const [displayNameOverride, setDisplayNameOverride] = useState<string | null>(null);
+  const [isPaidAccount, setIsPaidAccount] = useState(false);
   const env = import.meta.env as Record<string, string | undefined>;
   const stripePortalUrl = env.VITE_STRIPE_PAYMENT_URL;
   const stripeMonthlyUrl = env.VITE_STRIPE_MONTHLY_URL;
@@ -369,8 +373,29 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     }
   }, [user?.uid]);
 
+  useEffect(() => {
+    if (!user?.uid) {
+      setIsPaidAccount(false);
+      return;
+    }
+    const emailPaid =
+      user.email?.toLowerCase() === PAID_ACCOUNT_EMAIL.toLowerCase();
+    let localPaid = false;
+    if (typeof window !== "undefined") {
+      try {
+        const stored = window.localStorage.getItem(PAID_STATUS_STORAGE_KEY);
+        const parsed = stored ? (JSON.parse(stored) as Record<string, boolean>) : {};
+        localPaid = !!parsed[user.uid];
+      } catch {
+        localPaid = false;
+      }
+    }
+    setIsPaidAccount(emailPaid || localPaid);
+  }, [user?.uid, user?.email]);
+
   const displayName =
     displayNameOverride || user?.displayName || user?.email?.split("@")[0] || "Member";
+  const integrationsLocked = !isPaidAccount;
 
   // Calculate synergy level from real data only
   const synergyLevel = latestHealth && latestEnv && latestHealth.glucose && latestEnv.aqi ? 
@@ -389,7 +414,11 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
               data-testid="button-open-profile"
             >
               <div className="flex flex-col items-center gap-1">
-                <ProfileAvatar className="h-20 w-20" />
+                <ProfileAvatar
+                  className={`h-20 w-20 ${
+                    isPaidAccount ? "ring-2 ring-white ring-offset-2 ring-offset-black" : ""
+                  }`}
+                />
                 <span className="text-2xl font-bold">{displayName}</span>
               </div>
             </button>
@@ -854,8 +883,13 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
               <ChevronRight className="w-4 h-4 opacity-60" />
             </button>
             <button
-              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-              onClick={handleOpenPaymentPortal}
+              className={`w-full flex items-center justify-between p-4 border border-white/10 rounded-lg ${
+                integrationsLocked
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover-elevate active-elevate-2"
+              }`}
+              onClick={integrationsLocked ? undefined : handleOpenPaymentPortal}
+              disabled={integrationsLocked}
               data-testid="button-device-connections"
             >
               <div className="flex items-center gap-3">
@@ -866,8 +900,13 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
             </button>
             <div className="space-y-3">
               <button
-                className="w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-                onClick={handleOpenPaymentPortal}
+                className={`w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg ${
+                  integrationsLocked
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover-elevate active-elevate-2"
+                }`}
+                onClick={integrationsLocked ? undefined : handleOpenPaymentPortal}
+                disabled={integrationsLocked}
                 data-testid="button-connect-healthcare-provider"
               >
                 <div className="flex items-center gap-3">
@@ -877,8 +916,13 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                 <ChevronRight className="w-4 h-4 opacity-60" />
               </button>
               <button
-                className="w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-                onClick={handleOpenPaymentPortal}
+                className={`w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg ${
+                  integrationsLocked
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover-elevate active-elevate-2"
+                }`}
+                onClick={integrationsLocked ? undefined : handleOpenPaymentPortal}
+                disabled={integrationsLocked}
                 data-testid="button-upload-bloodwork"
               >
                 <div className="flex items-center gap-3">
@@ -888,8 +932,13 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                 <ChevronRight className="w-4 h-4 opacity-60" />
               </button>
               <button
-                className="w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-                onClick={handleOpenPaymentPortal}
+                className={`w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg ${
+                  integrationsLocked
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover-elevate active-elevate-2"
+                }`}
+                onClick={integrationsLocked ? undefined : handleOpenPaymentPortal}
+                disabled={integrationsLocked}
                 data-testid="button-connect-indoor-air"
               >
                 <div className="flex items-center gap-3">
