@@ -25,7 +25,7 @@ export default function LoginScreen() {
         await signUpWithEmail(email, password);
         toast({
           title: "Account created",
-          description: "Welcome to Xuunu!",
+          description: "Check your email to verify your account before signing in.",
         });
       } else {
         await signInWithEmail(email, password);

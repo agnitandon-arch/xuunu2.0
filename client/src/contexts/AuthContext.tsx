@@ -6,6 +6,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
+  sendEmailVerification,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   getRedirectResult,
@@ -77,7 +78,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUpWithEmail = async (email: string, password: string) => {
-    await createUserWithEmailAndPassword(auth, email, password);
+    const credential = await createUserWithEmailAndPassword(auth, email, password);
+    if (credential.user && !credential.user.emailVerified) {
+      try {
+        await sendEmailVerification(credential.user);
+      } catch (error) {
+        console.error("Failed to send verification email:", error);
+      }
+    }
   };
 
   const resetPassword = async (email: string) => {
