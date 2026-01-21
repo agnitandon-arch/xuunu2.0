@@ -26,6 +26,19 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { updateProfile } from "firebase/auth";
 import { useQuery } from "@tanstack/react-query";
 import type { HealthEntry } from "@shared/schema";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  orderBy,
+  query,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 type ShareTarget = {
   id: "tiktok" | "facebook" | "x" | "instagram" | "whatsapp";
@@ -34,20 +47,7 @@ type ShareTarget = {
   buildUrl: (url: string, text: string) => string;
 };
 
-const FEED_STORAGE_KEY = "xuunu-feed-items";
-const FEED_DRAFT_KEY = "xuunu-feed-draft";
-const FEED_NOTIFIED_KEY = "xuunu-feed-notified";
-const NOTIFICATIONS_KEY = "xuunu-notifications-enabled";
-const CHALLENGE_STORAGE_KEY = "xuunu-challenges";
-const CHALLENGE_SCHEDULE_KEY = "xuunu-challenge-schedules";
-const LONGEVITY_STORAGE_KEY = "xuunu-longevity-challenge";
-const CHALLENGE_SCHEDULE_NOTIFIED_KEY = "xuunu-challenge-schedule-notified";
-const CHALLENGE_DAILY_NOTIFIED_KEY = "xuunu-challenge-daily-notified";
-const DISPLAY_NAME_STORAGE_KEY = "xuunu-display-name";
-const TEAM_CHALLENGE_COMPLETED_KEY = "xuunu-team-challenge-completed";
-const PROFILE_VISIBILITY_KEY = "xuunu-profile-visibility";
 const PAID_ACCOUNT_EMAIL = "agnishikha@yahoo.com";
-const PAID_STATUS_STORAGE_KEY = "xuunu-paid-account";
 
 type ChallengeType = "Hiking" | "Running" | "Biking";
 
@@ -226,6 +226,7 @@ export default function DataInsightsScreen({
   const [isProfileInvisible, setIsProfileInvisible] = useState(false);
   const [profileVisibilityDraft, setProfileVisibilityDraft] = useState(false);
   const [isPaidAccount, setIsPaidAccount] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [editingFeedItemId, setEditingFeedItemId] = useState<string | null>(null);
   const [editingFeedTimestamp, setEditingFeedTimestamp] = useState("");
   const [teamChallengeCount, setTeamChallengeCount] = useState(0);
@@ -257,6 +258,9 @@ export default function DataInsightsScreen({
   const scheduleTimeoutsRef = useRef<Record<string, number>>({});
   const liveLocationRef = useRef<ChallengeLocation>(null);
   const locationWatchIdRef = useRef<number | null>(null);
+  const notifiedSchedulesRef = useRef<Set<string>>(new Set());
+  const dailyNotifiedRef = useRef<Record<string, string>>({});
+  const feedNotifiedRef = useRef<Set<string>>(new Set());
   const lastStepsRef = useRef<number | null>(null);
   const lastStepChangeAtRef = useRef<number | null>(null);
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -287,7 +291,7 @@ export default function DataInsightsScreen({
     typeof window !== "undefined" &&
     "Notification" in window &&
     Notification.permission === "granted" &&
-    window.localStorage.getItem(NOTIFICATIONS_KEY) === "true";
+    notificationsEnabled;
 
   const sendNotification = (title: string, body: string) => {
     if (!canNotify()) return;
@@ -300,15 +304,26 @@ export default function DataInsightsScreen({
 
   const ensureNotificationsEnabled = async () => {
     if (typeof window === "undefined" || !("Notification" in window)) return false;
+    if (!user?.uid) return false;
     if (Notification.permission === "granted") {
-      window.localStorage.setItem(NOTIFICATIONS_KEY, "true");
+      await setDoc(
+        doc(db, "users", user.uid),
+        { notificationsEnabled: true },
+        { merge: true }
+      );
+      setNotificationsEnabled(true);
       return true;
     }
     if (Notification.permission === "default") {
       try {
         const result = await Notification.requestPermission();
         if (result === "granted") {
-          window.localStorage.setItem(NOTIFICATIONS_KEY, "true");
+          await setDoc(
+            doc(db, "users", user.uid),
+            { notificationsEnabled: true },
+            { merge: true }
+          );
+          setNotificationsEnabled(true);
           return true;
         }
       } catch {
@@ -318,47 +333,6 @@ export default function DataInsightsScreen({
     return false;
   };
 
-  const loadNotifiedSchedules = () => {
-    if (typeof window === "undefined") return new Set<string>();
-    try {
-      const stored = window.localStorage.getItem(CHALLENGE_SCHEDULE_NOTIFIED_KEY);
-      const parsed = stored ? (JSON.parse(stored) as string[]) : [];
-      return new Set(parsed);
-    } catch {
-      return new Set<string>();
-    }
-  };
-
-  const saveNotifiedSchedules = (ids: Set<string>) => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(
-        CHALLENGE_SCHEDULE_NOTIFIED_KEY,
-        JSON.stringify([...ids])
-      );
-    } catch {
-      // Ignore storage failures.
-    }
-  };
-
-  const loadDailyNotified = () => {
-    if (typeof window === "undefined") return {};
-    try {
-      const stored = window.localStorage.getItem(CHALLENGE_DAILY_NOTIFIED_KEY);
-      return stored ? (JSON.parse(stored) as Record<string, string>) : {};
-    } catch {
-      return {};
-    }
-  };
-
-  const saveDailyNotified = (data: Record<string, string>) => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(CHALLENGE_DAILY_NOTIFIED_KEY, JSON.stringify(data));
-    } catch {
-      // Ignore storage failures.
-    }
-  };
 
   const friends = useMemo<FriendProfile[]>(
     () => [
@@ -417,164 +391,96 @@ export default function DataInsightsScreen({
   }, [user?.uid]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const storedDraft = window.localStorage.getItem(FEED_DRAFT_KEY);
-    if (!storedDraft) return;
-    try {
-      const parsed = JSON.parse(storedDraft) as {
-        text?: string;
-        photos?: string[];
-        shared?: boolean;
-      };
-      if (typeof parsed.text === "string") {
-        setUpdateText(parsed.text);
-      }
-      if (Array.isArray(parsed.photos)) {
-        setUpdatePhotos(parsed.photos);
-      }
-      if (typeof parsed.shared === "boolean") {
-        setShareUpdate(parsed.shared);
-      }
-    } catch {
-      // Ignore invalid drafts.
-    }
-  }, []);
-
-  useEffect(() => {
     if (!user || showEditProfileDialog) return;
     const baseName = user.displayName || user.email?.split("@")[0] || "";
     setUsernameDraft(baseName);
   }, [user?.uid, user?.displayName, user?.email, showEditProfileDialog]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !user?.uid) {
-      setDisplayNameOverride(null);
-      return;
-    }
-    try {
-      const stored = window.localStorage.getItem(DISPLAY_NAME_STORAGE_KEY);
-      const parsed = stored ? (JSON.parse(stored) as Record<string, string>) : {};
-      setDisplayNameOverride(parsed[user.uid] ?? null);
-    } catch {
-      setDisplayNameOverride(null);
-    }
-  }, [user?.uid]);
-
-  useEffect(() => {
     if (!user?.uid) {
+      setDisplayNameOverride(null);
       setIsPaidAccount(false);
+      setIsProfileInvisible(false);
+      setProfileVisibilityDraft(false);
+      setTeamChallengeCount(0);
+      setNotificationsEnabled(false);
       return;
     }
     const emailPaid =
       user.email?.toLowerCase() === PAID_ACCOUNT_EMAIL.toLowerCase();
-    let localPaid = false;
-    if (typeof window !== "undefined") {
-      try {
-        const stored = window.localStorage.getItem(PAID_STATUS_STORAGE_KEY);
-        const parsed = stored ? (JSON.parse(stored) as Record<string, boolean>) : {};
-        localPaid = !!parsed[user.uid];
-      } catch {
-        localPaid = false;
+    const userRef = doc(db, "users", user.uid);
+    const unsubscribe = onSnapshot(
+      userRef,
+      (snapshot) => {
+        const data = snapshot.data() ?? {};
+        const paid = emailPaid || !!data.paidStatus;
+        setDisplayNameOverride(
+          typeof data.displayNameOverride === "string" ? data.displayNameOverride : null
+        );
+        setIsPaidAccount(paid);
+        setIsProfileInvisible(!!data.profileInvisible);
+        setProfileVisibilityDraft(!!data.profileInvisible);
+        setTeamChallengeCount(typeof data.teamChallengeCount === "number" ? data.teamChallengeCount : 0);
+        setNotificationsEnabled(!!data.notificationsEnabled);
+      },
+      () => {
+        setDisplayNameOverride(null);
+        setIsPaidAccount(emailPaid);
+        setIsProfileInvisible(false);
+        setProfileVisibilityDraft(false);
+        setTeamChallengeCount(0);
+        setNotificationsEnabled(false);
       }
-    }
-    setIsPaidAccount(emailPaid || localPaid);
+    );
+    return unsubscribe;
   }, [user?.uid, user?.email]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !user?.uid) {
-      setIsProfileInvisible(false);
-      setProfileVisibilityDraft(false);
-      return;
-    }
-    try {
-      const stored = window.localStorage.getItem(PROFILE_VISIBILITY_KEY);
-      const parsed = stored ? (JSON.parse(stored) as Record<string, boolean>) : {};
-      const value = parsed[user.uid] ?? false;
-      setIsProfileInvisible(value);
-      setProfileVisibilityDraft(value);
-    } catch {
-      setIsProfileInvisible(false);
-      setProfileVisibilityDraft(false);
-    }
-  }, [user?.uid]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !user?.uid) {
-      setTeamChallengeCount(0);
-      return;
-    }
-    try {
-      const stored = window.localStorage.getItem(TEAM_CHALLENGE_COMPLETED_KEY);
-      const parsed = stored ? (JSON.parse(stored) as Record<string, number>) : {};
-      setTeamChallengeCount(parsed[user.uid] ?? 0);
-    } catch {
-      setTeamChallengeCount(0);
-    }
-  }, [user?.uid]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !user?.uid) return;
-    try {
-      const stored = window.localStorage.getItem(LONGEVITY_STORAGE_KEY);
-      const parsed = stored ? (JSON.parse(stored) as Record<string, LongevityChallenge>) : {};
-      setLongevityChallenge(parsed[user.uid] ?? null);
-      setSelectedLongevityType(null);
-      setLongevityPhotos([]);
-      setLongevityNote("");
-    } catch {
-      setLongevityChallenge(null);
-    }
-  }, [user?.uid]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !user?.uid) return;
-    try {
-      const stored = window.localStorage.getItem(LONGEVITY_STORAGE_KEY);
-      const parsed = stored ? (JSON.parse(stored) as Record<string, LongevityChallenge>) : {};
-      if (longevityChallenge) {
-        parsed[user.uid] = longevityChallenge;
-      } else {
-        delete parsed[user.uid];
+    if (!user?.uid) return;
+    const ref = doc(db, "users", user.uid, "longevityChallenge", "current");
+    const unsubscribe = onSnapshot(
+      ref,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          setLongevityChallenge(snapshot.data() as LongevityChallenge);
+        } else {
+          setLongevityChallenge(null);
+        }
+        setSelectedLongevityType(null);
+        setLongevityPhotos([]);
+        setLongevityNote("");
+      },
+      () => {
+        setLongevityChallenge(null);
       }
-      window.localStorage.setItem(LONGEVITY_STORAGE_KEY, JSON.stringify(parsed));
-    } catch {
-      // Ignore storage failures.
-    }
-  }, [longevityChallenge, user?.uid]);
+    );
+    return unsubscribe;
+  }, [user?.uid]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const stored = window.localStorage.getItem(CHALLENGE_SCHEDULE_KEY);
-      const parsed = stored ? JSON.parse(stored) : [];
-      const schedules = Array.isArray(parsed) ? parsed : [];
-      const normalized = schedules
-        .filter((challenge) => challenge && typeof challenge === "object")
-        .map((challenge) => ({
-          ...challenge,
-          invitedFriends: Array.isArray(challenge.invitedFriends)
-            ? challenge.invitedFriends
+    if (!user?.uid) return;
+    const ref = collection(db, "users", user.uid, "challengeSchedules");
+    const scheduleQuery = query(ref, orderBy("scheduledFor", "asc"));
+    const unsubscribe = onSnapshot(
+      scheduleQuery,
+      (snapshot) => {
+        const schedules = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<ChallengeSchedule, "id">),
+          invitedFriends: Array.isArray(docSnap.data().invitedFriends)
+            ? docSnap.data().invitedFriends
             : [],
-        }))
-        .filter((challenge) => challenge.userId === user?.uid);
-      setScheduledChallenges(normalized);
-    } catch {
-      setScheduledChallenges([]);
-    }
+        }));
+        setScheduledChallenges(schedules);
+      },
+      () => setScheduledChallenges([])
+    );
+    return unsubscribe;
   }, [user?.uid]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(CHALLENGE_SCHEDULE_KEY, JSON.stringify(scheduledChallenges));
-    } catch {
-      // Ignore storage failures.
-    }
-  }, [scheduledChallenges]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const notified = loadNotifiedSchedules();
+    const notified = notifiedSchedulesRef.current;
     Object.values(scheduleTimeoutsRef.current).forEach((timeoutId) => {
       window.clearTimeout(timeoutId);
     });
@@ -603,14 +509,11 @@ export default function DataInsightsScreen({
             "Challenge starting",
             `${challenge.type} challenge starts now.`
           );
-          const updated = loadNotifiedSchedules();
-          updated.add(challenge.id);
-          saveNotifiedSchedules(updated);
+          notifiedSchedulesRef.current.add(challenge.id);
         }
       }, delay);
     });
 
-    saveNotifiedSchedules(notified);
     return () => {
       Object.values(scheduleTimeoutsRef.current).forEach((timeoutId) => {
         window.clearTimeout(timeoutId);
@@ -872,27 +775,6 @@ export default function DataInsightsScreen({
     });
   };
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const payload = {
-      text: updateText,
-      photos: updatePhotos,
-      shared: shareUpdate,
-    };
-    try {
-      window.localStorage.setItem(FEED_DRAFT_KEY, JSON.stringify(payload));
-    } catch {
-      try {
-        window.localStorage.setItem(
-          FEED_DRAFT_KEY,
-          JSON.stringify({ text: updateText, photos: [], shared: shareUpdate })
-        );
-      } catch {
-        // Ignore storage failures.
-      }
-    }
-  }, [updateText, updatePhotos, shareUpdate]);
-
   const handleRemoveUpdatePhoto = (index: number) => {
     setUpdatePhotos((prev) => {
       const next = [...prev];
@@ -949,6 +831,11 @@ export default function DataInsightsScreen({
       .filter(Boolean) as FeedItem[];
   };
 
+  const saveFeedItem = async (item: FeedItem) => {
+    if (!user?.uid) return;
+    await setDoc(doc(db, "users", user.uid, "feedItems", item.id), item, { merge: true });
+  };
+
   const buildDefaultFeedItems = (avatar: string): FeedItem[] => [
     {
       id: "feed-1",
@@ -974,65 +861,42 @@ export default function DataInsightsScreen({
       likesCount: 7,
       liked: false,
     },
-    {
-      id: "feed-3",
-      authorName: "You",
-      authorAvatar: avatar,
-      time: "Yesterday",
-      content: "Started sharing my progress publicly this week.",
-      photos: [],
-      shared: true,
-      source: "you" as const,
-      likesCount: 3,
-      liked: false,
-    },
   ];
 
-  const [feedItems, setFeedItems] = useState<FeedItem[]>(() => {
-    if (typeof window === "undefined") {
-      return buildDefaultFeedItems(photoUrl || "");
+  const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setFeedItems(buildDefaultFeedItems(photoUrl || ""));
+      return;
     }
-    const stored = window.localStorage.getItem(FEED_STORAGE_KEY);
-    if (stored) {
+    const loadFeedItems = async () => {
       try {
-        const parsed = JSON.parse(stored);
-        const normalized = normalizeFeedItems(parsed);
-        return normalized.length > 0 ? normalized : buildDefaultFeedItems(photoUrl || "");
+        const feedRef = collection(db, "users", user.uid, "feedItems");
+        const feedQuery = query(feedRef, orderBy("postedAt", "desc"));
+        const snapshot = await getDocs(feedQuery);
+        const data = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<FeedItem, "id">),
+        }));
+        const normalized = normalizeFeedItems(data);
+        setFeedItems([...normalized, ...buildDefaultFeedItems(photoUrl || "")]);
       } catch {
-        return buildDefaultFeedItems(photoUrl || "");
+        setFeedItems(buildDefaultFeedItems(photoUrl || ""));
       }
-    }
-    return buildDefaultFeedItems(photoUrl || "");
-  });
+    };
+    void loadFeedItems();
+  }, [user?.uid, photoUrl]);
 
   useEffect(() => {
     setFeedItems((prev) =>
       prev.map((item) =>
-        item.source === "you" ? { ...item, authorAvatar: photoUrl || "" } : item
+        item.source === "you"
+          ? { ...item, authorAvatar: photoUrl || "", authorName: displayName }
+          : item
       )
     );
-  }, [photoUrl]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(FEED_STORAGE_KEY, JSON.stringify(feedItems));
-    } catch (error) {
-      const withoutPhotos = feedItems.map((item) => ({ ...item, photos: [] }));
-      try {
-        window.localStorage.setItem(FEED_STORAGE_KEY, JSON.stringify(withoutPhotos));
-      } catch {
-        try {
-          window.localStorage.setItem(
-            FEED_STORAGE_KEY,
-            JSON.stringify(withoutPhotos.slice(0, 1))
-          );
-        } catch {
-          // Ignore storage failures (e.g., quota exceeded).
-        }
-      }
-    }
-  }, [feedItems]);
+  }, [photoUrl, displayName]);
 
   const publicFeedItems = useMemo(
     () => feedItems.filter((item) => item.shared),
@@ -1083,11 +947,18 @@ export default function DataInsightsScreen({
     );
   };
 
-  const handleDeleteFeedItem = (id: string) => {
+  const handleDeleteFeedItem = async (id: string) => {
     setFeedItems((prev) => prev.filter((item) => item.id !== id));
     if (editingFeedItemId === id) {
       setEditingFeedItemId(null);
       setEditingFeedTimestamp("");
+    }
+    if (user?.uid) {
+      try {
+        await deleteDoc(doc(db, "users", user.uid, "feedItems", id));
+      } catch {
+        // Ignore delete errors.
+      }
     }
     toast({
       title: "Post deleted",
@@ -1102,7 +973,7 @@ export default function DataInsightsScreen({
     setEditingFeedTimestamp(formatDateTimeLocal(safeDate));
   };
 
-  const handleSaveFeedTime = () => {
+  const handleSaveFeedTime = async () => {
     if (!editingFeedItemId) return;
     const nextDate = new Date(editingFeedTimestamp);
     if (Number.isNaN(nextDate.getTime())) {
@@ -1126,6 +997,16 @@ export default function DataInsightsScreen({
           : item
       )
     );
+    if (user?.uid) {
+      try {
+        await updateDoc(doc(db, "users", user.uid, "feedItems", editingFeedItemId), {
+          postedAt: nextIso,
+          time: nextLabel,
+        });
+      } catch {
+        // Ignore update errors.
+      }
+    }
     setEditingFeedItemId(null);
     setEditingFeedTimestamp("");
     toast({
@@ -1142,25 +1023,20 @@ export default function DataInsightsScreen({
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!canNotify()) return;
-    try {
-      const stored = window.localStorage.getItem(FEED_NOTIFIED_KEY);
-      const notified = new Set<string>(stored ? (JSON.parse(stored) as string[]) : []);
-      const newFriendItems = feedItems.filter(
-        (item) => item.source === "friend" && !notified.has(item.id)
-      );
-      if (newFriendItems.length > 0) {
-        newFriendItems.forEach((item) => {
-          sendNotification("Friend update", `${item.authorName} shared an update.`);
-          notified.add(item.id);
-        });
-        window.localStorage.setItem(FEED_NOTIFIED_KEY, JSON.stringify([...notified]));
-      }
-    } catch {
-      // Ignore notification tracking errors.
+    const notified = feedNotifiedRef.current;
+    const newFriendItems = feedItems.filter(
+      (item) => item.source === "friend" && !notified.has(item.id)
+    );
+    if (newFriendItems.length > 0) {
+      newFriendItems.forEach((item) => {
+        sendNotification("Friend update", `${item.authorName} shared an update.`);
+        notified.add(item.id);
+      });
+      feedNotifiedRef.current = new Set(notified);
     }
   }, [feedItems]);
 
-  const handleShareUpdate = () => {
+  const handleShareUpdate = async () => {
     if (!updateText.trim() && updatePhotos.length === 0) {
       toast({
         title: "Add a note or photo",
@@ -1185,12 +1061,10 @@ export default function DataInsightsScreen({
     };
 
     setFeedItems((prev) => [newItem, ...prev]);
+    await saveFeedItem(newItem);
     setUpdateText("");
     setUpdatePhotos([]);
     setShareUpdate(isProfileInvisible ? false : true);
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(FEED_DRAFT_KEY);
-    }
     toast({
       title: "Update shared",
       description: "Your latest progress is now visible in the feed.",
@@ -1219,16 +1093,11 @@ export default function DataInsightsScreen({
     setIsSavingName(true);
     try {
       await updateProfile(user, { displayName: nextName });
-      if (typeof window !== "undefined") {
-        try {
-          const stored = window.localStorage.getItem(DISPLAY_NAME_STORAGE_KEY);
-          const parsed = stored ? (JSON.parse(stored) as Record<string, string>) : {};
-          parsed[user.uid] = nextName;
-          window.localStorage.setItem(DISPLAY_NAME_STORAGE_KEY, JSON.stringify(parsed));
-        } catch {
-          // Ignore storage failures.
-        }
-      }
+      await setDoc(
+        doc(db, "users", user.uid),
+        { displayNameOverride: nextName },
+        { merge: true }
+      );
       setDisplayNameOverride(nextName);
       setFeedItems((prev) =>
         prev.map((item) =>
@@ -1269,16 +1138,11 @@ export default function DataInsightsScreen({
           )
         );
       }
-      if (typeof window !== "undefined") {
-        try {
-          const stored = window.localStorage.getItem(PROFILE_VISIBILITY_KEY);
-          const parsed = stored ? (JSON.parse(stored) as Record<string, boolean>) : {};
-          parsed[user.uid] = profileVisibilityDraft;
-          window.localStorage.setItem(PROFILE_VISIBILITY_KEY, JSON.stringify(parsed));
-        } catch {
-          // Ignore storage failures.
-        }
-      }
+      await setDoc(
+        doc(db, "users", user.uid),
+        { profileInvisible: profileVisibilityDraft },
+        { merge: true }
+      );
       toast({
         title: profileVisibilityDraft ? "Profile hidden" : "Profile visible",
         description: profileVisibilityDraft
@@ -1467,16 +1331,11 @@ export default function DataInsightsScreen({
     )}`;
   };
 
-  const saveChallenge = (challenge: ChallengeRecord) => {
-    if (typeof window === "undefined") return;
-    try {
-      const stored = window.localStorage.getItem(CHALLENGE_STORAGE_KEY);
-      const parsed = stored ? (JSON.parse(stored) as ChallengeRecord[]) : [];
-      const updated = [challenge, ...parsed];
-      window.localStorage.setItem(CHALLENGE_STORAGE_KEY, JSON.stringify(updated));
-    } catch {
-      // Ignore storage failures.
-    }
+  const saveChallenge = async (challenge: ChallengeRecord) => {
+    if (!user?.uid) return;
+    await setDoc(doc(db, "users", user.uid, "challenges", challenge.id), challenge, {
+      merge: true,
+    });
   };
 
   const handleStartChallenge = async (
@@ -1568,7 +1427,7 @@ export default function DataInsightsScreen({
       invitedFriends,
       shared: shareScheduledChallenge,
     };
-    setScheduledChallenges((prev) => [record, ...prev]);
+    await setDoc(doc(db, "users", user.uid, "challengeSchedules", record.id), record);
     const notificationsEnabled = await ensureNotificationsEnabled();
     if (!notificationsEnabled) {
       toast({
@@ -1595,6 +1454,7 @@ export default function DataInsightsScreen({
           invitedFriends: record.invitedFriends,
         },
       };
+      await saveFeedItem(feedItem);
       setFeedItems((prev) => [feedItem, ...prev]);
     }
     setShowChallengePicker(false);
@@ -1605,7 +1465,7 @@ export default function DataInsightsScreen({
     });
   };
 
-  const handleStartScheduledChallenge = (challenge: ChallengeSchedule) => {
+  const handleStartScheduledChallenge = async (challenge: ChallengeSchedule) => {
     const startTime = new Date(challenge.scheduledFor).getTime();
     if (Date.now() < startTime) {
       toast({
@@ -1615,7 +1475,9 @@ export default function DataInsightsScreen({
       });
       return;
     }
-    setScheduledChallenges((prev) => prev.filter((item) => item.id !== challenge.id));
+    if (user?.uid) {
+      await deleteDoc(doc(db, "users", user.uid, "challengeSchedules", challenge.id));
+    }
     handleStartChallenge(challenge.type, { invitedFriends: challenge.invitedFriends });
   };
 
@@ -1623,6 +1485,16 @@ export default function DataInsightsScreen({
     setInvitedFriends((prev) =>
       prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]
     );
+  };
+
+  const saveLongevityChallenge = async (challenge: LongevityChallenge | null) => {
+    if (!user?.uid) return;
+    const ref = doc(db, "users", user.uid, "longevityChallenge", "current");
+    if (challenge) {
+      await setDoc(ref, challenge);
+    } else {
+      await deleteDoc(ref);
+    }
   };
 
   const handleStartLongevityChallenge = () => {
@@ -1650,6 +1522,7 @@ export default function DataInsightsScreen({
       logs: [],
     };
     setLongevityChallenge(record);
+    void saveLongevityChallenge(record);
     setSelectedLongevityType(null);
     setLongevityPhotos([]);
     setLongevityNote("");
@@ -1701,9 +1574,12 @@ export default function DataInsightsScreen({
       photos: longevityPhotos,
       note: longevityNote.trim() ? longevityNote.trim() : undefined,
     };
-    setLongevityChallenge((prev) =>
-      prev ? { ...prev, logs: [log, ...prev.logs] } : prev
-    );
+    const updated = {
+      ...longevityChallenge,
+      logs: [log, ...longevityChallenge.logs],
+    };
+    setLongevityChallenge(updated);
+    void saveLongevityChallenge(updated);
     setLongevityPhotos([]);
     setLongevityNote("");
     toast({
@@ -1714,6 +1590,7 @@ export default function DataInsightsScreen({
 
   const handleResetLongevityChallenge = () => {
     setLongevityChallenge(null);
+    void saveLongevityChallenge(null);
     setSelectedLongevityType(null);
     setLongevityPhotos([]);
     setLongevityNote("");
@@ -1763,23 +1640,18 @@ export default function DataInsightsScreen({
     [activeChallenge, getCurrentLocation, latestHealth?.steps, toast, user]
   );
 
-  const handleFinalizeChallenge = (shared: boolean) => {
+  const handleFinalizeChallenge = async (shared: boolean) => {
     if (!pendingChallenge) return;
     const record = { ...pendingChallenge, shared };
-    saveChallenge(record);
+    await saveChallenge(record);
     if (record.invitedFriends && record.invitedFriends.length > 0 && user) {
-      if (typeof window !== "undefined") {
-        try {
-          const stored = window.localStorage.getItem(TEAM_CHALLENGE_COMPLETED_KEY);
-          const parsed = stored ? (JSON.parse(stored) as Record<string, number>) : {};
-          const nextCount = (parsed[user.uid] ?? 0) + 1;
-          parsed[user.uid] = nextCount;
-          window.localStorage.setItem(TEAM_CHALLENGE_COMPLETED_KEY, JSON.stringify(parsed));
-          setTeamChallengeCount(nextCount);
-        } catch {
-          // Ignore storage failures.
-        }
-      }
+      const nextCount = teamChallengeCount + 1;
+      setTeamChallengeCount(nextCount);
+      await setDoc(
+        doc(db, "users", user.uid),
+        { teamChallengeCount: nextCount },
+        { merge: true }
+      );
     }
     if (shared) {
       const feedItem: FeedItem = {
@@ -1803,6 +1675,7 @@ export default function DataInsightsScreen({
           invitedFriends: record.invitedFriends,
         },
       };
+      await saveFeedItem(feedItem);
       setFeedItems((prev) => [feedItem, ...prev]);
     }
     setPendingChallenge(null);
@@ -1964,7 +1837,7 @@ export default function DataInsightsScreen({
     if (typeof window === "undefined") return;
     if (!canNotify()) return;
     const todayKey = getLocalDateKey(new Date());
-    const dailyNotified = loadDailyNotified();
+    const dailyNotified = dailyNotifiedRef.current;
     let updated = false;
 
     scheduledChallenges.forEach((challenge) => {
@@ -1996,7 +1869,7 @@ export default function DataInsightsScreen({
     }
 
     if (updated) {
-      saveDailyNotified(dailyNotified);
+      dailyNotifiedRef.current = { ...dailyNotified };
     }
   }, [
     scheduledChallenges,

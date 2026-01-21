@@ -30,11 +30,11 @@ import type { HealthEntry, EnvironmentalReading } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { seedInitialData } from "@/lib/localStore";
+import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const PAID_ACCOUNT_EMAIL = "agnishikha@yahoo.com";
-const PAID_STATUS_STORAGE_KEY = "xuunu-paid-account";
-
-const DISPLAY_NAME_STORAGE_KEY = "xuunu-display-name";
+const TERRA_REFRESH_DOC = "terraRefresh";
 
 interface DashboardScreenProps {
   onNavigate?: (tab: string) => void;
@@ -59,6 +59,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const [refreshingMetric, setRefreshingMetric] = useState<string | null>(null);
   const [displayNameOverride, setDisplayNameOverride] = useState<string | null>(null);
   const [isPaidAccount, setIsPaidAccount] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const env = import.meta.env as Record<string, string | undefined>;
   const stripePortalUrl = env.VITE_STRIPE_PAYMENT_URL;
   const stripeMonthlyUrl = env.VITE_STRIPE_MONTHLY_URL;
@@ -120,7 +121,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   useEffect(() => {
     if (!user?.uid || healthLoading || envLoading) return;
     if (!latestHealth && !latestEnv) {
-      seedInitialData(user.uid);
+      void seedInitialData(user.uid);
       queryClient.invalidateQueries({
         queryKey: [`/api/health-entries/latest?userId=${user.uid}`],
       });
@@ -153,21 +154,17 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const handleMetricRefresh = async (metricId: string) => {
     if (!user || refreshingMetric) return;
     const today = new Date().toISOString().slice(0, 10);
-    const storageKey = `xuunu-terra-refresh-${user.uid}`;
     let refreshCount = 0;
 
-    if (typeof window !== "undefined") {
-      try {
-        const stored = window.localStorage.getItem(storageKey);
-        if (stored) {
-          const parsed = JSON.parse(stored) as { date?: string; count?: number };
-          if (parsed.date === today && typeof parsed.count === "number") {
-            refreshCount = parsed.count;
-          }
-        }
-      } catch (error) {
-        refreshCount = 0;
+    try {
+      const refreshRef = doc(db, "users", user.uid, "meta", TERRA_REFRESH_DOC);
+      const snapshot = await getDoc(refreshRef);
+      const data = snapshot.data() as { date?: string; count?: number } | undefined;
+      if (data?.date === today && typeof data.count === "number") {
+        refreshCount = data.count;
       }
+    } catch {
+      refreshCount = 0;
     }
 
     if (refreshCount >= 4) {
@@ -179,11 +176,11 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     }
 
     const nextCount = refreshCount + 1;
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(
-        storageKey,
-        JSON.stringify({ date: today, count: nextCount })
-      );
+    try {
+      const refreshRef = doc(db, "users", user.uid, "meta", TERRA_REFRESH_DOC);
+      await setDoc(refreshRef, { date: today, count: nextCount }, { merge: true });
+    } catch {
+      // Ignore storage failures.
     }
 
     setRefreshingMetric(metricId);
@@ -237,7 +234,10 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     }
 
     if (Notification.permission === "granted") {
-      window.localStorage.setItem("xuunu-notifications-enabled", "true");
+      if (user?.uid) {
+        await setDoc(doc(db, "users", user.uid), { notificationsEnabled: true }, { merge: true });
+        setNotificationsEnabled(true);
+      }
       toast({
         title: "Notifications enabled",
         description: "Notifications are already enabled.",
@@ -246,7 +246,14 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     }
 
     if (Notification.permission === "denied") {
-      window.localStorage.setItem("xuunu-notifications-enabled", "false");
+      if (user?.uid) {
+        await setDoc(
+          doc(db, "users", user.uid),
+          { notificationsEnabled: false },
+          { merge: true }
+        );
+        setNotificationsEnabled(false);
+      }
       toast({
         title: "Notifications blocked",
         description: "Enable notifications in your phone settings.",
@@ -258,13 +265,27 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     try {
       const permission = await Notification.requestPermission();
       if (permission === "granted") {
-        window.localStorage.setItem("xuunu-notifications-enabled", "true");
+        if (user?.uid) {
+          await setDoc(
+            doc(db, "users", user.uid),
+            { notificationsEnabled: true },
+            { merge: true }
+          );
+          setNotificationsEnabled(true);
+        }
         toast({
           title: "Notifications enabled",
           description: "You're all set to receive alerts.",
         });
       } else {
-        window.localStorage.setItem("xuunu-notifications-enabled", "false");
+        if (user?.uid) {
+          await setDoc(
+            doc(db, "users", user.uid),
+            { notificationsEnabled: false },
+            { merge: true }
+          );
+          setNotificationsEnabled(false);
+        }
         toast({
           title: "Notifications disabled",
           description: "Enable notifications in your phone settings.",
@@ -365,37 +386,32 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !user?.uid) {
-      setDisplayNameOverride(null);
-      return;
-    }
-    try {
-      const stored = window.localStorage.getItem(DISPLAY_NAME_STORAGE_KEY);
-      const parsed = stored ? (JSON.parse(stored) as Record<string, string>) : {};
-      setDisplayNameOverride(parsed[user.uid] ?? null);
-    } catch {
-      setDisplayNameOverride(null);
-    }
-  }, [user?.uid]);
-
-  useEffect(() => {
     if (!user?.uid) {
+      setDisplayNameOverride(null);
       setIsPaidAccount(false);
+      setNotificationsEnabled(false);
       return;
     }
     const emailPaid =
       user.email?.toLowerCase() === PAID_ACCOUNT_EMAIL.toLowerCase();
-    let localPaid = false;
-    if (typeof window !== "undefined") {
-      try {
-        const stored = window.localStorage.getItem(PAID_STATUS_STORAGE_KEY);
-        const parsed = stored ? (JSON.parse(stored) as Record<string, boolean>) : {};
-        localPaid = !!parsed[user.uid];
-      } catch {
-        localPaid = false;
+    const userRef = doc(db, "users", user.uid);
+    const unsubscribe = onSnapshot(
+      userRef,
+      (snapshot) => {
+        const data = snapshot.data() ?? {};
+        setDisplayNameOverride(
+          typeof data.displayNameOverride === "string" ? data.displayNameOverride : null
+        );
+        setIsPaidAccount(emailPaid || !!data.paidStatus);
+        setNotificationsEnabled(!!data.notificationsEnabled);
+      },
+      () => {
+        setDisplayNameOverride(null);
+        setIsPaidAccount(emailPaid);
+        setNotificationsEnabled(false);
       }
-    }
-    setIsPaidAccount(emailPaid || localPaid);
+    );
+    return unsubscribe;
   }, [user?.uid, user?.email]);
 
   const displayName =
@@ -959,7 +975,9 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
               data-testid="button-notifications"
             >
               <span className="text-sm">Notifications</span>
-              <span className="text-xs opacity-60">Enabled</span>
+              <span className="text-xs opacity-60">
+                {notificationsEnabled ? "Enabled" : "Disabled"}
+              </span>
             </button>
             <button
               className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"

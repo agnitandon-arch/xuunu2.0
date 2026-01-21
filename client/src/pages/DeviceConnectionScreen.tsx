@@ -8,6 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Watch, Loader2, CheckCircle, AlertCircle, Droplets } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface UserCredentials {
   id: string;
@@ -36,8 +38,6 @@ export default function DeviceConnectionScreen() {
   const [appleHealthConnected, setAppleHealthConnected] = useState(false);
   const [isAppleHealthConnecting, setIsAppleHealthConnecting] = useState(false);
 
-  const APPLE_HEALTH_STORAGE_KEY = "xuunu-apple-health-connected";
-
   // Fetch existing credentials
   const { data: credentials, isLoading: credentialsLoading } = useQuery<UserCredentials | null>({
     queryKey: ['/api/user-credentials', { userId: user?.uid }],
@@ -61,10 +61,20 @@ export default function DeviceConnectionScreen() {
   });
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(APPLE_HEALTH_STORAGE_KEY);
-    setAppleHealthConnected(stored === "true");
-  }, []);
+    if (!user?.uid) {
+      setAppleHealthConnected(false);
+      return;
+    }
+    const unsubscribe = onSnapshot(
+      doc(db, "users", user.uid),
+      (snapshot) => {
+        const data = snapshot.data() ?? {};
+        setAppleHealthConnected(!!data.appleHealthConnected);
+      },
+      () => setAppleHealthConnected(false)
+    );
+    return unsubscribe;
+  }, [user?.uid]);
 
   const handleConnectAppleHealth = async () => {
     if (isAppleHealthConnecting) return;
@@ -81,8 +91,14 @@ export default function DeviceConnectionScreen() {
     setIsAppleHealthConnecting(true);
     try {
       if (typeof window !== "undefined") {
-        window.localStorage.setItem(APPLE_HEALTH_STORAGE_KEY, "true");
         window.location.href = "x-apple-health://";
+      }
+      if (user?.uid) {
+        await setDoc(
+          doc(db, "users", user.uid),
+          { appleHealthConnected: true },
+          { merge: true }
+        );
       }
       setAppleHealthConnected(true);
       toast({

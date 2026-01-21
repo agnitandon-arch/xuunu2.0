@@ -1,48 +1,41 @@
 import { useCallback, useEffect, useState } from "react";
-
-const STORAGE_KEY = "xuunu-profile-photo";
-const EVENT_NAME = "xuunu-profile-photo-change";
-
-const getStoredPhoto = () => {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(STORAGE_KEY);
-};
-
-const notifyChange = () => {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(EVENT_NAME));
-};
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { useAuth } from "@/contexts/AuthContext";
+import { db } from "@/lib/firebase";
 
 export function useProfilePhoto() {
-  const [photoUrl, setPhotoUrlState] = useState<string | null>(() => getStoredPhoto());
+  const { user } = useAuth();
+  const [photoUrl, setPhotoUrlState] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY) {
-        setPhotoUrlState(event.newValue);
-      }
-    };
-    const handleCustom = () => setPhotoUrlState(getStoredPhoto());
-
-    window.addEventListener("storage", handleStorage);
-    window.addEventListener(EVENT_NAME, handleCustom);
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-      window.removeEventListener(EVENT_NAME, handleCustom);
-    };
-  }, []);
-
-  const setPhotoUrl = useCallback((value: string | null) => {
-    if (typeof window === "undefined") return;
-    if (value) {
-      window.localStorage.setItem(STORAGE_KEY, value);
-    } else {
-      window.localStorage.removeItem(STORAGE_KEY);
+    if (!user?.uid) {
+      setPhotoUrlState(user?.photoURL ?? null);
+      return;
     }
-    setPhotoUrlState(value);
-    notifyChange();
-  }, []);
+    const ref = doc(db, "users", user.uid);
+    const unsubscribe = onSnapshot(
+      ref,
+      (snapshot) => {
+        const data = snapshot.data() ?? {};
+        const storedPhoto =
+          typeof data.photoUrl === "string" && data.photoUrl.length > 0
+            ? data.photoUrl
+            : null;
+        setPhotoUrlState(storedPhoto ?? user.photoURL ?? null);
+      },
+      () => setPhotoUrlState(user.photoURL ?? null)
+    );
+    return unsubscribe;
+  }, [user?.uid, user?.photoURL]);
+
+  const setPhotoUrl = useCallback(
+    async (value: string | null) => {
+      if (!user?.uid) return;
+      await setDoc(doc(db, "users", user.uid), { photoUrl: value ?? null }, { merge: true });
+      setPhotoUrlState(value);
+    },
+    [user?.uid]
+  );
 
   return { photoUrl, setPhotoUrl };
 }

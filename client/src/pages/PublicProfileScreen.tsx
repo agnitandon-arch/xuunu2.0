@@ -2,6 +2,8 @@ import { ArrowLeft, Globe, Link, Trophy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import ProfileAvatar from "@/components/ProfileAvatar";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 type DashboardConfig = {
   id: string;
@@ -26,7 +28,6 @@ type ChallengeRecord = {
   shared?: boolean;
 };
 
-const CHALLENGE_STORAGE_KEY = "xuunu-challenges";
 
 interface PublicProfileScreenProps {
   onBack: () => void;
@@ -87,25 +88,25 @@ export default function PublicProfileScreen({ onBack }: PublicProfileScreenProps
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const loadChallenges = () => {
-      try {
-        const stored = window.localStorage.getItem(CHALLENGE_STORAGE_KEY);
-        const parsed = stored ? (JSON.parse(stored) as ChallengeRecord[]) : [];
-        setSharedChallenges(parsed.filter((challenge) => challenge.shared));
-      } catch {
-        setSharedChallenges([]);
-      }
-    };
-    loadChallenges();
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === CHALLENGE_STORAGE_KEY) {
-        loadChallenges();
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
+    if (!user?.uid) {
+      setSharedChallenges([]);
+      return;
+    }
+    const ref = collection(db, "users", user.uid, "challenges");
+    const challengeQuery = query(ref, orderBy("endedAt", "desc"));
+    const unsubscribe = onSnapshot(
+      challengeQuery,
+      (snapshot) => {
+        const challenges = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<ChallengeRecord, "id">),
+        }));
+        setSharedChallenges(challenges.filter((challenge) => challenge.shared));
+      },
+      () => setSharedChallenges([])
+    );
+    return unsubscribe;
+  }, [user?.uid]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

@@ -1,4 +1,17 @@
-type StoredItem<T> = T & { id: string };
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+import { db } from "./firebase";
 
 type HealthEntry = {
   id: string;
@@ -68,36 +81,7 @@ type BioSignatureSnapshot = {
   createdAt: string;
 };
 
-const HEALTH_ENTRIES_KEY = "xuunu-health-entries";
-const ENV_READINGS_KEY = "xuunu-env-readings";
-const MEDICATIONS_KEY = "xuunu-medications";
-const MEDICATION_LOGS_KEY = "xuunu-medication-logs";
-const BIOSIGNATURE_KEY = "xuunu-biosignature-snapshots";
-
 const SNAPSHOT_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
-
-const getStore = <T>(key: string): T[] => {
-  if (typeof window === "undefined") return [];
-  const raw = window.localStorage.getItem(key);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw) as T[];
-  } catch {
-    return [];
-  }
-};
-
-const setStore = <T>(key: string, value: T[]) => {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(key, JSON.stringify(value));
-};
-
-const createId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `local-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-};
 
 const toNumber = (value: unknown): number | undefined => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -108,24 +92,29 @@ const toNumber = (value: unknown): number | undefined => {
   return undefined;
 };
 
-const sortByTimestampDesc = <T extends { timestamp: string }>(items: T[]) =>
-  [...items].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+const userCollection = (userId: string, name: string) =>
+  collection(db, "users", userId, name);
 
-export const getHealthEntries = (userId: string, limit?: number) => {
-  const all = getStore<HealthEntry>(HEALTH_ENTRIES_KEY).filter((entry) => entry.userId === userId);
-  const sorted = sortByTimestampDesc(all);
-  return typeof limit === "number" ? sorted.slice(0, limit) : sorted;
+export const getHealthEntries = async (userId: string, max?: number) => {
+  const ref = userCollection(userId, "healthEntries");
+  const q = max
+    ? query(ref, orderBy("timestamp", "desc"), limit(max))
+    : query(ref, orderBy("timestamp", "desc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(
+    (docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<HealthEntry, "id">) }) as HealthEntry
+  );
 };
 
-export const getLatestHealthEntry = (userId: string) => {
-  const entries = getHealthEntries(userId, 1);
+export const getLatestHealthEntry = async (userId: string) => {
+  const entries = await getHealthEntries(userId, 1);
   return entries[0] ?? null;
 };
 
-export const createHealthEntry = (data: Partial<HealthEntry> & { userId: string }) => {
-  const previous = getLatestHealthEntry(data.userId);
+export const createHealthEntry = async (data: Partial<HealthEntry> & { userId: string }) => {
+  const previous = await getLatestHealthEntry(data.userId);
   const entry: HealthEntry = {
-    id: createId(),
+    id: doc(userCollection(data.userId, "healthEntries")).id,
     userId: data.userId,
     timestamp: data.timestamp || new Date().toISOString(),
     glucose: toNumber(data.glucose),
@@ -160,30 +149,34 @@ export const createHealthEntry = (data: Partial<HealthEntry> & { userId: string 
         symptomSeverity: entry.symptomSeverity ?? previous.symptomSeverity,
       }
     : entry;
-  const entries = getStore<HealthEntry>(HEALTH_ENTRIES_KEY);
-  const updated = [mergedEntry, ...entries];
-  setStore(HEALTH_ENTRIES_KEY, updated);
-  maybeCreateBioSignatureSnapshot(mergedEntry);
+  await setDoc(doc(db, "users", data.userId, "healthEntries", mergedEntry.id), mergedEntry);
+  await maybeCreateBioSignatureSnapshot(mergedEntry);
   return mergedEntry;
 };
 
-export const getEnvironmentalReadings = (userId: string) => {
-  const all = getStore<EnvironmentalReading>(ENV_READINGS_KEY).filter(
-    (reading) => reading.userId === userId
+export const getEnvironmentalReadings = async (userId: string) => {
+  const ref = userCollection(userId, "environmentalReadings");
+  const q = query(ref, orderBy("timestamp", "desc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(
+    (docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<EnvironmentalReading, "id">) }) as EnvironmentalReading
   );
-  return sortByTimestampDesc(all);
 };
 
-export const getLatestEnvironmentalReading = (userId: string) => {
-  const readings = getEnvironmentalReadings(userId);
-  return readings[0] ?? null;
+export const getLatestEnvironmentalReading = async (userId: string) => {
+  const ref = userCollection(userId, "environmentalReadings");
+  const q = query(ref, orderBy("timestamp", "desc"), limit(1));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  const docSnap = snapshot.docs[0];
+  return { id: docSnap.id, ...(docSnap.data() as Omit<EnvironmentalReading, "id">) } as EnvironmentalReading;
 };
 
-export const createEnvironmentalReading = (
+export const createEnvironmentalReading = async (
   data: Partial<EnvironmentalReading> & { userId: string }
 ) => {
   const reading: EnvironmentalReading = {
-    id: createId(),
+    id: doc(userCollection(data.userId, "environmentalReadings")).id,
     userId: data.userId,
     timestamp: data.timestamp || new Date().toISOString(),
     aqi: toNumber(data.aqi),
@@ -191,61 +184,57 @@ export const createEnvironmentalReading = (
     humidity: toNumber(data.humidity),
     locationMode: data.locationMode || "manual",
   };
-  const readings = getStore<EnvironmentalReading>(ENV_READINGS_KEY);
-  const updated = [reading, ...readings];
-  setStore(ENV_READINGS_KEY, updated);
+  await setDoc(doc(db, "users", data.userId, "environmentalReadings", reading.id), reading);
   return reading;
 };
 
-export const getMedications = (userId: string) => {
-  const all = getStore<Medication>(MEDICATIONS_KEY).filter((med) => med.userId === userId);
-  return all.filter((med) => med.isActive === 1);
+export const getMedications = async (userId: string) => {
+  const ref = userCollection(userId, "medications");
+  const q = query(ref, orderBy("createdAt", "desc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(
+    (docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<Medication, "id">) }) as Medication
+  );
 };
 
-export const createMedication = (data: Omit<Medication, "id" | "createdAt" | "updatedAt">) => {
+export const createMedication = async (data: Omit<Medication, "id" | "createdAt" | "updatedAt">) => {
   const now = new Date().toISOString();
   const medication: Medication = {
+    id: doc(userCollection(data.userId, "medications")).id,
     ...data,
-    id: createId(),
     createdAt: now,
     updatedAt: now,
   };
-  const medications = getStore<Medication>(MEDICATIONS_KEY);
-  setStore(MEDICATIONS_KEY, [medication, ...medications]);
+  await setDoc(doc(db, "users", data.userId, "medications", medication.id), medication);
   return medication;
 };
 
-export const deleteMedication = (userId: string, id: string) => {
-  const medications = getStore<Medication>(MEDICATIONS_KEY);
-  const updated = medications.map((med) =>
-    med.id === id && med.userId === userId ? { ...med, isActive: 0 } : med
-  );
-  setStore(MEDICATIONS_KEY, updated);
+export const updateMedication = async (userId: string, id: string, updates: Partial<Medication>) => {
+  const ref = doc(db, "users", userId, "medications", id);
+  await updateDoc(ref, { ...updates, updatedAt: new Date().toISOString() });
+  const snap = await getDoc(ref);
+  return snap.exists() ? ({ id: snap.id, ...(snap.data() as Omit<Medication, "id">) } as Medication) : null;
 };
 
-export const updateMedication = (userId: string, id: string, updates: Partial<Medication>) => {
-  const medications = getStore<Medication>(MEDICATIONS_KEY);
-  const updated = medications.map((med) =>
-    med.id === id && med.userId === userId
-      ? { ...med, ...updates, updatedAt: new Date().toISOString() }
-      : med
-  );
-  setStore(MEDICATIONS_KEY, updated);
-  return updated.find((med) => med.id === id) ?? null;
+export const deleteMedication = async (userId: string, id: string) => {
+  await deleteDoc(doc(db, "users", userId, "medications", id));
 };
 
-export const getMedicationLogs = (
+export const getMedicationLogs = async (
   userId: string,
   medicationId?: string,
   startDate?: string,
   endDate?: string
 ) => {
-  let logs = getStore<MedicationLog>(MEDICATION_LOGS_KEY).filter(
-    (log) => log.userId === userId
-  );
+  const ref = userCollection(userId, "medicationLogs");
+  let q = query(ref);
   if (medicationId) {
-    logs = logs.filter((log) => log.medicationId === medicationId);
+    q = query(ref, where("medicationId", "==", medicationId));
   }
+  const snapshot = await getDocs(q);
+  let logs = snapshot.docs.map(
+    (docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<MedicationLog, "id">) }) as MedicationLog
+  );
   if (startDate) {
     logs = logs.filter((log) => new Date(log.takenAt) >= new Date(startDate));
   }
@@ -255,37 +244,36 @@ export const getMedicationLogs = (
   return logs.sort((a, b) => new Date(b.takenAt).getTime() - new Date(a.takenAt).getTime());
 };
 
-export const createMedicationLog = (data: Omit<MedicationLog, "id" | "createdAt">) => {
+export const createMedicationLog = async (data: Omit<MedicationLog, "id" | "createdAt">) => {
   const log: MedicationLog = {
+    id: doc(userCollection(data.userId, "medicationLogs")).id,
     ...data,
-    id: createId(),
     createdAt: new Date().toISOString(),
   };
-  const logs = getStore<MedicationLog>(MEDICATION_LOGS_KEY);
-  setStore(MEDICATION_LOGS_KEY, [log, ...logs]);
+  await setDoc(doc(db, "users", data.userId, "medicationLogs", log.id), log);
   return log;
 };
 
-export const getBioSignatureSnapshots = (userId: string, limit?: number) => {
-  const snapshots = getStore<BioSignatureSnapshot>(BIOSIGNATURE_KEY).filter(
-    (snapshot) => snapshot.userId === userId
+export const getBioSignatureSnapshots = async (userId: string, max?: number) => {
+  const ref = userCollection(userId, "bioSignatureSnapshots");
+  const q = max
+    ? query(ref, orderBy("createdAt", "desc"), limit(max))
+    : query(ref, orderBy("createdAt", "desc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(
+    (docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Omit<BioSignatureSnapshot, "id">) }) as BioSignatureSnapshot
   );
-  const sorted = [...snapshots].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-  return typeof limit === "number" ? sorted.slice(0, limit) : sorted;
 };
 
-const maybeCreateBioSignatureSnapshot = (entry: HealthEntry) => {
-  const snapshots = getBioSignatureSnapshots(entry.userId);
-  const last = snapshots[0];
-  const now = new Date(entry.timestamp).getTime();
-  if (last && now - new Date(last.createdAt).getTime() < SNAPSHOT_INTERVAL_MS) {
-    return;
+const maybeCreateBioSignatureSnapshot = async (entry: HealthEntry) => {
+  const snapshots = await getBioSignatureSnapshots(entry.userId, 1);
+  const lastSnapshot = snapshots[0];
+  if (lastSnapshot) {
+    const lastTimestamp = new Date(lastSnapshot.createdAt).getTime();
+    if (Date.now() - lastTimestamp < SNAPSHOT_INTERVAL_MS) return;
   }
-
   const snapshot: BioSignatureSnapshot = {
-    id: createId(),
+    id: doc(userCollection(entry.userId, "bioSignatureSnapshots")).id,
     userId: entry.userId,
     glucose: entry.glucose ?? 0,
     activity: entry.activity ?? 0,
@@ -294,45 +282,49 @@ const maybeCreateBioSignatureSnapshot = (entry: HealthEntry) => {
     aqi: entry.aqi ?? 0,
     heartRate: entry.heartRate ?? 0,
     sleep: entry.sleepHours ?? 0,
-    patternHash: `${entry.userId}-${entry.timestamp}`,
+    patternHash: `${entry.glucose ?? 0}-${entry.activity ?? 0}-${entry.recovery ?? 0}-${entry.strain ?? 0}-${entry.aqi ?? 0}`,
     healthNotes: entry.notes,
-    createdAt: entry.timestamp,
+    createdAt: new Date().toISOString(),
   };
-
-  const updated = [snapshot, ...snapshots];
-  setStore(BIOSIGNATURE_KEY, updated);
+  await setDoc(doc(db, "users", entry.userId, "bioSignatureSnapshots", snapshot.id), snapshot);
 };
 
-export const seedInitialData = (userId: string) => {
-  const existing = getHealthEntries(userId, 1);
+export const seedInitialData = async (userId: string) => {
+  const existing = await getHealthEntries(userId, 1);
   if (existing.length > 0) return;
-
-  const today = new Date();
-  const baseGlucose = 132;
-  const baseSleep = 6.8;
-  const baseHeartRate = 74;
-  const baseSteps = 6200;
-
-  for (let i = 0; i < 6; i += 1) {
-    const entryDate = new Date(today);
-    entryDate.setDate(today.getDate() - i * 3);
-    createHealthEntry({
-      userId,
-      timestamp: entryDate.toISOString(),
-      glucose: baseGlucose - i * 2,
-      sleepHours: baseSleep + i * 0.2,
-      heartRate: baseHeartRate - i,
-      steps: baseSteps + i * 400,
-      hrv: 52 + i * 2,
-    });
-  }
-
-  createEnvironmentalReading({
-    userId,
-    timestamp: today.toISOString(),
-    aqi: 58,
-    temperature: 72,
-    humidity: 46,
-    locationMode: "auto",
-  });
+  const now = new Date();
+  const sampleEntries = [
+    {
+      glucose: 110,
+      activity: 68,
+      recovery: 72,
+      strain: 40,
+      aqi: 55,
+      heartRate: 70,
+      hrv: 65,
+      sleepHours: 7.2,
+      steps: 5400,
+      symptomSeverity: 2,
+      notes: "Seeded sample day",
+    },
+    {
+      glucose: 98,
+      activity: 75,
+      recovery: 80,
+      strain: 45,
+      aqi: 42,
+      heartRate: 68,
+      hrv: 70,
+      sleepHours: 7.8,
+      steps: 6200,
+      symptomSeverity: 1,
+      notes: "Seeded sample day",
+    },
+  ];
+  await Promise.all(
+    sampleEntries.map((entry, index) => {
+      const timestamp = new Date(now.getTime() - index * 24 * 60 * 60 * 1000).toISOString();
+      return createHealthEntry({ ...entry, userId, timestamp });
+    })
+  );
 };

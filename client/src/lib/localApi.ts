@@ -79,44 +79,44 @@ export async function handleLocalApi({ method, url, data }: LocalRequest) {
     const userId = getUserId(searchParams);
     if (!userId) return errorResponse("userId is required");
     const limit = searchParams.get("limit");
-    return jsonResponse(getHealthEntries(userId, limit ? Number(limit) : undefined));
+    return jsonResponse(await getHealthEntries(userId, limit ? Number(limit) : undefined));
   }
 
   if (path === "/api/health-entries/latest" && verb === "GET") {
     const userId = getUserId(searchParams);
     if (!userId) return errorResponse("userId is required");
-    return jsonResponse(getLatestHealthEntry(userId));
+    return jsonResponse(await getLatestHealthEntry(userId));
   }
 
   if (path === "/api/health-entries" && verb === "POST") {
     const userId = getUserId(searchParams, body);
     if (!userId) return errorResponse("userId is required");
-    return jsonResponse(createHealthEntry({ ...body, userId }));
+    return jsonResponse(await createHealthEntry({ ...body, userId }));
   }
 
   if (path === "/api/environmental-readings/latest" && verb === "GET") {
     const userId = getUserId(searchParams);
     if (!userId) return errorResponse("userId is required");
-    return jsonResponse(getLatestEnvironmentalReading(userId));
+    return jsonResponse(await getLatestEnvironmentalReading(userId));
   }
 
   if (path === "/api/environmental-readings" && verb === "POST") {
     const userId = getUserId(searchParams, body);
     if (!userId) return errorResponse("userId is required");
-    return jsonResponse(createEnvironmentalReading({ ...body, userId }));
+    return jsonResponse(await createEnvironmentalReading({ ...body, userId }));
   }
 
   if (path === "/api/medications" && verb === "GET") {
     const userId = getUserId(searchParams);
     if (!userId) return errorResponse("userId is required");
-    return jsonResponse(getMedications(userId));
+    return jsonResponse(await getMedications(userId));
   }
 
   if (path === "/api/medications" && verb === "POST") {
     const userId = getUserId(searchParams, body);
     if (!userId) return errorResponse("userId is required");
     return jsonResponse(
-      createMedication({
+      await createMedication({
         userId,
         name: body.name,
         dosage: body.dosage,
@@ -132,7 +132,7 @@ export async function handleLocalApi({ method, url, data }: LocalRequest) {
     const userId = getUserId(searchParams, body);
     const id = path.split("/")[3];
     if (!userId || !id) return errorResponse("userId and id are required");
-    deleteMedication(userId, id);
+    await deleteMedication(userId, id);
     return jsonResponse({ success: true });
   }
 
@@ -140,14 +140,14 @@ export async function handleLocalApi({ method, url, data }: LocalRequest) {
     const userId = getUserId(searchParams, body);
     const id = path.split("/")[3];
     if (!userId || !id) return errorResponse("userId and id are required");
-    return jsonResponse(updateMedication(userId, id, body));
+    return jsonResponse(await updateMedication(userId, id, body));
   }
 
   if (path === "/api/medication-logs" && verb === "GET") {
     const userId = getUserId(searchParams);
     if (!userId) return errorResponse("userId is required");
     return jsonResponse(
-      getMedicationLogs(
+      await getMedicationLogs(
         userId,
         searchParams.get("medicationId") || undefined,
         searchParams.get("startDate") || undefined,
@@ -160,7 +160,7 @@ export async function handleLocalApi({ method, url, data }: LocalRequest) {
     const userId = getUserId(searchParams, body);
     if (!userId) return errorResponse("userId is required");
     return jsonResponse(
-      createMedicationLog({
+      await createMedicationLog({
         userId,
         medicationId: body.medicationId,
         takenAt: body.takenAt || new Date().toISOString(),
@@ -174,7 +174,7 @@ export async function handleLocalApi({ method, url, data }: LocalRequest) {
     const userId = getUserId(searchParams);
     if (!userId) return errorResponse("userId is required");
     const limit = searchParams.get("limit");
-    return jsonResponse(getBioSignatureSnapshots(userId, limit ? Number(limit) : undefined));
+    return jsonResponse(await getBioSignatureSnapshots(userId, limit ? Number(limit) : undefined));
   }
 
   if (path === "/api/bio-signature/insights" && verb === "POST") {

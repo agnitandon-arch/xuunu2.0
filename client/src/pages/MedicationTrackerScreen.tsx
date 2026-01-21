@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, Clock, Check, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +28,7 @@ export default function MedicationTrackerScreen({ onBack }: MedicationTrackerScr
   const { user } = useAuth();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [newMedication, setNewMedication] = useState({
     name: "",
     dosage: "",
@@ -38,6 +41,22 @@ export default function MedicationTrackerScreen({ onBack }: MedicationTrackerScr
     queryKey: [`/api/medications?userId=${user?.uid}`],
     enabled: !!user?.uid,
   });
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setNotificationsEnabled(false);
+      return;
+    }
+    const unsubscribe = onSnapshot(
+      doc(db, "users", user.uid),
+      (snapshot) => {
+        const data = snapshot.data() ?? {};
+        setNotificationsEnabled(!!data.notificationsEnabled);
+      },
+      () => setNotificationsEnabled(false)
+    );
+    return unsubscribe;
+  }, [user?.uid]);
 
   const { data: logs = [] } = useQuery<MedicationLog[]>({
     queryKey: [`/api/medication-logs?userId=${user?.uid}`],
@@ -194,10 +213,7 @@ export default function MedicationTrackerScreen({ onBack }: MedicationTrackerScr
     reminderTimeouts.current = [];
 
     if (typeof window === "undefined" || !("Notification" in window)) return;
-    const notificationsEnabled =
-      window.localStorage.getItem("xuunu-notifications-enabled") === "true" &&
-      Notification.permission === "granted";
-    if (!notificationsEnabled) return;
+    if (!notificationsEnabled || Notification.permission !== "granted") return;
 
     const now = new Date();
     medications.forEach((medication) => {

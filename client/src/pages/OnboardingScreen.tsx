@@ -4,15 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface OnboardingScreenProps {
   userId: string;
   onComplete: () => void;
 }
-
-const APPLE_HEALTH_STORAGE_KEY = "xuunu-apple-health-connected";
-const HEALTH_PLATFORM_KEY = "xuunu-health-platform";
-const HEALTH_CONNECTION_SKIPPED_KEY = "xuunu-health-connection-skipped";
 
 export default function OnboardingScreen({ userId, onComplete }: OnboardingScreenProps) {
   const { toast } = useToast();
@@ -22,33 +20,42 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
   const [skipConnection, setSkipConnection] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(APPLE_HEALTH_STORAGE_KEY);
-    if (stored === "true") {
-      setIsConnected(true);
+    const loadOnboarding = async () => {
+      try {
+        const ref = doc(db, "users", userId, "settings", "onboarding");
+        const snapshot = await getDoc(ref);
+        const data = snapshot.data() ?? {};
+        setHipaaAccepted(!!data.hipaaAccepted);
+        setIsConnected(!!data.isConnected);
+        setSkipConnection(!!data.skipConnection);
+        if (data.platform === "ios" || data.platform === "android") {
+          setPlatform(data.platform);
+        }
+      } catch {
+        // Ignore load errors.
+      }
+    };
+    void loadOnboarding();
+  }, [userId]);
+
+  const saveOnboarding = async (updates: Record<string, unknown>) => {
+    try {
+      await setDoc(doc(db, "users", userId, "settings", "onboarding"), updates, { merge: true });
+    } catch {
+      // Ignore save errors.
     }
-    const storedPlatform = window.localStorage.getItem(HEALTH_PLATFORM_KEY);
-    if (storedPlatform === "ios" || storedPlatform === "android") {
-      setPlatform(storedPlatform);
-    }
-    const skipped = window.localStorage.getItem(HEALTH_CONNECTION_SKIPPED_KEY);
-    if (skipped === "true") {
-      setSkipConnection(true);
-    }
-  }, []);
+  };
 
   const handleSelectPlatform = async (value: "ios" | "android") => {
     setPlatform(value);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(HEALTH_PLATFORM_KEY, value);
-    }
     if (value === "ios") {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(APPLE_HEALTH_STORAGE_KEY, "true");
-        window.localStorage.removeItem(HEALTH_CONNECTION_SKIPPED_KEY);
-      }
       setSkipConnection(false);
       setIsConnected(true);
+      await saveOnboarding({
+        platform: value,
+        isConnected: true,
+        skipConnection: false,
+      });
       toast({
         title: "Apple Health connected",
         description: "Apple Health syncs automatically on iOS.",
@@ -65,12 +72,15 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
         return;
       }
       if (typeof window !== "undefined") {
-        window.localStorage.setItem(APPLE_HEALTH_STORAGE_KEY, "true");
-        window.localStorage.removeItem(HEALTH_CONNECTION_SKIPPED_KEY);
         window.open("https://fit.google.com/", "_blank");
       }
       setSkipConnection(false);
       setIsConnected(true);
+      await saveOnboarding({
+        platform: value,
+        isConnected: true,
+        skipConnection: false,
+      });
       toast({
         title: "Google Health connection started",
         description: "Complete the connection on your Android device.",
@@ -139,7 +149,11 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
             <Checkbox
               id="hipaa-accept"
               checked={hipaaAccepted}
-              onCheckedChange={(checked) => setHipaaAccepted(checked === true)}
+              onCheckedChange={(checked) => {
+                const nextValue = checked === true;
+                setHipaaAccepted(nextValue);
+                void saveOnboarding({ hipaaAccepted: nextValue });
+              }}
               data-testid="checkbox-hipaa"
             />
             <Label htmlFor="hipaa-accept" className="text-xs text-white/70">
@@ -191,9 +205,7 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
             variant="ghost"
             onClick={() => {
               setSkipConnection(true);
-              if (typeof window !== "undefined") {
-                window.localStorage.setItem(HEALTH_CONNECTION_SKIPPED_KEY, "true");
-              }
+              void saveOnboarding({ skipConnection: true });
               toast({
                 title: "We'll remind you later",
                 description: "You can connect your health account anytime.",
