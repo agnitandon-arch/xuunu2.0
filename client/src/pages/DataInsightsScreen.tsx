@@ -9,6 +9,7 @@ import {
   Heart,
   Plus,
   MapPin,
+  Flag,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -142,6 +143,7 @@ type FeedItem = {
   authorName: string;
   authorAvatar: string;
   time: string;
+  postedAt?: string;
   content: string;
   photos: string[];
   shared: boolean;
@@ -215,6 +217,8 @@ export default function DataInsightsScreen({
   const [usernameDraft, setUsernameDraft] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
+  const [editingFeedItemId, setEditingFeedItemId] = useState<string | null>(null);
+  const [editingFeedTimestamp, setEditingFeedTimestamp] = useState("");
   const [longevityChallenge, setLongevityChallenge] = useState<LongevityChallenge | null>(null);
   const [selectedLongevityType, setSelectedLongevityType] =
     useState<LongevityChallengeType | null>(null);
@@ -875,7 +879,6 @@ export default function DataInsightsScreen({
     }
     return buildDefaultFeedItems(photoUrl || "");
   });
-  const [showDeleteFeedDialog, setShowDeleteFeedDialog] = useState(false);
 
   useEffect(() => {
     setFeedItems((prev) =>
@@ -911,6 +914,39 @@ export default function DataInsightsScreen({
     [feedItems]
   );
 
+  const hasUserChallengePost = useMemo(
+    () =>
+      feedItems.some(
+        (item) =>
+          item.source === "you" &&
+          (item.challenge || item.challengeSchedule)
+      ) || scheduledChallenges.length > 0,
+    [feedItems, scheduledChallenges.length]
+  );
+
+  const invitedFriendNames = useMemo(() => {
+    const names = new Set<string>();
+    const addNames = (list?: string[]) => {
+      list?.forEach((name) => names.add(name));
+    };
+    scheduledChallenges.forEach((challenge) => addNames(challenge.invitedFriends));
+    feedItems.forEach((item) => {
+      if (item.challenge?.invitedFriends) {
+        addNames(item.challenge.invitedFriends);
+      }
+      if (item.challengeSchedule?.invitedFriends) {
+        addNames(item.challengeSchedule.invitedFriends);
+      }
+    });
+    if (activeChallenge?.invitedFriends) {
+      addNames(activeChallenge.invitedFriends);
+    }
+    if (pendingChallenge?.invitedFriends) {
+      addNames(pendingChallenge.invitedFriends);
+    }
+    return names;
+  }, [scheduledChallenges, feedItems, activeChallenge, pendingChallenge]);
+
   const handleToggleLike = (id: string) => {
     setFeedItems((prev) =>
       prev.map((item) => {
@@ -922,21 +958,59 @@ export default function DataInsightsScreen({
     );
   };
 
-  const handleClearFeed = () => {
-    setFeedItems([]);
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.removeItem(FEED_STORAGE_KEY);
-        window.localStorage.removeItem(FEED_NOTIFIED_KEY);
-      } catch {
-        // Ignore storage failures.
-      }
+  const handleDeleteFeedItem = (id: string) => {
+    setFeedItems((prev) => prev.filter((item) => item.id !== id));
+    if (editingFeedItemId === id) {
+      setEditingFeedItemId(null);
+      setEditingFeedTimestamp("");
     }
-    setShowDeleteFeedDialog(false);
     toast({
-      title: "Feed cleared",
-      description: "Your feed has been deleted.",
+      title: "Post deleted",
+      description: "Your post has been removed from the feed.",
     });
+  };
+
+  const handleStartEditFeedTime = (item: FeedItem) => {
+    const baseDate = item.postedAt ? new Date(item.postedAt) : new Date();
+    setEditingFeedItemId(item.id);
+    setEditingFeedTimestamp(formatDateTimeLocal(baseDate));
+  };
+
+  const handleSaveFeedTime = () => {
+    if (!editingFeedItemId) return;
+    const nextDate = new Date(editingFeedTimestamp);
+    if (Number.isNaN(nextDate.getTime())) {
+      toast({
+        title: "Invalid date",
+        description: "Please select a valid time and date.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const nextIso = nextDate.toISOString();
+    const nextLabel = nextDate.toLocaleString();
+    setFeedItems((prev) =>
+      prev.map((item) =>
+        item.id === editingFeedItemId
+          ? {
+              ...item,
+              postedAt: nextIso,
+              time: nextLabel,
+            }
+          : item
+      )
+    );
+    setEditingFeedItemId(null);
+    setEditingFeedTimestamp("");
+    toast({
+      title: "Time updated",
+      description: "Challenge date and time updated.",
+    });
+  };
+
+  const handleCancelEditFeedTime = () => {
+    setEditingFeedItemId(null);
+    setEditingFeedTimestamp("");
   };
 
   useEffect(() => {
@@ -970,10 +1044,11 @@ export default function DataInsightsScreen({
       return;
     }
 
-    const newItem = {
+    const newItem: FeedItem = {
       id: `feed-${Date.now()}`,
       authorName: "You",
       authorAvatar: photoUrl || "",
+      postedAt: new Date().toISOString(),
       time: "Just now",
       content: updateText.trim() || "Shared new progress.",
       photos: updatePhotos,
@@ -1272,6 +1347,7 @@ export default function DataInsightsScreen({
         id: `challenge-schedule-${record.id}`,
         authorName: "You",
         authorAvatar: photoUrl || "",
+        postedAt: new Date().toISOString(),
         time: "Just now",
         content: `Scheduled a ${record.type} challenge.`,
         photos: [],
@@ -1446,6 +1522,7 @@ export default function DataInsightsScreen({
         id: `challenge-${record.id}`,
         authorName: "You",
         authorAvatar: photoUrl || "",
+        postedAt: new Date().toISOString(),
         time: "Just now",
         content: `${record.type} challenge completed in ${formatDuration(record.durationSec)} (${record.stepsDelta.toLocaleString()} steps).`,
         photos: [],
@@ -1645,23 +1722,31 @@ export default function DataInsightsScreen({
           </button>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="rounded-full"
-                      data-testid="button-update-profile-photo"
-                    >
-                      <ProfileAvatar className="h-20 w-20" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent className="bg-black border-white/10 text-white text-xs">
-                    Update image
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <div className="flex flex-col items-center gap-1">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="rounded-full"
+                        data-testid="button-update-profile-photo"
+                      >
+                        <ProfileAvatar className="h-20 w-20" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-black border-white/10 text-white text-xs">
+                      Update image
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                {hasUserChallengePost && (
+                  <div className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-primary/80">
+                    <Flag className="h-3 w-3" />
+                    Challenge
+                  </div>
+                )}
+              </div>
               <div>
                 <h1 className="text-2xl font-bold">{displayName}</h1>
                 {isEditingName ? (
@@ -2396,14 +2481,6 @@ export default function DataInsightsScreen({
                 <p className="text-xs text-white/50">Latest shared updates from friends.</p>
               </div>
             </div>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setShowDeleteFeedDialog(true)}
-              data-testid="button-delete-feed"
-            >
-              Delete feed
-            </Button>
           </div>
           {showNetworkMembers && (
             <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-4">
@@ -2483,13 +2560,56 @@ export default function DataInsightsScreen({
                     </div>
                     <div>
                       <p className="text-sm font-semibold">{item.authorName}</p>
-                      <p className="text-xs text-white/40">{item.time}</p>
+                      <p className="text-xs text-white/40">
+                        {item.postedAt ? new Date(item.postedAt).toLocaleString() : item.time}
+                      </p>
                     </div>
                   </div>
-                  <span className="text-[10px] uppercase tracking-widest text-white/40">
-                    {item.source === "you" ? "You" : "Friend"}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-[10px] uppercase tracking-widest text-white/40">
+                      {item.source === "you" ? "You" : "Friend"}
+                    </span>
+                    {item.source === "you" && (
+                      <div className="flex items-center gap-2 text-[11px] text-white/50">
+                        {(item.challenge || item.challengeSchedule) && (
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditFeedTime(item)}
+                            className="hover:text-white"
+                            data-testid={`button-edit-time-${item.id}`}
+                          >
+                            Edit time
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteFeedItem(item.id)}
+                          className="text-rose-200 hover:text-rose-100"
+                          data-testid={`button-delete-item-${item.id}`}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
+                {editingFeedItemId === item.id && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Input
+                      type="datetime-local"
+                      value={editingFeedTimestamp}
+                      onChange={(event) => setEditingFeedTimestamp(event.target.value)}
+                      className="h-9 bg-black/40 border-white/10 text-xs"
+                      data-testid="input-edit-challenge-time"
+                    />
+                    <Button size="sm" onClick={handleSaveFeedTime}>
+                      Save
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={handleCancelEditFeedTime}>
+                      Cancel
+                    </Button>
+                  </div>
+                )}
                 <p className="mt-3 text-sm text-white/80">{item.content}</p>
                 {item.challengeSchedule && (
                   <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-white/70">
@@ -2596,25 +2716,6 @@ export default function DataInsightsScreen({
           </div>
         </section>
 
-        <Dialog open={showDeleteFeedDialog} onOpenChange={setShowDeleteFeedDialog}>
-          <DialogContent className="bg-black border-white/10 text-white">
-            <DialogHeader>
-              <DialogTitle>Delete feed?</DialogTitle>
-              <DialogDescription className="text-white/60">
-                This removes all posts from your feed. You can still create new updates later.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowDeleteFeedDialog(false)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" onClick={handleClearFeed}>
-                Delete feed
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -2665,7 +2766,12 @@ export default function DataInsightsScreen({
                 <button
                   type="button"
                   className="text-xs text-white/60 hover:text-white"
-                  onClick={() => onViewFriend?.(friend)}
+                  onClick={() =>
+                    onViewFriend?.({
+                      ...friend,
+                      hasChallengeInvite: invitedFriendNames.has(friend.name),
+                    })
+                  }
                   data-testid={`button-view-friend-${friend.id}`}
                 >
                   View
