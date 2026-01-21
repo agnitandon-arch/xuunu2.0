@@ -1392,6 +1392,14 @@ export default function DataInsightsScreen({
     options?: { invitedFriends?: string[] }
   ) => {
     if (!user) return;
+    if (challengesLocked) {
+      toast({
+        title: "Unlock challenges",
+        description: "Upgrade to a paid account to join challenges.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (activeChallenge) {
       toast({
         title: "Challenge in progress",
@@ -1425,6 +1433,14 @@ export default function DataInsightsScreen({
 
   const handleScheduleChallenge = async () => {
     if (!user || !selectedChallengeType) return;
+    if (challengesLocked) {
+      toast({
+        title: "Unlock challenges",
+        description: "Upgrade to a paid account to schedule challenges.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!scheduleDate || !scheduleTime) {
       toast({
         title: "Pick a start time",
@@ -1526,6 +1542,14 @@ export default function DataInsightsScreen({
       });
       return;
     }
+    if (challengesLocked) {
+      toast({
+        title: "Unlock challenges",
+        description: "Upgrade to a paid account to start longevity challenges.",
+        variant: "destructive",
+      });
+      return;
+    }
     const record: LongevityChallenge = {
       id: `longevity-${Date.now()}`,
       userId: user.uid,
@@ -1545,6 +1569,14 @@ export default function DataInsightsScreen({
 
   const handleLogLongevityDay = () => {
     if (!longevityChallenge) return;
+    if (challengesLocked) {
+      toast({
+        title: "Unlock challenges",
+        description: "Upgrade to a paid account to log challenge days.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (longevityPhotos.length === 0) {
       toast({
         title: "Add photos",
@@ -1834,6 +1866,7 @@ export default function DataInsightsScreen({
   const longevityLogs = longevityChallenge
     ? [...longevityChallenge.logs].sort((a, b) => b.date.localeCompare(a.date))
     : [];
+  const challengesLocked = !isPaidAccount;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2218,7 +2251,11 @@ export default function DataInsightsScreen({
           )}
         </section>
 
-      <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
+      <section
+        className={`rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4 ${
+          challengesLocked ? "opacity-60" : ""
+        }`}
+      >
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-widest text-white/70">
@@ -2227,10 +2264,25 @@ export default function DataInsightsScreen({
             <p className="text-xs text-white/50">
               Join a challenge to track your time, steps, and pins.
             </p>
+            {challengesLocked && (
+              <p className="text-xs text-white/40 mt-1">
+                Upgrade to unlock challenges.
+              </p>
+            )}
           </div>
           <Button
             variant="outline"
-            onClick={() => setShowChallengePicker(true)}
+            onClick={() => {
+              if (challengesLocked) {
+                toast({
+                  title: "Unlock challenges",
+                  description: "Upgrade to a paid account to join challenges.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              setShowChallengePicker(true);
+            }}
             data-testid="button-join-challenge"
             disabled={!user}
           >
@@ -2301,7 +2353,7 @@ export default function DataInsightsScreen({
                       size="sm"
                       variant={isReady ? "default" : "outline"}
                       onClick={() => handleStartScheduledChallenge(challenge)}
-                      disabled={!isReady || !!activeChallenge}
+                      disabled={!isReady || !!activeChallenge || challengesLocked}
                       data-testid={`button-start-scheduled-${challenge.id}`}
                     >
                       {isReady ? "Start Challenge" : "Scheduled"}
@@ -2327,6 +2379,10 @@ export default function DataInsightsScreen({
       <Dialog
         open={showChallengePicker}
         onOpenChange={(open) => {
+          if (challengesLocked) {
+            setShowChallengePicker(false);
+            return;
+          }
           setShowChallengePicker(open);
           if (!open) {
             resetChallengeDialog();
@@ -2390,7 +2446,11 @@ export default function DataInsightsScreen({
                     Start 24 hours to 7 days in advance.
                   </p>
                 </div>
-                <Switch checked={scheduleChallenge} onCheckedChange={setScheduleChallenge} />
+                <Switch
+                  checked={scheduleChallenge}
+                  onCheckedChange={setScheduleChallenge}
+                  disabled={challengesLocked}
+                />
               </div>
               {scheduleChallenge && (
                 <div className="space-y-2">
@@ -2447,7 +2507,7 @@ export default function DataInsightsScreen({
               {scheduleChallenge ? (
                 <Button
                   onClick={handleScheduleChallenge}
-                  disabled={!selectedChallengeType}
+                    disabled={!selectedChallengeType || challengesLocked}
                   data-testid="button-schedule-challenge"
                 >
                   Schedule Challenge
@@ -2458,7 +2518,7 @@ export default function DataInsightsScreen({
                     selectedChallengeType &&
                     handleStartChallenge(selectedChallengeType, { invitedFriends })
                   }
-                  disabled={!selectedChallengeType}
+                    disabled={!selectedChallengeType || challengesLocked}
                   data-testid="button-start-challenge"
                 >
                   Start Challenge
@@ -2548,7 +2608,11 @@ export default function DataInsightsScreen({
         </DialogContent>
       </Dialog>
 
-      <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
+      <section
+        className={`rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4 ${
+          challengesLocked ? "opacity-60" : ""
+        }`}
+      >
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-widest text-white/70">
@@ -2557,12 +2621,18 @@ export default function DataInsightsScreen({
             <p className="text-xs text-white/50">
               Pick a weekly habit and post daily photo proof.
             </p>
+            {challengesLocked && (
+              <p className="text-xs text-white/40 mt-1">
+                Upgrade to unlock longevity challenges.
+              </p>
+            )}
           </div>
           {longevityChallenge && (
             <Button
               size="sm"
               variant="outline"
               onClick={handleResetLongevityChallenge}
+              disabled={challengesLocked}
               data-testid="button-reset-longevity"
             >
               Start New
@@ -2663,7 +2733,7 @@ export default function DataInsightsScreen({
                     <div className="flex justify-end">
                       <Button
                         onClick={handleLogLongevityDay}
-                        disabled={longevityPhotos.length === 0}
+                        disabled={longevityPhotos.length === 0 || challengesLocked}
                         data-testid="button-log-longevity-day"
                       >
                         Post Today's Activity
@@ -2723,6 +2793,7 @@ export default function DataInsightsScreen({
                       : "border-white/10 bg-black/40 hover:border-white/30"
                   }`}
                   data-testid={`button-select-longevity-${option.type.toLowerCase()}`}
+                  disabled={challengesLocked}
                 >
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold">{option.title}</p>
@@ -2735,7 +2806,7 @@ export default function DataInsightsScreen({
             <div className="flex justify-end">
               <Button
                 onClick={handleStartLongevityChallenge}
-                disabled={!selectedLongevityType}
+                disabled={!selectedLongevityType || challengesLocked}
                 data-testid="button-start-longevity"
               >
                 Start Longevity Challenge
