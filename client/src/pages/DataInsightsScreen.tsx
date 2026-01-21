@@ -102,6 +102,9 @@ const LONGEVITY_OPTIONS: Array<{
   },
 ];
 
+const isLongevityType = (value: unknown): value is LongevityChallengeType =>
+  value === "Veggies" || value === "Strength" || value === "Cardio";
+
 type ChallengeRecord = {
   id: string;
   userId: string;
@@ -442,7 +445,22 @@ export default function DataInsightsScreen({
       ref,
       (snapshot) => {
         if (snapshot.exists()) {
-          setLongevityChallenge(snapshot.data() as LongevityChallenge);
+          const data = snapshot.data() as Partial<LongevityChallenge>;
+          if (!isLongevityType(data.type)) {
+            setLongevityChallenge(null);
+          } else {
+            const logs = Array.isArray(data.logs)
+              ? data.logs.map(normalizeLongevityLog).filter(Boolean)
+              : [];
+            const startedAt = normalizeDateValue(data.startedAt) ?? new Date().toISOString();
+            setLongevityChallenge({
+              id: data.id || snapshot.id,
+              userId: data.userId || user.uid,
+              type: data.type,
+              startedAt,
+              logs: logs as LongevityLog[],
+            });
+          }
         } else {
           setLongevityChallenge(null);
         }
@@ -1260,6 +1278,17 @@ export default function DataInsightsScreen({
     const normalized = normalizeDateValue(value);
     if (!normalized) return fallback;
     return new Date(normalized).toLocaleDateString();
+  };
+
+  const normalizeLongevityLog = (log: unknown): LongevityLog | null => {
+    if (!log || typeof log !== "object") return null;
+    const entry = log as Partial<LongevityLog>;
+    if (typeof entry.date !== "string") return null;
+    return {
+      date: entry.date,
+      photos: Array.isArray(entry.photos) ? entry.photos : [],
+      note: typeof entry.note === "string" ? entry.note : undefined,
+    };
   };
 
   const getLongevityConfig = (type: LongevityChallengeType) =>
