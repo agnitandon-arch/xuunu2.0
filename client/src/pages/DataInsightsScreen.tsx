@@ -38,6 +38,7 @@ const CHALLENGE_STORAGE_KEY = "xuunu-challenges";
 const CHALLENGE_SCHEDULE_KEY = "xuunu-challenge-schedules";
 const LONGEVITY_STORAGE_KEY = "xuunu-longevity-challenge";
 const CHALLENGE_SCHEDULE_NOTIFIED_KEY = "xuunu-challenge-schedule-notified";
+const CHALLENGE_DAILY_NOTIFIED_KEY = "xuunu-challenge-daily-notified";
 
 type ChallengeType = "Hiking" | "Running" | "Biking";
 
@@ -311,6 +312,25 @@ export default function DataInsightsScreen({
         CHALLENGE_SCHEDULE_NOTIFIED_KEY,
         JSON.stringify([...ids])
       );
+    } catch {
+      // Ignore storage failures.
+    }
+  };
+
+  const loadDailyNotified = () => {
+    if (typeof window === "undefined") return {};
+    try {
+      const stored = window.localStorage.getItem(CHALLENGE_DAILY_NOTIFIED_KEY);
+      return stored ? (JSON.parse(stored) as Record<string, string>) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const saveDailyNotified = (data: Record<string, string>) => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(CHALLENGE_DAILY_NOTIFIED_KEY, JSON.stringify(data));
     } catch {
       // Ignore storage failures.
     }
@@ -1479,6 +1499,52 @@ export default function DataInsightsScreen({
   const longevityLogs = longevityChallenge
     ? [...longevityChallenge.logs].sort((a, b) => b.date.localeCompare(a.date))
     : [];
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!canNotify()) return;
+    const todayKey = getLocalDateKey(new Date());
+    const dailyNotified = loadDailyNotified();
+    let updated = false;
+
+    scheduledChallenges.forEach((challenge) => {
+      const scheduledTime = new Date(challenge.scheduledFor).getTime();
+      if (scheduledTime <= Date.now()) {
+        return;
+      }
+      const notifyKey = `scheduled-${challenge.id}`;
+      if (dailyNotified[notifyKey] === todayKey) return;
+      sendNotification(
+        "Challenge reminder",
+        `${challenge.type} challenge starts ${new Date(challenge.scheduledFor).toLocaleString()}.`
+      );
+      dailyNotified[notifyKey] = todayKey;
+      updated = true;
+    });
+
+    if (longevityChallenge && !longevityHasLoggedToday) {
+      const notifyKey = `longevity-${longevityChallenge.id}`;
+      if (dailyNotified[notifyKey] !== todayKey) {
+        const title = longevityConfig?.title ?? "Longevity challenge";
+        sendNotification(
+          "Longevity challenge reminder",
+          `Post today's activity for ${title}.`
+        );
+        dailyNotified[notifyKey] = todayKey;
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      saveDailyNotified(dailyNotified);
+    }
+  }, [
+    scheduledChallenges,
+    longevityChallenge,
+    longevityHasLoggedToday,
+    longevityConfig?.title,
+    scheduleTick,
+  ]);
 
   return (
     <div className="min-h-screen bg-black pb-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
