@@ -11,8 +11,11 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isOwner(userId);
+      allow read, write: if isSignedIn() && isOwner(userId);
+
+      match /{document=**} {
+        allow read, write: if isSignedIn() && isOwner(userId);
+      }
     }
 
     match /activities/{activityId} {
