@@ -909,11 +909,12 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                 <div className="text-sm font-medium">Stripe Membership</div>
                 <div className="text-xs text-white/50">Choose a plan to unlock integrations.</div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleOpenPaymentPortal("monthly")}
+                  className="w-full sm:w-auto"
                   data-testid="button-stripe-monthly"
                 >
                   $9.99/mo
@@ -922,6 +923,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                   variant="outline"
                   size="sm"
                   onClick={() => handleOpenPaymentPortal("yearly")}
+                  className="w-full sm:w-auto"
                   data-testid="button-stripe-yearly"
                 >
                   $99/yr

@@ -281,6 +281,10 @@ export default function DataInsightsScreen({
   const dragStateRef = useRef<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
   const [showNetworkMembers, setShowNetworkMembers] = useState(false);
   const [networkDegree, setNetworkDegree] = useState<"second" | "third">("second");
+  const env = import.meta.env as Record<string, string | undefined>;
+  const stripePortalUrl = env.VITE_STRIPE_PAYMENT_URL;
+  const stripeMonthlyUrl = env.VITE_STRIPE_MONTHLY_URL;
+  const stripeYearlyUrl = env.VITE_STRIPE_YEARLY_URL;
 
   const CROP_SIZE = 240;
   const OUTPUT_SIZE = 320;
@@ -341,6 +345,23 @@ export default function DataInsightsScreen({
       }
     }
     return false;
+  };
+
+  const handleOpenPaymentPortal = (plan?: "monthly" | "yearly") => {
+    const planUrl =
+      plan === "monthly" ? stripeMonthlyUrl : plan === "yearly" ? stripeYearlyUrl : undefined;
+    const portalUrl =
+      planUrl || stripePortalUrl || stripeMonthlyUrl || stripeYearlyUrl || "https://stripe.com";
+    window.open(portalUrl, "_blank");
+    toast({
+      title: "Premium membership",
+      description:
+        plan === "monthly"
+          ? "Stripe monthly • $9.99/month."
+          : plan === "yearly"
+            ? "Stripe yearly • $99/year."
+            : "Powered by Stripe • $9.99/month or $99/year.",
+    });
   };
 
 
@@ -2441,11 +2462,36 @@ export default function DataInsightsScreen({
               setShowChallengePicker(true);
             }}
             data-testid="button-join-challenge"
-            disabled={!user}
+            disabled={!user || challengesLocked}
           >
             Join Challenge
           </Button>
         </div>
+        {challengesLocked && (
+          <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-3">
+            <p className="text-xs text-white/60">
+              Upgrade to unlock challenges, scheduling, and leaderboards.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleOpenPaymentPortal("monthly")}
+                data-testid="button-upgrade-monthly-challenges"
+              >
+                $9.99/mo
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleOpenPaymentPortal("yearly")}
+                data-testid="button-upgrade-yearly-challenges"
+              >
+                $99/yr
+              </Button>
+            </div>
+          </div>
+        )}
         {activeChallenge && (
           <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -2479,6 +2525,7 @@ export default function DataInsightsScreen({
                 variant="destructive"
                 onClick={() => handleStopChallenge(false)}
                 data-testid="button-stop-challenge"
+                disabled={challengesLocked}
               >
                 Stop Challenge
               </Button>
@@ -2796,6 +2843,31 @@ export default function DataInsightsScreen({
             </Button>
           )}
         </div>
+        {challengesLocked && (
+          <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-3">
+            <p className="text-xs text-white/60">
+              Upgrade to unlock longevity challenges and daily photo logs.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleOpenPaymentPortal("monthly")}
+                data-testid="button-upgrade-monthly-longevity"
+              >
+                $9.99/mo
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleOpenPaymentPortal("yearly")}
+                data-testid="button-upgrade-yearly-longevity"
+              >
+                $99/yr
+              </Button>
+            </div>
+          </div>
+        )}
         {longevityChallenge ? (
           <div className="space-y-4">
             <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-2">
