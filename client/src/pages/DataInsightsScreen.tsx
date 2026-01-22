@@ -38,7 +38,8 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDownloadURL, ref, uploadString } from "firebase/storage";
+import { db, storage } from "@/lib/firebase";
 
 type ShareTarget = {
   id: "tiktok" | "facebook" | "x" | "instagram" | "whatsapp";
@@ -621,7 +622,7 @@ export default function DataInsightsScreen({
     setImageSize(null);
   };
 
-  const handleCropSave = () => {
+  const handleCropSave = async () => {
     if (!cropImageUrl || !imageRef.current || !imageSize) {
       return;
     }
@@ -642,12 +643,20 @@ export default function DataInsightsScreen({
 
     ctx.drawImage(imageRef.current, drawX, drawY, drawWidth, drawHeight);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-    setPhotoUrl(dataUrl);
-    toast({
-      title: "Profile photo updated",
-      description: "Your photo will appear across all tabs.",
-    });
-    handleCropCancel();
+    try {
+      await setPhotoUrl(dataUrl);
+      toast({
+        title: "Profile photo updated",
+        description: "Your photo will appear across all tabs.",
+      });
+      handleCropCancel();
+    } catch {
+      toast({
+        title: "Photo update failed",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -1072,14 +1081,39 @@ export default function DataInsightsScreen({
       return;
     }
 
+    if (!user) {
+      toast({
+        title: "Not signed in",
+        description: "Please sign in to share an update.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const feedId = `feed-${Date.now()}`;
+    let uploadedPhotos: string[] = [];
+    try {
+      uploadedPhotos = await uploadPhotoDataUrls(
+        updatePhotos,
+        `users/${user.uid}/feed/${feedId}`
+      );
+    } catch (error) {
+      toast({
+        title: "Photo upload failed",
+        description: "Please try again. Your update was not shared.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const newItem: FeedItem = {
-      id: `feed-${Date.now()}`,
+      id: feedId,
       authorName: "You",
       authorAvatar: photoUrl || "",
       postedAt: new Date().toISOString(),
       time: "Just now",
       content: updateText.trim() || "Shared new progress.",
-      photos: updatePhotos,
+      photos: uploadedPhotos,
       shared: shareUpdate,
       source: "you" as const,
       likesCount: 0,
@@ -1289,6 +1323,20 @@ export default function DataInsightsScreen({
       photos: Array.isArray(entry.photos) ? entry.photos : [],
       note: typeof entry.note === "string" ? entry.note : undefined,
     };
+  };
+
+  const uploadPhotoDataUrls = async (photos: string[], pathPrefix: string) => {
+    if (!user?.uid || photos.length === 0) return [];
+    const uploads = photos.map(async (photo, index) => {
+      if (!photo.startsWith("data:")) return photo;
+      const photoRef = ref(
+        storage,
+        `${pathPrefix}/${Date.now()}-${index}.jpg`
+      );
+      await uploadString(photoRef, photo, "data_url");
+      return await getDownloadURL(photoRef);
+    });
+    return Promise.all(uploads);
   };
 
   const getLongevityConfig = (type: LongevityChallengeType) =>
@@ -1615,8 +1663,16 @@ export default function DataInsightsScreen({
     });
   };
 
-  const handleLogLongevityDay = () => {
+  const handleLogLongevityDay = async () => {
     if (!longevityChallenge) return;
+    if (!user?.uid) {
+      toast({
+        title: "Not signed in",
+        description: "Please sign in to log your challenge.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (challengesLocked) {
       toast({
         title: "Unlock challenges",
@@ -1652,9 +1708,23 @@ export default function DataInsightsScreen({
       });
       return;
     }
+    let uploadedPhotos: string[] = [];
+    try {
+      uploadedPhotos = await uploadPhotoDataUrls(
+        longevityPhotos,
+        `users/${user.uid}/longevity/${longevityChallenge.id}/${todayKey}`
+      );
+    } catch {
+      toast({
+        title: "Photo upload failed",
+        description: "Please try again. Your log was not saved.",
+        variant: "destructive",
+      });
+      return;
+    }
     const log: LongevityLog = {
       date: todayKey,
-      photos: longevityPhotos,
+      photos: uploadedPhotos,
       note: longevityNote.trim() ? longevityNote.trim() : undefined,
     };
     const updated = {
@@ -1662,7 +1732,7 @@ export default function DataInsightsScreen({
       logs: [log, ...longevityChallenge.logs],
     };
     setLongevityChallenge(updated);
-    void saveLongevityChallenge(updated);
+    await saveLongevityChallenge(updated);
     setLongevityPhotos([]);
     setLongevityNote("");
     toast({

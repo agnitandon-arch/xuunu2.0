@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { getDownloadURL, ref, uploadString } from "firebase/storage";
 import { useAuth } from "@/contexts/AuthContext";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 
 export function useProfilePhoto() {
   const { user } = useAuth();
@@ -31,8 +32,14 @@ export function useProfilePhoto() {
   const setPhotoUrl = useCallback(
     async (value: string | null) => {
       if (!user?.uid) return;
-      await setDoc(doc(db, "users", user.uid), { photoUrl: value ?? null }, { merge: true });
-      setPhotoUrlState(value);
+      let nextUrl = value ?? null;
+      if (value && value.startsWith("data:")) {
+        const photoRef = ref(storage, `users/${user.uid}/profile/photo.jpg`);
+        await uploadString(photoRef, value, "data_url");
+        nextUrl = await getDownloadURL(photoRef);
+      }
+      await setDoc(doc(db, "users", user.uid), { photoUrl: nextUrl }, { merge: true });
+      setPhotoUrlState(nextUrl);
     },
     [user?.uid]
   );
