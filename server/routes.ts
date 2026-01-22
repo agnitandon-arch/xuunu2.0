@@ -5,8 +5,39 @@ import { insertHealthEntrySchema, insertEnvironmentalReadingSchema, insertUserAp
 import { fromZodError } from "zod-validation-error";
 import { TerraClient } from "terra-api";
 import Anthropic from "@anthropic-ai/sdk";
+import Stripe from "stripe";
 const TERRA_WEARABLE_PROVIDERS = ["APPLE_HEALTH"];
 const TERRA_LAB_PROVIDERS = ["QUEST", "LABCORP", "EVERLYWELL", "LETSGETCHECKED"];
+
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const stripeClient = stripeSecretKey
+  ? new Stripe(stripeSecretKey, { apiVersion: "2023-10-16" })
+  : null;
+
+const getStripeString = (value: unknown) =>
+  typeof value === "string" ? value : undefined;
+
+const resolveStripeUserId = async ({
+  userId,
+  customerId,
+  customerEmail,
+}: {
+  userId?: string;
+  customerId?: string;
+  customerEmail?: string;
+}) => {
+  if (userId) return userId;
+  if (customerId) {
+    const flags = await storage.getUserFeatureFlagsByCustomerId(customerId);
+    if (flags) return flags.userId;
+  }
+  if (customerEmail) {
+    const user = await storage.getUserByEmail(customerEmail);
+    if (user) return user.id;
+  }
+  return null;
+};
 
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -96,6 +127,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating user feature flags:", error);
       res.status(500).json({ error: "Failed to update user feature flags" });
+    }
+  });
+
+  app.post("/api/stripe/webhook", async (req, res) => {
+    if (!stripeClient || !stripeWebhookSecret) {
+      return res.status(500).json({ error: "Stripe webhook not configured" });
+    }
+    const signature = req.headers["stripe-signature"];
+    if (!signature || Array.isArray(signature)) {
+      return res.status(400).json({ error: "Missing Stripe signature" });
+    }
+
+    const rawBody =
+      req.rawBody instanceof Buffer
+        ? req.rawBody
+        : Buffer.from(JSON.stringify(req.body ?? {}));
+
+    let event: Stripe.Event;
+    try {
+      event = stripeClient.webhooks.constructEvent(rawBody, signature, stripeWebhookSecret);
+    } catch (error: any) {
+      console.error("Stripe webhook signature verification failed:", error);
+      return res.status(400).send(`Webhook Error: ${error.message ?? "Invalid signature"}`);
+    }
+
+    try {
+      switch (event.type) {
+        case "checkout.session.completed": {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const customerId = getStripeString(session.customer);
+          const subscriptionId = getStripeString(session.subscription);
+          const userId = await resolveStripeUserId({
+            userId: session.metadata?.userId || session.client_reference_id || undefined,
+            customerId,
+            customerEmail: session.customer_email || session.customer_details?.email || undefined,
+          });
+          if (userId) {
+            await storage.upsertUserFeatureFlags({
+              userId,
+              paidStatus: true,
+              stripeCustomerId: customerId,
+              stripeSubscriptionId: subscriptionId,
+            });
+          }
+          break;
+        }
+        case "customer.subscription.created":
+        case "customer.subscription.updated":
+        case "customer.subscription.deleted": {
+          const subscription = event.data.object as Stripe.Subscription;
+          const customerId = getStripeString(subscription.customer);
+          const userId = await resolveStripeUserId({
+            userId: subscription.metadata?.userId,
+            customerId,
+          });
+          if (userId) {
+            const isPaid =
+              event.type !== "customer.subscription.deleted" &&
+              (subscription.status === "active" || subscription.status === "trialing");
+            await storage.upsertUserFeatureFlags({
+              userId,
+              paidStatus: isPaid,
+              stripeCustomerId: customerId,
+              stripeSubscriptionId: subscription.id,
+            });
+          }
+          break;
+        }
+        default:
+          break;
+      }
+
+      res.json({ received: true });
+    } catch (error) {
+      console.error("Stripe webhook handler failed:", error);
+      res.status(500).json({ error: "Stripe webhook failed" });
     }
   });
 

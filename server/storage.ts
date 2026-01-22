@@ -36,9 +36,11 @@ import { eq, desc, and, gte, lte } from "drizzle-orm";
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserPreferences(userId: string, preferences: { preferredUnits: string }): Promise<User>;
   getUserFeatureFlags(userId: string): Promise<UserFeatureFlags | undefined>;
+  getUserFeatureFlagsByCustomerId(customerId: string): Promise<UserFeatureFlags | undefined>;
   upsertUserFeatureFlags(flags: InsertUserFeatureFlags): Promise<UserFeatureFlags>;
   
   createHealthEntry(entry: InsertHealthEntry): Promise<HealthEntry>;
@@ -87,6 +89,11 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
@@ -110,6 +117,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(userFeatureFlags)
       .where(eq(userFeatureFlags.userId, userId));
+    return flags || undefined;
+  }
+
+  async getUserFeatureFlagsByCustomerId(customerId: string): Promise<UserFeatureFlags | undefined> {
+    const [flags] = await db
+      .select()
+      .from(userFeatureFlags)
+      .where(eq(userFeatureFlags.stripeCustomerId, customerId));
     return flags || undefined;
   }
 
