@@ -283,7 +283,6 @@ export default function DataInsightsScreen({
 
   const CROP_SIZE = 240;
   const OUTPUT_SIZE = 320;
-  const MAX_PHOTO_SIZE = 100 * 1024 * 1024;
   const displayName =
     displayNameOverride || user?.displayName || user?.email?.split("@")[0] || "Member";
 
@@ -580,15 +579,6 @@ export default function DataInsightsScreen({
       return;
     }
 
-    if (file.size > MAX_PHOTO_SIZE) {
-      toast({
-        title: "File too large",
-        description: "Please upload an image smaller than 100MB.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     const objectUrl = URL.createObjectURL(file);
     setCropImageUrl(objectUrl);
     setIsCropOpen(true);
@@ -731,17 +721,7 @@ export default function DataInsightsScreen({
       return;
     }
 
-    Promise.all(
-      selected.map(
-        (file) =>
-          new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = () => reject(new Error("Failed to read image"));
-            reader.readAsDataURL(file);
-          })
-      )
-    )
+    Promise.all(selected.map((file) => readAndResizeImage(file, 1280)))
       .then((results) => {
         setUpdatePhotos((prev) => [...prev, ...results]);
       })
@@ -780,17 +760,7 @@ export default function DataInsightsScreen({
       return;
     }
 
-    Promise.all(
-      selected.map(
-        (file) =>
-          new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = () => reject(new Error("Failed to read image"));
-            reader.readAsDataURL(file);
-          })
-      )
-    )
+    Promise.all(selected.map((file) => readAndResizeImage(file, 1280)))
       .then((results) => {
         setLongevityPhotos((prev) => [...prev, ...results]);
       })
@@ -1326,15 +1296,59 @@ export default function DataInsightsScreen({
     };
   };
 
+  const resizeImageDataUrl = (
+    dataUrl: string,
+    maxSize = 1280,
+    quality = 0.82
+  ) =>
+    new Promise<string>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => {
+        const maxDimension = Math.max(image.width, image.height);
+        if (maxDimension <= maxSize) {
+          resolve(dataUrl);
+          return;
+        }
+        const scale = maxSize / maxDimension;
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Unable to resize image"));
+          return;
+        }
+        ctx.drawImage(image, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      image.onerror = () => reject(new Error("Unable to load image"));
+      image.src = dataUrl;
+    });
+
+  const readAndResizeImage = async (file: File, maxSize = 1280) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const resized = await resizeImageDataUrl(reader.result as string, maxSize);
+          resolve(resized);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = () => reject(new Error("Failed to read image"));
+      reader.readAsDataURL(file);
+    });
+
   const uploadPhotoDataUrls = async (photos: string[], pathPrefix: string) => {
     if (!user?.uid || photos.length === 0) return [];
     const uploads = photos.map(async (photo, index) => {
       if (!photo.startsWith("data:")) return photo;
-      const photoRef = ref(
-        storage,
-        `${pathPrefix}/${Date.now()}-${index}.jpg`
-      );
-      await uploadString(photoRef, photo, "data_url");
+      const resized = await resizeImageDataUrl(photo);
+      const photoRef = ref(storage, `${pathPrefix}/${Date.now()}-${index}.jpg`);
+      await uploadString(photoRef, resized, "data_url");
       return await getDownloadURL(photoRef);
     });
     return Promise.all(uploads);
