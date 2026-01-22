@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, decimal, json } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, decimal, json, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -10,6 +10,16 @@ export const users = pgTable("users", {
   email: text("email"),
   preferredUnits: text("preferred_units").notNull().default("imperial"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const userFeatureFlags = pgTable("user_feature_flags", {
+  userId: varchar("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  paidStatus: boolean("paid_status").notNull().default(false),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const healthEntries = pgTable("health_entries", {
@@ -118,6 +128,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   environmentalReadings: many(environmentalReadings),
   apiCredentials: one(userApiCredentials),
   connectedDevices: many(connectedDevices),
+  featureFlags: one(userFeatureFlags),
 }));
 
 export const userApiCredentialsRelations = relations(userApiCredentials, ({ one }) => ({
@@ -250,6 +261,10 @@ export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
 });
 
+export const insertUserFeatureFlagsSchema = createInsertSchema(userFeatureFlags).omit({
+  updatedAt: true,
+});
+
 export const insertHealthEntrySchema = createInsertSchema(healthEntries).omit({
   id: true,
   timestamp: true,
@@ -289,6 +304,8 @@ export const insertMedicationLogSchema = createInsertSchema(medicationLogs).omit
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type UserFeatureFlags = typeof userFeatureFlags.$inferSelect;
+export type InsertUserFeatureFlags = z.infer<typeof insertUserFeatureFlagsSchema>;
 export type HealthEntry = typeof healthEntries.$inferSelect;
 export type InsertHealthEntry = z.infer<typeof insertHealthEntrySchema>;
 export type EnvironmentalReading = typeof environmentalReadings.$inferSelect;

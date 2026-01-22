@@ -9,6 +9,8 @@ import {
   type InsertUserApiCredentials,
   type ConnectedDevice,
   type InsertConnectedDevice,
+  type UserFeatureFlags,
+  type InsertUserFeatureFlags,
   type Note,
   type InsertNote,
   type BioSignatureSnapshot,
@@ -22,6 +24,7 @@ import {
   environmentalReadings,
   userApiCredentials,
   connectedDevices,
+  userFeatureFlags,
   notes,
   bioSignatureSnapshots,
   medications,
@@ -35,6 +38,8 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserPreferences(userId: string, preferences: { preferredUnits: string }): Promise<User>;
+  getUserFeatureFlags(userId: string): Promise<UserFeatureFlags | undefined>;
+  upsertUserFeatureFlags(flags: InsertUserFeatureFlags): Promise<UserFeatureFlags>;
   
   createHealthEntry(entry: InsertHealthEntry): Promise<HealthEntry>;
   getUserHealthEntries(userId: string, limit?: number): Promise<HealthEntry[]>;
@@ -87,6 +92,7 @@ export class DatabaseStorage implements IStorage {
       .insert(users)
       .values(insertUser)
       .returning();
+    await this.upsertUserFeatureFlags({ userId: user.id, paidStatus: false });
     return user;
   }
 
@@ -97,6 +103,31 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return updatedUser;
+  }
+
+  async getUserFeatureFlags(userId: string): Promise<UserFeatureFlags | undefined> {
+    const [flags] = await db
+      .select()
+      .from(userFeatureFlags)
+      .where(eq(userFeatureFlags.userId, userId));
+    return flags || undefined;
+  }
+
+  async upsertUserFeatureFlags(flags: InsertUserFeatureFlags): Promise<UserFeatureFlags> {
+    const [result] = await db
+      .insert(userFeatureFlags)
+      .values({ ...flags })
+      .onConflictDoUpdate({
+        target: userFeatureFlags.userId,
+        set: {
+          paidStatus: flags.paidStatus,
+          stripeCustomerId: flags.stripeCustomerId,
+          stripeSubscriptionId: flags.stripeSubscriptionId,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return result;
   }
 
   async createHealthEntry(entry: InsertHealthEntry): Promise<HealthEntry> {

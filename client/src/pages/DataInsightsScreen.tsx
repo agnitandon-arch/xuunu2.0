@@ -231,6 +231,7 @@ export default function DataInsightsScreen({
   const [isProfileInvisible, setIsProfileInvisible] = useState(false);
   const [profileVisibilityDraft, setProfileVisibilityDraft] = useState(false);
   const [isPaidAccount, setIsPaidAccount] = useState(false);
+  const [firestorePaidStatus, setFirestorePaidStatus] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [editingFeedItemId, setEditingFeedItemId] = useState<string | null>(null);
   const [editingFeedTimestamp, setEditingFeedTimestamp] = useState("");
@@ -288,6 +289,11 @@ export default function DataInsightsScreen({
 
   const { data: latestHealth, refetch: refetchHealth } = useQuery<HealthEntry | null>({
     queryKey: [`/api/health-entries/latest?userId=${user?.uid}`],
+    enabled: !!user?.uid,
+  });
+
+  const { data: featureFlags } = useQuery<{ paidStatus: boolean }>({
+    queryKey: [`/api/user-features?userId=${user?.uid}`],
     enabled: !!user?.uid,
   });
 
@@ -404,6 +410,7 @@ export default function DataInsightsScreen({
     if (!user?.uid) {
       setDisplayNameOverride(null);
       setIsPaidAccount(false);
+      setFirestorePaidStatus(false);
       setIsProfileInvisible(false);
       setProfileVisibilityDraft(false);
       setTeamChallengeCount(0);
@@ -417,11 +424,10 @@ export default function DataInsightsScreen({
       userRef,
       (snapshot) => {
         const data = snapshot.data() ?? {};
-        const paid = emailPaid || !!data.paidStatus;
         setDisplayNameOverride(
           typeof data.displayNameOverride === "string" ? data.displayNameOverride : null
         );
-        setIsPaidAccount(paid);
+        setFirestorePaidStatus(!!data.paidStatus);
         setIsProfileInvisible(!!data.profileInvisible);
         setProfileVisibilityDraft(!!data.profileInvisible);
         setTeamChallengeCount(typeof data.teamChallengeCount === "number" ? data.teamChallengeCount : 0);
@@ -429,7 +435,7 @@ export default function DataInsightsScreen({
       },
       () => {
         setDisplayNameOverride(null);
-        setIsPaidAccount(emailPaid);
+        setFirestorePaidStatus(false);
         setIsProfileInvisible(false);
         setProfileVisibilityDraft(false);
         setTeamChallengeCount(0);
@@ -438,6 +444,22 @@ export default function DataInsightsScreen({
     );
     return unsubscribe;
   }, [user?.uid, user?.email]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const emailPaid =
+      user.email?.toLowerCase() === PAID_ACCOUNT_EMAIL.toLowerCase();
+    const serverPaid = !!featureFlags?.paidStatus;
+    const paid = emailPaid || serverPaid || firestorePaidStatus;
+    setIsPaidAccount(paid);
+    if (featureFlags && firestorePaidStatus !== serverPaid) {
+      void setDoc(
+        doc(db, "users", user.uid),
+        { paidStatus: serverPaid },
+        { merge: true }
+      );
+    }
+  }, [user?.uid, user?.email, featureFlags, firestorePaidStatus]);
 
   useEffect(() => {
     if (!user?.uid) return;

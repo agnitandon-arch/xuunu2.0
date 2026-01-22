@@ -58,6 +58,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User feature flags (paid/unpaid)
+  app.get("/api/user-features", async (req, res) => {
+    try {
+      const userId = req.query.userId as string;
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      let flags = await storage.getUserFeatureFlags(userId);
+      if (!flags) {
+        flags = await storage.upsertUserFeatureFlags({ userId, paidStatus: false });
+      }
+      res.json({ paidStatus: !!flags.paidStatus });
+    } catch (error) {
+      console.error("Error fetching user feature flags:", error);
+      res.status(500).json({ error: "Failed to fetch user feature flags" });
+    }
+  });
+
+  app.post("/api/user-features/stripe-complete", async (req, res) => {
+    try {
+      const { userId, stripeCustomerId, stripeSubscriptionId } = req.body as {
+        userId?: string;
+        stripeCustomerId?: string;
+        stripeSubscriptionId?: string;
+      };
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      const flags = await storage.upsertUserFeatureFlags({
+        userId,
+        paidStatus: true,
+        stripeCustomerId,
+        stripeSubscriptionId,
+      });
+      res.json({ paidStatus: !!flags.paidStatus });
+    } catch (error) {
+      console.error("Error updating user feature flags:", error);
+      res.status(500).json({ error: "Failed to update user feature flags" });
+    }
+  });
+
   // Update user preferences
   app.patch("/api/users/:id/preferences", async (req, res) => {
     try {

@@ -59,6 +59,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const [refreshingMetric, setRefreshingMetric] = useState<string | null>(null);
   const [displayNameOverride, setDisplayNameOverride] = useState<string | null>(null);
   const [isPaidAccount, setIsPaidAccount] = useState(false);
+  const [firestorePaidStatus, setFirestorePaidStatus] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const env = import.meta.env as Record<string, string | undefined>;
   const stripePortalUrl = env.VITE_STRIPE_PAYMENT_URL;
@@ -116,6 +117,11 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     useQuery<EnvironmentalReading | null>({
     queryKey: [`/api/environmental-readings/latest?userId=${user?.uid}`],
     enabled: !!user,
+  });
+
+  const { data: featureFlags } = useQuery<{ paidStatus: boolean }>({
+    queryKey: [`/api/user-features?userId=${user?.uid}`],
+    enabled: !!user?.uid,
   });
 
   useEffect(() => {
@@ -404,6 +410,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     if (!user?.uid) {
       setDisplayNameOverride(null);
       setIsPaidAccount(false);
+      setFirestorePaidStatus(false);
       setNotificationsEnabled(false);
       return;
     }
@@ -417,17 +424,33 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
         setDisplayNameOverride(
           typeof data.displayNameOverride === "string" ? data.displayNameOverride : null
         );
-        setIsPaidAccount(emailPaid || !!data.paidStatus);
+        setFirestorePaidStatus(!!data.paidStatus);
         setNotificationsEnabled(!!data.notificationsEnabled);
       },
       () => {
         setDisplayNameOverride(null);
-        setIsPaidAccount(emailPaid);
+        setFirestorePaidStatus(false);
         setNotificationsEnabled(false);
       }
     );
     return unsubscribe;
   }, [user?.uid, user?.email]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const emailPaid =
+      user.email?.toLowerCase() === PAID_ACCOUNT_EMAIL.toLowerCase();
+    const serverPaid = !!featureFlags?.paidStatus;
+    const paid = emailPaid || serverPaid || firestorePaidStatus;
+    setIsPaidAccount(paid);
+    if (featureFlags && firestorePaidStatus !== serverPaid) {
+      void setDoc(
+        doc(db, "users", user.uid),
+        { paidStatus: serverPaid },
+        { merge: true }
+      );
+    }
+  }, [user?.uid, user?.email, featureFlags, firestorePaidStatus]);
 
   const displayName =
     displayNameOverride || user?.displayName || user?.email?.split("@")[0] || "Member";
