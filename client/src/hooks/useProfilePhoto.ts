@@ -18,11 +18,15 @@ export function useProfilePhoto() {
       ref,
       (snapshot) => {
         const data = snapshot.data() ?? {};
-        const storedPhoto =
+        const storedPhotoUrl =
           typeof data.photoUrl === "string" && data.photoUrl.length > 0
             ? data.photoUrl
             : null;
-        setPhotoUrlState(storedPhoto ?? user.photoURL ?? null);
+        const storedPhotoData =
+          typeof data.photoDataUrl === "string" && data.photoDataUrl.length > 0
+            ? data.photoDataUrl
+            : null;
+        setPhotoUrlState(storedPhotoUrl ?? storedPhotoData ?? user.photoURL ?? null);
       },
       () => setPhotoUrlState(user.photoURL ?? null)
     );
@@ -32,14 +36,28 @@ export function useProfilePhoto() {
   const setPhotoUrl = useCallback(
     async (value: string | null) => {
       if (!user?.uid) return;
-      let nextUrl = value ?? null;
+      let nextUrl: string | null = null;
+      let nextDataUrl: string | null = null;
+
       if (value && value.startsWith("data:")) {
-        const photoRef = ref(storage, `users/${user.uid}/profile/photo.jpg`);
-        await uploadString(photoRef, value, "data_url");
-        nextUrl = await getDownloadURL(photoRef);
+        try {
+          const photoRef = ref(storage, `users/${user.uid}/profile/photo.jpg`);
+          await uploadString(photoRef, value, "data_url");
+          nextUrl = await getDownloadURL(photoRef);
+        } catch (error) {
+          console.warn("Profile photo upload failed, saving to Firestore instead.", error);
+          nextDataUrl = value;
+        }
+      } else {
+        nextUrl = value ?? null;
       }
-      await setDoc(doc(db, "users", user.uid), { photoUrl: nextUrl }, { merge: true });
-      setPhotoUrlState(nextUrl);
+
+      await setDoc(
+        doc(db, "users", user.uid),
+        { photoUrl: nextUrl, photoDataUrl: nextDataUrl },
+        { merge: true }
+      );
+      setPhotoUrlState(nextUrl ?? nextDataUrl);
     },
     [user?.uid]
   );
