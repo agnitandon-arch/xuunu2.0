@@ -956,7 +956,7 @@ export default function DataInsightsScreen({
   }, [photoUrl, displayName]);
 
   const publicFeedItems = useMemo(
-    () => feedItems.filter((item) => item.shared),
+    () => feedItems.filter((item) => item.shared || item.source === "you"),
     [feedItems]
   );
 
