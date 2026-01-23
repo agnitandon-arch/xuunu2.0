@@ -881,8 +881,14 @@ export default function DataInsightsScreen({
   };
 
   const saveFeedItem = async (item: FeedItem) => {
-    if (!user?.uid) return;
-    await setDoc(doc(db, "users", user.uid, "feedItems", item.id), item, { merge: true });
+    if (!user?.uid) return false;
+    try {
+      await setDoc(doc(db, "users", user.uid, "feedItems", item.id), item, { merge: true });
+      return true;
+    } catch (error) {
+      console.error("Failed to save feed item:", error);
+      return false;
+    }
   };
 
   const buildDefaultFeedItems = (avatar: string): FeedItem[] => [
@@ -1438,6 +1444,14 @@ export default function DataInsightsScreen({
     return parsed.toFixed(4);
   };
 
+  const normalizeChallengeLocation = (location: ChallengeLocation): ChallengeLocation => {
+    if (!location) return null;
+    const lat = Number(location.lat);
+    const lng = Number(location.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+  };
+
   const getDistanceKm = (start: ChallengeLocation, end: ChallengeLocation) => {
     if (!start || !end) return 0;
     const toRad = (value: number) => (value * Math.PI) / 180;
@@ -1500,7 +1514,13 @@ export default function DataInsightsScreen({
 
   const saveChallenge = async (challenge: ChallengeRecord) => {
     if (!user?.uid) return;
-    await setDoc(doc(db, "users", user.uid, "challenges", challenge.id), challenge, {
+    const sanitized: ChallengeRecord = {
+      ...challenge,
+      startLocation: normalizeChallengeLocation(challenge.startLocation),
+      endLocation: normalizeChallengeLocation(challenge.endLocation),
+      invitedFriends: challenge.invitedFriends ?? [],
+    };
+    await setDoc(doc(db, "users", user.uid, "challenges", challenge.id), sanitized, {
       merge: true,
     });
   };
@@ -1839,8 +1859,22 @@ export default function DataInsightsScreen({
 
   const handleFinalizeChallenge = async (shared: boolean) => {
     if (!pendingChallenge) return;
+    if (!user) {
+      toast({
+        title: "Not signed in",
+        description: "Please sign in to save your challenge.",
+        variant: "destructive",
+      });
+      return;
+    }
     const record = { ...pendingChallenge, shared };
-    await saveChallenge(record);
+    let challengeSaved = true;
+    try {
+      await saveChallenge(record);
+    } catch (error) {
+      console.error("Failed to save challenge:", error);
+      challengeSaved = false;
+    }
     if (record.invitedFriends && record.invitedFriends.length > 0 && user) {
       const nextCount = teamChallengeCount + 1;
       setTeamChallengeCount(nextCount);
@@ -1850,6 +1884,7 @@ export default function DataInsightsScreen({
         { merge: true }
       );
     }
+    let feedSaved = true;
     if (shared) {
       const feedItem: FeedItem = {
         id: `challenge-${record.id}`,
@@ -1872,8 +1907,15 @@ export default function DataInsightsScreen({
           invitedFriends: record.invitedFriends,
         },
       };
-      await saveFeedItem(feedItem);
+      feedSaved = await saveFeedItem(feedItem);
       setFeedItems((prev) => [feedItem, ...prev]);
+    }
+    if (!challengeSaved || (shared && !feedSaved)) {
+      toast({
+        title: "Challenge saved with issues",
+        description: "We couldn't sync this challenge to the cloud. Please try again.",
+        variant: "destructive",
+      });
     }
     setPendingChallenge(null);
     setShareChallenge(true);
