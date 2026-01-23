@@ -8,6 +8,33 @@ export function useProfilePhoto() {
   const { user } = useAuth();
   const [photoUrl, setPhotoUrlState] = useState<string | null>(null);
 
+  const resizeDataUrl = (dataUrl: string, maxSize = 512, quality = 0.85) =>
+    new Promise<string>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => {
+        const maxDimension = Math.max(image.width, image.height);
+        if (maxDimension <= maxSize) {
+          resolve(dataUrl);
+          return;
+        }
+        const scale = maxSize / maxDimension;
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Unable to resize image"));
+          return;
+        }
+        ctx.drawImage(image, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      image.onerror = () => reject(new Error("Unable to load image"));
+      image.src = dataUrl;
+    });
+
   useEffect(() => {
     if (!user?.uid) {
       setPhotoUrlState(user?.photoURL ?? null);
@@ -41,8 +68,10 @@ export function useProfilePhoto() {
 
       if (value && value.startsWith("data:")) {
         try {
+          const resized = await resizeDataUrl(value);
+          nextDataUrl = resized;
           const photoRef = ref(storage, `users/${user.uid}/profile/photo.jpg`);
-          await uploadString(photoRef, value, "data_url");
+          await uploadString(photoRef, resized, "data_url");
           nextUrl = await getDownloadURL(photoRef);
         } catch (error) {
           console.warn("Profile photo upload failed, saving to Firestore instead.", error);

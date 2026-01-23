@@ -1105,20 +1105,6 @@ export default function DataInsightsScreen({
     }
 
     const feedId = `feed-${Date.now()}`;
-    let uploadedPhotos: string[] = [];
-    try {
-      uploadedPhotos = await uploadPhotoDataUrls(
-        updatePhotos,
-        `users/${user.uid}/feed/${feedId}`
-      );
-    } catch (error) {
-      toast({
-        title: "Photo upload failed",
-        description: "Please try again. Your update was not shared.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     const newItem: FeedItem = {
       id: feedId,
@@ -1127,7 +1113,7 @@ export default function DataInsightsScreen({
       postedAt: new Date().toISOString(),
       time: "Just now",
       content: updateText.trim() || "Shared new progress.",
-      photos: uploadedPhotos,
+      photos: updatePhotos,
       shared: shareUpdate,
       source: "you" as const,
       likesCount: 0,
@@ -1341,8 +1327,8 @@ export default function DataInsightsScreen({
 
   const resizeImageDataUrl = (
     dataUrl: string,
-    maxSize = 1280,
-    quality = 0.82
+    maxSize = 960,
+    quality = 0.78
   ) =>
     new Promise<string>((resolve, reject) => {
       const image = new Image();
@@ -1370,7 +1356,7 @@ export default function DataInsightsScreen({
       image.src = dataUrl;
     });
 
-  const readAndResizeImage = async (file: File, maxSize = 1280) =>
+  const readAndResizeImage = async (file: File, maxSize = 960) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async () => {
