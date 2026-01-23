@@ -39,11 +39,11 @@ export default function ShowcaseAll() {
         
         <div className="flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-xl font-bold mb-4 uppercase tracking-widest">Bio Signature</h2>
+            <h2 className="text-xl font-bold mb-4 uppercase tracking-widest">7-day Bio Signature</h2>
             <BioSignature healthData={healthData} size={280} />
             <p className="mt-4 text-sm opacity-60 max-w-md mx-auto">
-              A unique, animated visualization that continuously evolves with your health data.
-              <br />Combines 7+ metrics into a living pattern that updates in real-time.
+              A unique, animated visualization that reflects your last 7 days.
+              <br />Challenge completion nudges the pattern toward healthier symmetry.
             </p>
           </div>
         </div>

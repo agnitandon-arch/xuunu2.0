@@ -8,6 +8,7 @@ interface HealthData {
   aqi: number;
   heartRate?: number;
   sleep?: number;
+  challengeCompletion?: number;
 }
 
 interface BioSignatureProps {
@@ -53,6 +54,7 @@ export default function BioSignature({ healthData, size = 400 }: BioSignaturePro
         aqi: Math.min(healthData.aqi / 150, 1),
         heartRate: healthData.heartRate ? Math.min(healthData.heartRate / 120, 1) : 0.5,
         sleep: healthData.sleep ? healthData.sleep / 10 : 0.5,
+        challengeCompletion: Math.min(Math.max(healthData.challengeCompletion ?? 0, 0), 1),
       };
 
       for (let row = 0; row < gridSize; row++) {
@@ -77,13 +79,14 @@ export default function BioSignature({ healthData, size = 400 }: BioSignaturePro
           const heartRateInfluence = Math.cos((row + col) * 0.2 + normalizedData.heartRate * Math.PI + time * 0.7) * 0.5 + 0.5;
 
           // Combine influences with different weights
-          const combinedInfluence = 
-            glucoseInfluence * 0.25 +
-            activityInfluence * 0.2 +
-            recoveryInfluence * 0.2 +
-            strainInfluence * 0.15 +
-            aqiInfluence * 0.1 +
-            heartRateInfluence * 0.1;
+          const combinedInfluence =
+            glucoseInfluence * 0.22 +
+            activityInfluence * 0.18 +
+            recoveryInfluence * 0.18 +
+            strainInfluence * 0.13 +
+            aqiInfluence * 0.09 +
+            heartRateInfluence * 0.08 +
+            normalizedData.challengeCompletion * 0.12;
 
           // Calculate dot properties
           const opacity = Math.pow(combinedInfluence, 1.5) * 0.9 + 0.1;
@@ -147,7 +150,7 @@ export default function BioSignature({ healthData, size = 400 }: BioSignaturePro
         {isAnimating ? "Pause" : "Play"} Animation
       </button>
       <p className="mt-2 text-xs uppercase tracking-widest opacity-40">
-        Unique Bio Signature
+        7-day Bio Signature
       </p>
     </div>
   );

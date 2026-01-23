@@ -18,6 +18,7 @@ interface HealthMetrics {
   aqi: number;
   heartRate: number;
   sleep: number;
+  challengeCompletion?: number;
 }
 
 /**
@@ -109,17 +110,27 @@ function normalizeSleep(sleep: number): number {
 }
 
 /**
+ * Normalize challenge completion (0-1 or 0-7 completions in last 7 days)
+ */
+function normalizeChallengeCompletion(completion?: number): number {
+  if (typeof completion !== "number" || Number.isNaN(completion)) return 0;
+  const normalized = completion > 1 ? Math.min(1, completion / 7) : Math.min(1, completion);
+  return normalized * 100;
+}
+
+/**
  * Compute weighted health synergy score (0-100)
  */
 export function computeHealthScore(metrics: HealthMetrics): number {
   const weights = {
-    glucose: 0.25,
-    recovery: 0.20,
+    glucose: 0.22,
+    recovery: 0.18,
     sleep: 0.15,
-    aqi: 0.15,
-    heartRate: 0.10,
-    activity: 0.10,
-    strain: 0.05,
+    aqi: 0.09,
+    heartRate: 0.08,
+    activity: 0.18,
+    strain: 0.10,
+    challengeCompletion: 0.10,
   };
 
   const normalizedScores = {
@@ -130,6 +141,7 @@ export function computeHealthScore(metrics: HealthMetrics): number {
     aqi: normalizeAQI(metrics.aqi),
     heartRate: normalizeHeartRate(metrics.heartRate),
     sleep: normalizeSleep(metrics.sleep),
+    challengeCompletion: normalizeChallengeCompletion(metrics.challengeCompletion),
   };
 
   const weightedScore =
@@ -139,7 +151,8 @@ export function computeHealthScore(metrics: HealthMetrics): number {
     normalizedScores.aqi * weights.aqi +
     normalizedScores.heartRate * weights.heartRate +
     normalizedScores.activity * weights.activity +
-    normalizedScores.strain * weights.strain;
+    normalizedScores.strain * weights.strain +
+    normalizedScores.challengeCompletion * weights.challengeCompletion;
 
   return Math.round(weightedScore);
 }
@@ -227,6 +240,7 @@ export function getIdealPatternGuidance(): string {
 • Heart Rate: 60-80 bpm (healthy resting rate)
 • Activity: 7-12 (balanced movement)
 • Strain: 8-14 (moderate exertion)
+• Challenges: 3-7 completions/week (consistent follow-through)
 
 When all metrics align within optimal ranges, the pattern becomes bright, dense, and symmetrical - representing a body in environmental synergy.`;
 }

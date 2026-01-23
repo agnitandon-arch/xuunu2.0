@@ -15,8 +15,8 @@ export default function BioSignatureExample() {
     <div className="min-h-screen bg-black flex items-center justify-center p-8">
       <div className="space-y-8">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Your Bio Signature</h1>
-          <p className="text-sm opacity-60">A living visualization of your health data</p>
+          <h1 className="text-2xl font-bold mb-2">Your 7-day Bio Signature</h1>
+          <p className="text-sm opacity-60">A living visualization of your last 7 days</p>
         </div>
         <BioSignature healthData={healthData} size={400} />
         <div className="grid grid-cols-2 gap-4 max-w-md mx-auto text-xs">

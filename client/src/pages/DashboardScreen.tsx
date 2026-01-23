@@ -30,7 +30,7 @@ import type { HealthEntry, EnvironmentalReading } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { seedInitialData } from "@/lib/localStore";
-import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 const PAID_ACCOUNT_EMAIL = "agnishikha@yahoo.com";
@@ -61,6 +61,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const [isPaidAccount, setIsPaidAccount] = useState(false);
   const [firestorePaidStatus, setFirestorePaidStatus] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [challengeCompletionRate, setChallengeCompletionRate] = useState(0);
   const env = import.meta.env as Record<string, string | undefined>;
   const stripePortalUrl = env.VITE_STRIPE_PAYMENT_URL;
   const stripeMonthlyUrl = env.VITE_STRIPE_MONTHLY_URL;
@@ -119,10 +120,60 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     enabled: !!user,
   });
 
+  const { data: recentHealthEntries = [] } = useQuery<HealthEntry[]>({
+    queryKey: [`/api/health-entries?userId=${user?.uid}&limit=7`],
+    enabled: !!user?.uid,
+  });
+
+  const averageMetric = (values: Array<number | undefined>) => {
+    const usable = values.filter((value) => typeof value === "number" && Number.isFinite(value)) as number[];
+    if (usable.length === 0) return 0;
+    return usable.reduce((sum, value) => sum + value, 0) / usable.length;
+  };
+
+  const asNumber = (value: unknown) => {
+    if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+    if (typeof value === "string" && value.trim() !== "") {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    return undefined;
+  };
+
   const { data: featureFlags } = useQuery<{ paidStatus: boolean }>({
     queryKey: [`/api/user-features?userId=${user?.uid}`],
     enabled: !!user?.uid,
   });
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setChallengeCompletionRate(0);
+      return;
+    }
+    let isActive = true;
+    const loadChallenges = async () => {
+      try {
+        const ref = collection(db, "users", user.uid, "challenges");
+        const challengeQuery = query(ref, orderBy("endedAt", "desc"), limit(20));
+        const snapshot = await getDocs(challengeQuery);
+        const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const completed = snapshot.docs.filter((docSnap) => {
+          const endedAt = docSnap.data().endedAt as string | undefined;
+          const endedMs = endedAt ? new Date(endedAt).getTime() : NaN;
+          return Number.isFinite(endedMs) && endedMs >= cutoff;
+        });
+        const rate = Math.min(1, completed.length / 7);
+        if (isActive) setChallengeCompletionRate(rate);
+      } catch (error) {
+        console.error("Failed to load challenges:", error);
+        if (isActive) setChallengeCompletionRate(0);
+      }
+    };
+    void loadChallenges();
+    return () => {
+      isActive = false;
+    };
+  }, [user?.uid]);
 
   useEffect(() => {
     if (!user?.uid || healthLoading || envLoading) return;
@@ -403,15 +454,37 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     setSupportMessage("");
   };
 
-  // Only use real data from database/integrations - no fake values
+  const hasRecentHealth = recentHealthEntries.length > 0;
+  // Biosignature represents past 7 days where available
   const healthData = {
-    glucose: latestHealth?.glucose || 0,
-    activity: latestHealth?.activity ? Number(latestHealth.activity) : 0,
-    recovery: latestHealth?.recovery ? Number(latestHealth.recovery) : 0,
-    strain: latestHealth?.strain ? Number(latestHealth.strain) : 0,
+    glucose: hasRecentHealth
+      ? averageMetric(recentHealthEntries.map((entry) => asNumber(entry.glucose)))
+      : latestHealth?.glucose || 0,
+    activity: hasRecentHealth
+      ? averageMetric(recentHealthEntries.map((entry) => asNumber(entry.activity)))
+      : latestHealth?.activity
+        ? Number(latestHealth.activity)
+        : 0,
+    recovery: hasRecentHealth
+      ? averageMetric(recentHealthEntries.map((entry) => asNumber(entry.recovery)))
+      : latestHealth?.recovery
+        ? Number(latestHealth.recovery)
+        : 0,
+    strain: hasRecentHealth
+      ? averageMetric(recentHealthEntries.map((entry) => asNumber(entry.strain)))
+      : latestHealth?.strain
+        ? Number(latestHealth.strain)
+        : 0,
     aqi: latestEnv?.aqi || 0,
-    heartRate: latestHealth?.heartRate || 0,
-    sleep: latestHealth?.sleepHours ? parseFloat(latestHealth.sleepHours.toString()) : 0,
+    heartRate: hasRecentHealth
+      ? averageMetric(recentHealthEntries.map((entry) => asNumber(entry.heartRate)))
+      : latestHealth?.heartRate || 0,
+    sleep: hasRecentHealth
+      ? averageMetric(recentHealthEntries.map((entry) => asNumber(entry.sleepHours)))
+      : latestHealth?.sleepHours
+        ? parseFloat(latestHealth.sleepHours.toString())
+        : 0,
+    challengeCompletion: challengeCompletionRate,
   };
 
   const formattedDate = useMemo(() => {
