@@ -20,6 +20,8 @@ export const userFeatureFlags = pgTable("user_feature_flags", {
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   stripeCardLast4: text("stripe_card_last4"),
+  stripeCardBrand: text("stripe_card_brand"),
+  stripeStatus: text("stripe_status"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

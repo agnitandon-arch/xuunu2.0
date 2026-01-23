@@ -126,6 +126,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         paidStatus: isSuperuser ? true : !!flags.paidStatus,
         cardLast4: flags.stripeCardLast4 || null,
+        cardBrand: flags.stripeCardBrand || null,
+        stripeStatus: flags.stripeStatus || null,
         hasCustomer: !!flags.stripeCustomerId,
       });
     } catch (error) {
@@ -248,17 +250,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const session = event.data.object as Stripe.Checkout.Session;
           const customerId = getStripeString(session.customer);
           const subscriptionId = getStripeString(session.subscription);
-          const paymentIntentId = getStripeString(session.payment_intent);
           let cardLast4: string | undefined;
-          if (paymentIntentId && stripeClient) {
+          let cardBrand: string | undefined;
+          let stripeStatus: string | undefined;
+          if (customerId && stripeClient) {
             try {
-              const paymentIntent = await stripeClient.paymentIntents.retrieve(paymentIntentId, {
-                expand: ["payment_method"],
+              const customer = await stripeClient.customers.retrieve(customerId, {
+                expand: ["invoice_settings.default_payment_method"],
               });
-              const card = (paymentIntent.payment_method as Stripe.PaymentMethod | null)?.card;
-              cardLast4 = card?.last4;
+              const paymentMethod =
+                (customer as Stripe.Customer).invoice_settings
+                  ?.default_payment_method as Stripe.PaymentMethod | null;
+              cardLast4 = paymentMethod?.card?.last4;
+              cardBrand = paymentMethod?.card?.brand;
             } catch (error) {
               console.warn("Unable to fetch card last4:", error);
+            }
+          }
+          if (subscriptionId && stripeClient) {
+            try {
+              const subscription = await stripeClient.subscriptions.retrieve(subscriptionId);
+              stripeStatus = subscription.status;
+            } catch (error) {
+              console.warn("Unable to fetch subscription status:", error);
             }
           }
           const userId = await resolveStripeUserId({
@@ -273,6 +287,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               stripeCustomerId: customerId,
               stripeSubscriptionId: subscriptionId,
               stripeCardLast4: cardLast4,
+              stripeCardBrand: cardBrand,
+              stripeStatus: stripeStatus ?? "active",
             });
           }
           break;
@@ -295,6 +311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               paidStatus: isPaid,
               stripeCustomerId: customerId,
               stripeSubscriptionId: subscription.id,
+              stripeStatus: subscription.status,
             });
           }
           break;
