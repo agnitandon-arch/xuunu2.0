@@ -1272,6 +1272,22 @@ export default function DataInsightsScreen({
     return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
   };
 
+  const formatCountdown = (target: Date) => {
+    const diffMs = target.getTime() - scheduleNow;
+    if (diffMs <= 0) return "Start time reached";
+    const totalMinutes = Math.floor(diffMs / (60 * 1000));
+    const days = Math.floor(totalMinutes / (60 * 24));
+    const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+    const minutes = totalMinutes % 60;
+    if (days > 0) {
+      return `${days}d ${hours}h ${minutes}m`;
+    }
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  };
+
   const buildScheduledDate = (date: Date, timeValue: string) => {
     const [hours, minutes] = timeValue.split(":").map((value) => Number(value));
     if (Number.isNaN(hours) || Number.isNaN(minutes)) {
@@ -2732,6 +2748,12 @@ export default function DataInsightsScreen({
                       className="bg-black/40 border-white/10 text-sm"
                       data-testid="input-schedule-challenge"
                     />
+                    {scheduleDate && scheduleTime && buildScheduledDate(scheduleDate, scheduleTime) && (
+                      <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white/70">
+                        Starts in{" "}
+                        {formatCountdown(buildScheduledDate(scheduleDate, scheduleTime) as Date)}
+                      </div>
+                    )}
                     <p className="text-[11px] text-white/40">
                       Earliest: {scheduleBounds.min.toLocaleString()} • Latest:{" "}
                       {scheduleBounds.max.toLocaleString()}
