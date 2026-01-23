@@ -327,7 +327,11 @@ export default function DataInsightsScreen({
     enabled: !!user?.uid,
   });
 
-  const { data: featureFlags } = useQuery<{ paidStatus: boolean }>({
+  const { data: featureFlags } = useQuery<{
+    paidStatus: boolean;
+    cardLast4?: string | null;
+    hasCustomer?: boolean;
+  }>({
     queryKey: [`/api/user-features?userId=${user?.uid}`],
     enabled: !!user?.uid,
   });

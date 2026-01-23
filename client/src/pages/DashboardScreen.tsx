@@ -140,7 +140,11 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     return undefined;
   };
 
-  const { data: featureFlags } = useQuery<{ paidStatus: boolean }>({
+  const { data: featureFlags } = useQuery<{
+    paidStatus: boolean;
+    cardLast4?: string | null;
+    hasCustomer?: boolean;
+  }>({
     queryKey: [`/api/user-features?userId=${user?.uid}`],
     enabled: !!user?.uid,
   });
@@ -298,6 +302,27 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
           : plan === "yearly"
             ? "Stripe yearly • $99/year."
             : "Powered by Stripe • $9.99/month or $99/year.",
+    });
+  };
+
+  const handleManageBilling = async () => {
+    if (!user?.uid) return;
+    try {
+      const response = await apiRequest("POST", "/api/stripe/create-portal-session", {
+        userId: user.uid,
+      });
+      const data = await response.json();
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+    } catch (error) {
+      console.error("Stripe portal failed:", error);
+    }
+    toast({
+      title: "Billing unavailable",
+      description: "We couldn't open the billing portal right now.",
+      variant: "destructive",
     });
   };
 
@@ -998,6 +1023,11 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
               <div>
                 <div className="text-sm font-medium">Stripe Membership</div>
                 <div className="text-xs text-white/50">Choose a plan to unlock integrations.</div>
+                  {featureFlags?.cardLast4 && (
+                    <div className="text-[11px] text-white/40 mt-1">
+                      Card ending in {featureFlags.cardLast4}
+                    </div>
+                  )}
               </div>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 <Button
@@ -1018,6 +1048,17 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
                 >
                   $99/yr
                 </Button>
+                {featureFlags?.hasCustomer && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleManageBilling}
+                    className="w-full sm:w-auto"
+                    data-testid="button-manage-billing"
+                  >
+                    Manage Billing
+                  </Button>
+                )}
               </div>
             </div>
           </div>

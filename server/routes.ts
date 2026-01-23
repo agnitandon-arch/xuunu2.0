@@ -120,9 +120,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paidStatus: true,
           stripeCustomerId: flags.stripeCustomerId,
           stripeSubscriptionId: flags.stripeSubscriptionId,
+          stripeCardLast4: flags.stripeCardLast4,
         });
       }
-      res.json({ paidStatus: isSuperuser ? true : !!flags.paidStatus });
+      res.json({
+        paidStatus: isSuperuser ? true : !!flags.paidStatus,
+        cardLast4: flags.stripeCardLast4 || null,
+        hasCustomer: !!flags.stripeCustomerId,
+      });
     } catch (error) {
       console.error("Error fetching user feature flags:", error);
       res.status(500).json({ error: "Failed to fetch user feature flags" });
@@ -182,6 +187,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Stripe checkout session failed:", error);
       return res.status(500).json({ error: "Failed to create checkout session" });
+    }
+  });
+
+  app.post("/api/stripe/create-portal-session", async (req, res) => {
+    if (!stripeClient || !stripeSecretKey) {
+      return res.status(500).json({ error: "Stripe not configured" });
+    }
+    try {
+      const { userId } = req.body as { userId?: string };
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      const flags = await storage.getUserFeatureFlags(userId);
+      if (!flags?.stripeCustomerId) {
+        return res.status(400).json({ error: "No billing profile found" });
+      }
+      const returnUrl =
+        stripeCancelUrl ||
+        stripeSuccessUrl ||
+        `${req.protocol}://${req.get("host")}/app?billing=return`;
+      const session = await stripeClient.billingPortal.sessions.create({
+        customer: flags.stripeCustomerId,
+        return_url: returnUrl,
+      });
+      return res.json({ url: session.url });
+    } catch (error) {
+      console.error("Stripe portal session failed:", error);
+      return res.status(500).json({ error: "Failed to create portal session" });
     }
   });
 
