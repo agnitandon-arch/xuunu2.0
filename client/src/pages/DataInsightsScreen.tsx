@@ -41,6 +41,7 @@ import {
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadString } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
+import { saveDeviceImage } from "@/lib/deviceImageStore";
 
 type ShareTarget = {
   id: "tiktok" | "facebook" | "x" | "instagram" | "whatsapp";
@@ -1140,6 +1141,12 @@ export default function DataInsightsScreen({
       return;
     }
 
+    await Promise.all(
+      updatePhotos.map((photo, index) =>
+        saveDeviceImage(`feed-${feedId}-${index}`, photo)
+      )
+    );
+
     setFeedItems((prev) => [newItem, ...prev]);
     setUpdateText("");
     setUpdatePhotos([]);
@@ -1363,8 +1370,8 @@ export default function DataInsightsScreen({
 
   const resizeImageDataUrl = (
     dataUrl: string,
-    maxSize = 960,
-    quality = 0.78
+    maxSize = 720,
+    quality = 0.74
   ) =>
     new Promise<string>((resolve, reject) => {
       const image = new Image();
@@ -1392,7 +1399,7 @@ export default function DataInsightsScreen({
       image.src = dataUrl;
     });
 
-  const readAndResizeImage = async (file: File, maxSize = 960) =>
+  const readAndResizeImage = async (file: File, maxSize = 720) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async () => {

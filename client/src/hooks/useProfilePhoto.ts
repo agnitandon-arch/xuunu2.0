@@ -3,6 +3,7 @@ import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadString } from "firebase/storage";
 import { useAuth } from "@/contexts/AuthContext";
 import { db, storage } from "@/lib/firebase";
+import { getDeviceImage, saveDeviceImage } from "@/lib/deviceImageStore";
 
 export function useProfilePhoto() {
   const { user } = useAuth();
@@ -53,7 +54,17 @@ export function useProfilePhoto() {
           typeof data.photoDataUrl === "string" && data.photoDataUrl.length > 0
             ? data.photoDataUrl
             : null;
-        setPhotoUrlState(storedPhotoUrl ?? storedPhotoData ?? user.photoURL ?? null);
+        if (storedPhotoUrl || storedPhotoData) {
+          setPhotoUrlState(storedPhotoUrl ?? storedPhotoData ?? user.photoURL ?? null);
+          return;
+        }
+        void getDeviceImage(`profile-${user.uid}`).then((cached) => {
+          if (cached) {
+            setPhotoUrlState(cached);
+          } else {
+            setPhotoUrlState(user.photoURL ?? null);
+          }
+        });
       },
       () => setPhotoUrlState(user.photoURL ?? null)
     );
@@ -86,6 +97,9 @@ export function useProfilePhoto() {
         { photoUrl: nextUrl, photoDataUrl: nextDataUrl },
         { merge: true }
       );
+      if (nextDataUrl) {
+        await saveDeviceImage(`profile-${user.uid}`, nextDataUrl);
+      }
       setPhotoUrlState(nextUrl ?? nextDataUrl);
     },
     [user?.uid]
