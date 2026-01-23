@@ -28,6 +28,7 @@ import { updateProfile } from "firebase/auth";
 import { useQuery } from "@tanstack/react-query";
 import type { HealthEntry } from "@shared/schema";
 import {
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -36,6 +37,8 @@ import {
   onSnapshot,
   orderBy,
   query,
+  limit,
+  where,
   setDoc,
   updateDoc,
 } from "firebase/firestore";
@@ -164,6 +167,18 @@ type FeedItem = {
   liked: boolean;
   challenge?: ChallengeSummary;
   challengeSchedule?: ChallengeScheduleSummary;
+  groupId?: string;
+  groupName?: string;
+};
+
+type GroupRecord = {
+  id: string;
+  name: string;
+  ownerId: string;
+  inviteCode: string;
+  members: string[];
+  invitedFriends: string[];
+  createdAt: string;
 };
 
 type NetworkMember = {
@@ -246,6 +261,7 @@ export default function DataInsightsScreen({
   const [showChallengePicker, setShowChallengePicker] = useState(false);
   const [selectedChallengeType, setSelectedChallengeType] = useState<ChallengeType | null>(null);
   const [invitedFriends, setInvitedFriends] = useState<string[]>([]);
+  const [groupInvitedFriends, setGroupInvitedFriends] = useState<string[]>([]);
   const [scheduleChallenge, setScheduleChallenge] = useState(false);
   const [scheduleDate, setScheduleDate] = useState<Date | undefined>();
   const [scheduleTime, setScheduleTime] = useState("");
@@ -283,6 +299,19 @@ export default function DataInsightsScreen({
   const dragStateRef = useRef<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
   const [showNetworkMembers, setShowNetworkMembers] = useState(false);
   const [networkDegree, setNetworkDegree] = useState<"second" | "third">("second");
+  const [groups, setGroups] = useState<GroupRecord[]>([]);
+  const [showGroupDialog, setShowGroupDialog] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [joinCode, setJoinCode] = useState("");
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [isJoiningGroup, setIsJoiningGroup] = useState(false);
+  const [shareToGroup, setShareToGroup] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [showGroupUpdatesDialog, setShowGroupUpdatesDialog] = useState(false);
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [activeGroupName, setActiveGroupName] = useState("");
+  const [groupUpdates, setGroupUpdates] = useState<FeedItem[]>([]);
+  const [isLoadingGroupUpdates, setIsLoadingGroupUpdates] = useState(false);
   const env = import.meta.env as Record<string, string | undefined>;
   const stripePortalUrl = env.VITE_STRIPE_PAYMENT_URL;
   const stripeMonthlyUrl = env.VITE_STRIPE_MONTHLY_URL;
@@ -534,6 +563,27 @@ export default function DataInsightsScreen({
       () => {
         setLongevityChallenge(null);
       }
+    );
+    return unsubscribe;
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setGroups([]);
+      return;
+    }
+    const groupsRef = collection(db, "groups");
+    const groupsQuery = query(groupsRef, where("members", "array-contains", user.uid));
+    const unsubscribe = onSnapshot(
+      groupsQuery,
+      (snapshot) => {
+        const results = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() as Omit<GroupRecord, "id">),
+        }));
+        setGroups(results);
+      },
+      () => setGroups([])
     );
     return unsubscribe;
   }, [user?.uid]);
@@ -899,6 +949,8 @@ export default function DataInsightsScreen({
           liked: typeof entry.liked === "boolean" ? entry.liked : false,
           challenge,
           challengeSchedule,
+          groupId: typeof entry.groupId === "string" ? entry.groupId : undefined,
+          groupName: typeof entry.groupName === "string" ? entry.groupName : undefined,
         };
       })
       .filter(Boolean) as FeedItem[];
@@ -1138,6 +1190,7 @@ export default function DataInsightsScreen({
     setIsSharingUpdate(true);
     const feedId = `feed-${Date.now()}`;
 
+    const selectedGroup = groups.find((group) => group.id === selectedGroupId);
     const newItem: FeedItem = {
       id: feedId,
       authorName: "You",
@@ -1146,14 +1199,28 @@ export default function DataInsightsScreen({
       time: "Just now",
       content: updateText.trim() || "Shared new progress.",
       photos: updatePhotos,
-      shared: shareUpdate,
+      shared: shareToGroup ? false : shareUpdate,
       source: "you" as const,
       likesCount: 0,
       liked: false,
+      groupId: shareToGroup ? selectedGroup?.id : undefined,
+      groupName: shareToGroup ? selectedGroup?.name : undefined,
     };
 
     setFeedItems((prev) => [newItem, ...prev]);
     const saved = await saveFeedItem(newItem);
+    if (shareToGroup && selectedGroup) {
+      try {
+        await setDoc(doc(db, "groups", selectedGroup.id, "updates", feedId), {
+          ...newItem,
+          authorId: user.uid,
+          groupId: selectedGroup.id,
+          groupName: selectedGroup.name,
+        });
+      } catch (error) {
+        console.error("Failed to save group update:", error);
+      }
+    }
     await Promise.all(
       updatePhotos.map((photo, index) =>
         saveDeviceImage(`feed-${feedId}-${index}`, photo)
@@ -1162,6 +1229,8 @@ export default function DataInsightsScreen({
 
     setUpdateText("");
     setUpdatePhotos([]);
+    setShareToGroup(false);
+    setSelectedGroupId("");
     setShareUpdate(isProfileInvisible ? false : true);
     if (saved) {
       toast({
@@ -1385,6 +1454,160 @@ export default function DataInsightsScreen({
       photos: Array.isArray(entry.photos) ? entry.photos : [],
       note: typeof entry.note === "string" ? entry.note : undefined,
     };
+  };
+
+  const createInviteCode = () =>
+    Math.random().toString(36).slice(2, 8).toUpperCase();
+
+  const handleCreateGroup = async () => {
+    if (!user?.uid) {
+      toast({
+        title: "Not signed in",
+        description: "Please sign in to create a group.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const trimmed = groupName.trim();
+    if (!trimmed) {
+      toast({
+        title: "Group name required",
+        description: "Please enter a group name.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (trimmed.length > 20) {
+      toast({
+        title: "Group name too long",
+        description: "Group names can be up to 20 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsCreatingGroup(true);
+    try {
+      const inviteCode = createInviteCode();
+      const groupRef = doc(collection(db, "groups"));
+      const record: GroupRecord = {
+        id: groupRef.id,
+        name: trimmed,
+        ownerId: user.uid,
+        inviteCode,
+        members: [user.uid],
+        invitedFriends: groupInvitedFriends,
+        createdAt: new Date().toISOString(),
+      };
+      await setDoc(groupRef, record);
+      await setDoc(doc(db, "groupInvites", inviteCode), {
+        groupId: record.id,
+        ownerId: user.uid,
+        groupName: record.name,
+        createdAt: record.createdAt,
+      });
+      setGroupName("");
+      setGroupInvitedFriends([]);
+      setShowGroupDialog(false);
+      toast({
+        title: "Group created",
+        description: `Invite code: ${inviteCode}`,
+      });
+    } catch (error) {
+      console.error("Failed to create group:", error);
+      toast({
+        title: "Group creation failed",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingGroup(false);
+    }
+  };
+
+  const handleJoinGroup = async () => {
+    if (!user?.uid) {
+      toast({
+        title: "Not signed in",
+        description: "Please sign in to join a group.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const code = joinCode.trim().toUpperCase();
+    if (!code) {
+      toast({
+        title: "Invite code required",
+        description: "Enter the group invite code to join.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsJoiningGroup(true);
+    try {
+      const inviteSnap = await getDoc(doc(db, "groupInvites", code));
+      if (!inviteSnap.exists()) {
+        toast({
+          title: "Invalid invite",
+          description: "That invite code was not found.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const invite = inviteSnap.data() as { groupId: string; groupName?: string };
+      await updateDoc(doc(db, "groups", invite.groupId), {
+        members: arrayUnion(user.uid),
+      });
+      setJoinCode("");
+      toast({
+        title: "Joined group",
+        description: `You joined ${invite.groupName || "the group"}.`,
+      });
+    } catch (error) {
+      console.error("Failed to join group:", error);
+      toast({
+        title: "Join failed",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsJoiningGroup(false);
+    }
+  };
+
+  const handleShareGroupInvite = async (group: GroupRecord) => {
+    const message = `Join my group "${group.name}" in Xuunu with invite code: ${group.inviteCode}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Xuunu Group Invite", text: message });
+        return;
+      } catch {
+        // fall back to copy
+      }
+    }
+    await copyToClipboard(message, "Invite code");
+  };
+
+  const handleOpenGroupUpdates = async (group: GroupRecord) => {
+    if (!group.id) return;
+    setActiveGroupId(group.id);
+    setActiveGroupName(group.name);
+    setShowGroupUpdatesDialog(true);
+    setIsLoadingGroupUpdates(true);
+    try {
+      const updatesRef = collection(db, "groups", group.id, "updates");
+      const updatesQuery = query(updatesRef, orderBy("postedAt", "desc"), limit(20));
+      const snapshot = await getDocs(updatesQuery);
+      const updates = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...(docSnap.data() as Omit<FeedItem, "id">),
+      }));
+      setGroupUpdates(normalizeFeedItems(updates));
+    } catch (error) {
+      console.error("Failed to load group updates:", error);
+      setGroupUpdates([]);
+    } finally {
+      setIsLoadingGroupUpdates(false);
+    }
   };
 
   const resizeImageDataUrl = (
@@ -1734,6 +1957,12 @@ export default function DataInsightsScreen({
 
   const toggleInviteFriend = (name: string) => {
     setInvitedFriends((prev) =>
+      prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]
+    );
+  };
+
+  const toggleGroupInviteFriend = (name: string) => {
+    setGroupInvitedFriends((prev) =>
       prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]
     );
   };
@@ -2482,12 +2711,47 @@ export default function DataInsightsScreen({
             <span className="text-xs text-white/40">
               {updatePhotos.length}/1 photo
             </span>
+            {groups.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-white/60">
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={shareToGroup}
+                    onChange={(event) => setShareToGroup(event.target.checked)}
+                  />
+                  Share to group
+                </label>
+                {shareToGroup && (
+                  <select
+                    value={selectedGroupId}
+                    onChange={(event) => setSelectedGroupId(event.target.value)}
+                    className="rounded-md border border-white/10 bg-black/40 px-2 py-1 text-xs text-white/80"
+                    data-testid="select-group-share"
+                  >
+                    <option value="">Select group</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
             <div className="ml-auto flex items-center gap-2 text-xs text-white/60">
-              <span>{isProfileInvisible ? "Invisible" : shareUpdate ? "Shared" : "Private"}</span>
+              <span>
+                {shareToGroup
+                  ? "Group-only"
+                  : isProfileInvisible
+                    ? "Invisible"
+                    : shareUpdate
+                      ? "Shared"
+                      : "Private"}
+              </span>
               <Switch
                 checked={shareUpdate}
                 onCheckedChange={setShareUpdate}
-                disabled={isProfileInvisible}
+                disabled={isProfileInvisible || shareToGroup}
               />
             </div>
           </div>
@@ -2514,7 +2778,11 @@ export default function DataInsightsScreen({
           <div className="flex justify-end">
             <Button
               onClick={handleShareUpdate}
-              disabled={isSharingUpdate || (!updateText.trim() && updatePhotos.length === 0)}
+              disabled={
+                isSharingUpdate ||
+                (!updateText.trim() && updatePhotos.length === 0) ||
+                (shareToGroup && !selectedGroupId)
+              }
               data-testid="button-share-update"
             >
               {isSharingUpdate ? "Saving..." : "Share Update"}
@@ -3350,6 +3618,169 @@ export default function DataInsightsScreen({
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
+              <p className="text-xs uppercase tracking-widest text-white/50">Groups</p>
+              <p className="text-sm font-semibold">Invite-only groups</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setShowGroupDialog(true)}>
+              Create Group
+            </Button>
+          </div>
+          {groups.length === 0 ? (
+            <div className="text-xs text-white/50">
+              No groups yet. Create one or join with an invite code.
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {groups.map((group) => (
+                <div key={group.id} className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold">{group.name}</p>
+                      <p className="text-xs text-white/50">
+                        {group.members.length} member{group.members.length === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenGroupUpdates(group)}
+                        data-testid={`button-view-group-${group.id}`}
+                      >
+                        Updates
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleShareGroupInvite(group)}
+                        data-testid={`button-invite-group-${group.id}`}
+                      >
+                        Invite
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-white/40">Invite code: {group.inviteCode}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-2">
+            <label className="text-xs text-white/60">Join with invite code</label>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                value={joinCode}
+                onChange={(event) => setJoinCode(event.target.value)}
+                className="bg-black/40 border-white/10 text-sm"
+                placeholder="Enter code"
+                data-testid="input-join-group"
+              />
+              <Button
+                onClick={handleJoinGroup}
+                disabled={isJoiningGroup || !joinCode.trim()}
+                data-testid="button-join-group"
+              >
+                {isJoiningGroup ? "Joining..." : "Join"}
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <Dialog open={showGroupDialog} onOpenChange={setShowGroupDialog}>
+          <DialogContent className="bg-black border-white/10 text-white">
+            <DialogHeader>
+              <DialogTitle>Create a group</DialogTitle>
+              <DialogDescription className="text-white/60">
+                Invite-only groups keep updates private.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-white/60">Group name (max 20 chars)</Label>
+                <Input
+                  value={groupName}
+                  onChange={(event) => setGroupName(event.target.value.slice(0, 20))}
+                  className="bg-black/40 border-white/10"
+                  data-testid="input-group-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-white/60">Invite friends</Label>
+                <div className="grid gap-2">
+                  {friends.map((friend) => (
+                    <label key={friend.id} className="flex items-center gap-2 text-xs text-white/70">
+                      <input
+                        type="checkbox"
+                        checked={groupInvitedFriends.includes(friend.name)}
+                        onChange={() => toggleGroupInviteFriend(friend.name)}
+                      />
+                      {friend.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowGroupDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateGroup}
+                  disabled={isCreatingGroup}
+                  data-testid="button-create-group"
+                >
+                  {isCreatingGroup ? "Creating..." : "Create Group"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showGroupUpdatesDialog} onOpenChange={setShowGroupUpdatesDialog}>
+          <DialogContent className="bg-black border-white/10 text-white max-w-md">
+            <DialogHeader>
+              <DialogTitle>{activeGroupName || "Group updates"}</DialogTitle>
+              <DialogDescription className="text-white/60">
+                Updates shared exclusively with this group.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              {isLoadingGroupUpdates ? (
+                <div className="text-xs text-white/50">Loading updates...</div>
+              ) : groupUpdates.length === 0 ? (
+                <div className="text-xs text-white/50">No updates yet.</div>
+              ) : (
+                groupUpdates.map((update) => (
+                  <div
+                    key={update.id}
+                    className="rounded-lg border border-white/10 bg-black/40 p-3 space-y-2"
+                  >
+                    <div className="flex items-center justify-between text-xs text-white/50">
+                      <span>{update.authorName}</span>
+                      <span>{formatOptionalDate(update.postedAt, update.time)}</span>
+                    </div>
+                    <p className="text-sm text-white/80">{update.content}</p>
+                    {update.photos.length > 0 && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {update.photos.map((photo, index) => (
+                          <img
+                            key={`${update.id}-photo-${index}`}
+                            src={photo}
+                            alt="Group update"
+                            className="h-24 w-full rounded-lg object-cover"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
               <h3 className="text-sm font-semibold uppercase tracking-widest text-white/70">
                 Friends List
               </h3>
@@ -3392,16 +3823,16 @@ export default function DataInsightsScreen({
               >
                 <div>
                   <p className="text-sm font-semibold">{friend.name}</p>
-                  <p className="text-xs text-white/50">{friend.status}</p>
+                  <p className="text-xs text-white/50">{friend.email}</p>
+                  <p className="text-[11px] text-white/40">
+                    Group challenges: {friend.teamChallengeCount}
+                  </p>
                 </div>
                 <button
                   type="button"
                   className="text-xs text-white/60 hover:text-white"
                   onClick={() =>
-                    onViewFriend?.({
-                      ...friend,
-                      hasChallengeInvite: invitedFriendNames.has(friend.name),
-                    })
+                    onViewFriend?.(friend)
                   }
                   data-testid={`button-view-friend-${friend.id}`}
                 >
