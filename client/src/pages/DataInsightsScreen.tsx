@@ -660,6 +660,11 @@ export default function DataInsightsScreen({
 
   const handleCropSave = async () => {
     if (!cropImageUrl || !imageRef.current || !imageSize) {
+      toast({
+        title: "Photo not ready",
+        description: "Please wait for the image to load, then try again.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -1130,32 +1135,29 @@ export default function DataInsightsScreen({
       liked: false,
     };
 
+    setFeedItems((prev) => [newItem, ...prev]);
     const saved = await saveFeedItem(newItem);
-    if (!saved) {
-      toast({
-        title: "Update not saved",
-        description: "We couldn't save your update. Please try again.",
-        variant: "destructive",
-      });
-      setIsSharingUpdate(false);
-      return;
-    }
-
     await Promise.all(
       updatePhotos.map((photo, index) =>
         saveDeviceImage(`feed-${feedId}-${index}`, photo)
       )
     );
 
-    setFeedItems((prev) => [newItem, ...prev]);
     setUpdateText("");
     setUpdatePhotos([]);
     setShareUpdate(isProfileInvisible ? false : true);
-    toast({
-      title: "Update shared",
-      description: "Your latest progress is now visible in the feed.",
-    });
-    sendNotification("Update shared", "Your progress update is live.");
+    if (saved) {
+      toast({
+        title: "Update shared",
+        description: "Your latest progress is now visible in the feed.",
+      });
+      sendNotification("Update shared", "Your progress update is live.");
+    } else {
+      toast({
+        title: "Saved locally",
+        description: "Your update was saved on this device. We'll retry sync.",
+      });
+    }
     setIsSharingUpdate(false);
   };
 
