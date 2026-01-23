@@ -14,6 +14,7 @@ const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 const stripeClient = stripeSecretKey
   ? new Stripe(stripeSecretKey, { apiVersion: "2023-10-16" })
   : null;
+const SUPERUSER_EMAIL = "agnishikha@yahoo.com";
 
 const getStripeString = (value: unknown) =>
   typeof value === "string" ? value : undefined;
@@ -81,6 +82,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email,
         password: null,
       });
+
+      if (email.toLowerCase() === SUPERUSER_EMAIL.toLowerCase()) {
+        await storage.upsertUserFeatureFlags({ userId: id, paidStatus: true });
+      }
       
       res.json(newUser);
     } catch (error) {
@@ -96,11 +101,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
       }
+      const user = await storage.getUser(userId);
+      const isSuperuser =
+        user?.email?.toLowerCase() === SUPERUSER_EMAIL.toLowerCase();
       let flags = await storage.getUserFeatureFlags(userId);
       if (!flags) {
-        flags = await storage.upsertUserFeatureFlags({ userId, paidStatus: false });
+        flags = await storage.upsertUserFeatureFlags({
+          userId,
+          paidStatus: isSuperuser,
+        });
+      } else if (isSuperuser && !flags.paidStatus) {
+        flags = await storage.upsertUserFeatureFlags({
+          userId,
+          paidStatus: true,
+          stripeCustomerId: flags.stripeCustomerId,
+          stripeSubscriptionId: flags.stripeSubscriptionId,
+        });
       }
-      res.json({ paidStatus: !!flags.paidStatus });
+      res.json({ paidStatus: isSuperuser ? true : !!flags.paidStatus });
     } catch (error) {
       console.error("Error fetching user feature flags:", error);
       res.status(500).json({ error: "Failed to fetch user feature flags" });
