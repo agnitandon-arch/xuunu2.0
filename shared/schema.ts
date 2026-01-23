@@ -19,6 +19,7 @@ export const userFeatureFlags = pgTable("user_feature_flags", {
   paidStatus: boolean("paid_status").notNull().default(false),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
+  stripeCardLast4: text("stripe_card_last4"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

@@ -11,6 +11,10 @@ const TERRA_LAB_PROVIDERS = ["QUEST", "LABCORP", "EVERLYWELL", "LETSGETCHECKED"]
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const stripeMonthlyPriceId = process.env.STRIPE_PRICE_MONTHLY_ID;
+const stripeYearlyPriceId = process.env.STRIPE_PRICE_YEARLY_ID;
+const stripeSuccessUrl = process.env.STRIPE_SUCCESS_URL;
+const stripeCancelUrl = process.env.STRIPE_CANCEL_URL;
 const stripeClient = stripeSecretKey
   ? new Stripe(stripeSecretKey, { apiVersion: "2023-10-16" })
   : null;
@@ -148,6 +152,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/stripe/create-checkout-session", async (req, res) => {
+    if (!stripeClient || !stripeSecretKey) {
+      return res.status(500).json({ error: "Stripe not configured" });
+    }
+    try {
+      const { userId, plan } = req.body as { userId?: string; plan?: "monthly" | "yearly" };
+      if (!userId || !plan) {
+        return res.status(400).json({ error: "userId and plan are required" });
+      }
+      const priceId = plan === "yearly" ? stripeYearlyPriceId : stripeMonthlyPriceId;
+      if (!priceId) {
+        return res.status(400).json({ error: "Price not configured" });
+      }
+      const successUrl =
+        stripeSuccessUrl || `${req.protocol}://${req.get("host")}/app?payment=success`;
+      const cancelUrl =
+        stripeCancelUrl || `${req.protocol}://${req.get("host")}/app?payment=cancel`;
+      const session = await stripeClient.checkout.sessions.create({
+        mode: "subscription",
+        payment_method_types: ["card"],
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        client_reference_id: userId,
+        metadata: { userId },
+      });
+      return res.json({ url: session.url });
+    } catch (error) {
+      console.error("Stripe checkout session failed:", error);
+      return res.status(500).json({ error: "Failed to create checkout session" });
+    }
+  });
+
   app.post("/api/stripe/webhook", async (req, res) => {
     if (!stripeClient || !stripeWebhookSecret) {
       return res.status(500).json({ error: "Stripe webhook not configured" });
@@ -176,6 +213,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const session = event.data.object as Stripe.Checkout.Session;
           const customerId = getStripeString(session.customer);
           const subscriptionId = getStripeString(session.subscription);
+          const paymentIntentId = getStripeString(session.payment_intent);
+          let cardLast4: string | undefined;
+          if (paymentIntentId && stripeClient) {
+            try {
+              const paymentIntent = await stripeClient.paymentIntents.retrieve(paymentIntentId, {
+                expand: ["payment_method"],
+              });
+              const card = (paymentIntent.payment_method as Stripe.PaymentMethod | null)?.card;
+              cardLast4 = card?.last4;
+            } catch (error) {
+              console.warn("Unable to fetch card last4:", error);
+            }
+          }
           const userId = await resolveStripeUserId({
             userId: session.metadata?.userId || session.client_reference_id || undefined,
             customerId,
@@ -187,6 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               paidStatus: true,
               stripeCustomerId: customerId,
               stripeSubscriptionId: subscriptionId,
+              stripeCardLast4: cardLast4,
             });
           }
           break;

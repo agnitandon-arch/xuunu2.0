@@ -138,6 +138,7 @@ export class DatabaseStorage implements IStorage {
           paidStatus: flags.paidStatus,
           stripeCustomerId: flags.stripeCustomerId,
           stripeSubscriptionId: flags.stripeSubscriptionId,
+          stripeCardLast4: flags.stripeCardLast4,
           updatedAt: new Date(),
         },
       })

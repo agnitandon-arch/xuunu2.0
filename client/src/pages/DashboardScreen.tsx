@@ -216,12 +216,29 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     }
   };
 
-  const handleOpenPaymentPortal = (plan?: "monthly" | "yearly") => {
+  const handleOpenPaymentPortal = async (plan?: "monthly" | "yearly") => {
     const planUrl =
       plan === "monthly" ? stripeMonthlyUrl : plan === "yearly" ? stripeYearlyUrl : undefined;
-    const portalUrl =
+    const fallbackUrl =
       planUrl || stripePortalUrl || stripeMonthlyUrl || stripeYearlyUrl || "https://stripe.com";
-    window.open(portalUrl, "_blank");
+    if (!user?.uid) {
+      window.open(fallbackUrl, "_blank");
+      return;
+    }
+    try {
+      const response = await apiRequest("POST", "/api/stripe/create-checkout-session", {
+        userId: user.uid,
+        plan: plan ?? "monthly",
+      });
+      const data = await response.json();
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+    } catch (error) {
+      console.error("Stripe checkout failed:", error);
+    }
+    window.open(fallbackUrl, "_blank");
     toast({
       title: "Premium membership",
       description:
