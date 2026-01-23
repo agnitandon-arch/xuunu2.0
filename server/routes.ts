@@ -170,6 +170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!priceId) {
         return res.status(400).json({ error: "Price not configured" });
       }
+      const user = await storage.getUser(userId);
       const successUrl =
         stripeSuccessUrl || `${req.protocol}://${req.get("host")}/app?payment=success`;
       const cancelUrl =
@@ -177,6 +178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const session = await stripeClient.checkout.sessions.create({
         mode: "subscription",
         payment_method_types: ["card"],
+        customer_email: user?.email || undefined,
         line_items: [{ price: priceId, quantity: 1 }],
         success_url: successUrl,
         cancel_url: cancelUrl,
