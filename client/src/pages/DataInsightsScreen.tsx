@@ -224,6 +224,7 @@ export default function DataInsightsScreen({
   const [updateText, setUpdateText] = useState("");
   const [updatePhotos, setUpdatePhotos] = useState<string[]>([]);
   const [shareUpdate, setShareUpdate] = useState(true);
+  const [isSharingUpdate, setIsSharingUpdate] = useState(false);
   const [displayNameOverride, setDisplayNameOverride] = useState<string | null>(null);
   const [usernameDraft, setUsernameDraft] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
@@ -1110,6 +1111,8 @@ export default function DataInsightsScreen({
       return;
     }
 
+    if (isSharingUpdate) return;
+    setIsSharingUpdate(true);
     const feedId = `feed-${Date.now()}`;
 
     const newItem: FeedItem = {
@@ -1126,8 +1129,18 @@ export default function DataInsightsScreen({
       liked: false,
     };
 
+    const saved = await saveFeedItem(newItem);
+    if (!saved) {
+      toast({
+        title: "Update not saved",
+        description: "We couldn't save your update. Please try again.",
+        variant: "destructive",
+      });
+      setIsSharingUpdate(false);
+      return;
+    }
+
     setFeedItems((prev) => [newItem, ...prev]);
-    await saveFeedItem(newItem);
     setUpdateText("");
     setUpdatePhotos([]);
     setShareUpdate(isProfileInvisible ? false : true);
@@ -1136,6 +1149,7 @@ export default function DataInsightsScreen({
       description: "Your latest progress is now visible in the feed.",
     });
     sendNotification("Update shared", "Your progress update is live.");
+    setIsSharingUpdate(false);
   };
 
   const handleSaveDisplayName = async () => {
@@ -2455,6 +2469,15 @@ export default function DataInsightsScreen({
               ))}
             </div>
           )}
+          <div className="flex justify-end">
+            <Button
+              onClick={handleShareUpdate}
+              disabled={isSharingUpdate || (!updateText.trim() && updatePhotos.length === 0)}
+              data-testid="button-share-update"
+            >
+              {isSharingUpdate ? "Saving..." : "Share Update"}
+            </Button>
+          </div>
         </section>
 
       <section
