@@ -2108,7 +2108,7 @@ export default function DataInsightsScreen({
   const longevityLogs = longevityChallenge
     ? [...longevityChallenge.logs].sort((a, b) => b.date.localeCompare(a.date))
     : [];
-  const challengesLocked = !isPaidAccount;
+  const challengesLocked = false;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2543,31 +2543,6 @@ export default function DataInsightsScreen({
             Join Challenge
           </Button>
         </div>
-        {challengesLocked && (
-          <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-3">
-            <p className="text-xs text-white/60">
-              Upgrade to unlock challenges, scheduling, and leaderboards.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleOpenPaymentPortal("monthly")}
-                data-testid="button-upgrade-monthly-challenges"
-              >
-                $9.99/mo
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleOpenPaymentPortal("yearly")}
-                data-testid="button-upgrade-yearly-challenges"
-              >
-                $99/yr
-              </Button>
-            </div>
-          </div>
-        )}
         {activeChallenge && (
           <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -2925,31 +2900,6 @@ export default function DataInsightsScreen({
             </Button>
           )}
         </div>
-        {challengesLocked && (
-          <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-3">
-            <p className="text-xs text-white/60">
-              Upgrade to unlock longevity challenges and daily photo logs.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleOpenPaymentPortal("monthly")}
-                data-testid="button-upgrade-monthly-longevity"
-              >
-                $9.99/mo
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleOpenPaymentPortal("yearly")}
-                data-testid="button-upgrade-yearly-longevity"
-              >
-                $99/yr
-              </Button>
-            </div>
-          </div>
-        )}
         {longevityChallenge ? (
           <div className="space-y-4">
             <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-2">
