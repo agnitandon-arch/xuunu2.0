@@ -3,8 +3,6 @@ import BioSignature from "@/components/BioSignature";
 import SynergyInsightsDialog from "@/components/SynergyInsightsDialog";
 import BioSignatureDialog from "@/components/BioSignatureDialog";
 import MedicationQuickLog from "@/components/MedicationQuickLog";
-import EnvironmentalMap from "@/components/EnvironmentalMap";
-import HourlyImpactTracker from "@/components/HourlyImpactTracker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -19,9 +17,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, Loader2, Plus, Database, ChevronRight, Pill, Watch, Droplets, Wind } from "lucide-react";
+import { Loader2, Plus, Database, ChevronRight, Pill, Watch, Droplets, Wind } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,7 +45,6 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const [showBioSignature, setShowBioSignature] = useState(true);
   const [showSynergyDialog, setShowSynergyDialog] = useState(false);
   const [showBioSignatureDialog, setShowBioSignatureDialog] = useState(false);
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [supportEmail, setSupportEmail] = useState("");
   const [supportMessage, setSupportMessage] = useState("");
 
@@ -436,10 +432,6 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     });
     setCardioMinutes("");
     setCardioDialog(false);
-  };
-
-  const handleLocationUpdate = (lat: number, lng: number) => {
-    setLocation({ lat, lng });
   };
 
   useEffect(() => {
@@ -913,59 +905,6 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
               </div>
             </div>
 
-            {/* Environment Summary */}
-            <div className="bg-white/5 border border-white/10 rounded-lg p-6">
-              <div className="text-xs uppercase tracking-widest opacity-40 mb-3">ENVIRONMENT</div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-3xl font-bold font-mono mb-1">{latestEnv?.aqi || "—"}</div>
-                  <div className="text-xs opacity-60">Current AQI • {latestEnv?.aqi ? (latestEnv.aqi < 50 ? "Good" : latestEnv.aqi < 100 ? "Moderate" : "Unhealthy") : "No data"}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-mono">{latestEnv?.temperature ? `${latestEnv.temperature}°F` : "—"}</div>
-                  <div className="text-xs opacity-60">{latestEnv?.humidity ? `${latestEnv.humidity}% humidity` : "—"}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 mt-4 text-xs opacity-40">
-                <MapPin className="w-3 h-3" />
-                <span>{latestEnv?.locationMode === "manual" ? "Indoor" : "Outdoor"}</span>
-              </div>
-              <div className="mt-6">
-                <Tabs defaultValue="location" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 bg-white/5">
-                    <TabsTrigger value="location" data-testid="tab-location">
-                      Location
-                    </TabsTrigger>
-                    <TabsTrigger value="impact" data-testid="tab-impact">
-                      Impact
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="location" className="mt-6">
-                    <EnvironmentalMap onLocationUpdate={handleLocationUpdate} />
-                  </TabsContent>
-
-                  <TabsContent value="impact" className="mt-6">
-                    <HourlyImpactTracker />
-                  </TabsContent>
-                </Tabs>
-
-                <div className="pt-4 space-y-3 text-xs opacity-60">
-                  <p>
-                    <strong>7 Environmental Categories:</strong> Air, Noise, Water, Soil,
-                    Light, Thermal, and Radioactive exposure tracking.
-                  </p>
-                  <p>
-                    <strong>Data Sources:</strong> Multiple APIs including OpenWeatherMap,
-                    IQAir, EPA databases, and local monitoring stations.
-                  </p>
-                  <p>
-                    <strong>Privacy:</strong> Location data is only used to fetch environmental
-                    conditions and is not stored on external servers.
-                  </p>
-                </div>
-              </div>
-            </div>
           </>
         )}
 
