@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { HealthEntry, EnvironmentalReading } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getDeviceMetric, saveDeviceMetric } from "@/lib/deviceMetricsStore";
 import { useToast } from "@/hooks/use-toast";
 import { seedInitialData } from "@/lib/localStore";
 import { collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, setDoc } from "firebase/firestore";
@@ -101,15 +102,60 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     [env]
   );
 
-  const { data: latestHealth, isLoading: healthLoading } = useQuery<HealthEntry | null>({
+  const {
+    data: latestHealth,
+    isLoading: healthLoading,
+    refetch: refetchHealth,
+  } = useQuery<HealthEntry | null>({
     queryKey: [`/api/health-entries/latest?userId=${user?.uid}`],
-    enabled: !!user,
+    enabled: false,
   });
 
-  const { data: latestEnv, isLoading: envLoading } = useQuery<EnvironmentalReading | null>({
+  const {
+    data: latestEnv,
+    isLoading: envLoading,
+    refetch: refetchEnv,
+  } = useQuery<EnvironmentalReading | null>({
     queryKey: [`/api/environmental-readings/latest?userId=${user?.uid}`],
-    enabled: !!user,
+    enabled: false,
   });
+  useEffect(() => {
+    if (!user?.uid) return;
+    let isActive = true;
+    const primeCache = async () => {
+      const [cachedHealth, cachedEnv] = await Promise.all([
+        getDeviceMetric<HealthEntry | null>(`latest-health-${user.uid}`),
+        getDeviceMetric<EnvironmentalReading | null>(`latest-env-${user.uid}`),
+      ]);
+      if (!isActive) return;
+      if (cachedHealth) {
+        queryClient.setQueryData(
+          [`/api/health-entries/latest?userId=${user.uid}`],
+          cachedHealth
+        );
+      }
+      if (cachedEnv) {
+        queryClient.setQueryData(
+          [`/api/environmental-readings/latest?userId=${user.uid}`],
+          cachedEnv
+        );
+      }
+    };
+    void primeCache();
+    return () => {
+      isActive = false;
+    };
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid || !latestHealth) return;
+    void saveDeviceMetric(`latest-health-${user.uid}`, latestHealth);
+  }, [latestHealth, user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid || !latestEnv) return;
+    void saveDeviceMetric(`latest-env-${user.uid}`, latestEnv);
+  }, [latestEnv, user?.uid]);
 
   const { data: recentHealthEntries = [] } = useQuery<HealthEntry[]>({
     queryKey: [`/api/health-entries?userId=${user?.uid}&limit=7`],
@@ -325,6 +371,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     }
     try {
       await refreshAqiFromLocation();
+      await Promise.all([refetchHealth(), refetchEnv()]);
       if (source === "manual") {
         toast({
           title: "Data refreshed",
