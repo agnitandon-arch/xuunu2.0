@@ -58,13 +58,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signInWithGoogle = async () => {
+    const isMobile =
+      typeof navigator !== "undefined" &&
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isStandalone =
+      typeof window !== "undefined" &&
+      (window.matchMedia?.("(display-mode: standalone)")?.matches ||
+        (navigator as any).standalone);
+    if (isMobile || isStandalone) {
+      await signInWithRedirect(auth, googleProvider);
+      return;
+    }
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       const authError = error as AuthError | undefined;
       if (
         authError?.code === "auth/popup-blocked" ||
-        authError?.code === "auth/operation-not-supported-in-this-environment"
+        authError?.code === "auth/operation-not-supported-in-this-environment" ||
+        authError?.code === "auth/popup-closed-by-user" ||
+        authError?.code === "auth/cancelled-popup-request" ||
+        authError?.code === "auth/unauthorized-domain"
       ) {
         await signInWithRedirect(auth, googleProvider);
         return;
