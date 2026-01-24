@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertHealthEntrySchema, insertEnvironmentalReadingSchema, insertUserApiCredentialsSchema, insertNoteSchema, insertBioSignatureSnapshotSchema, insertMedicationSchema, insertMedicationLogSchema } from "@shared/schema";
+import { insertHealthEntrySchema, insertEnvironmentalReadingSchema, insertUserApiCredentialsSchema, insertNoteSchema, insertBioSignatureSnapshotSchema, insertMedicationSchema, insertMedicationLogSchema, insertUserUpdateSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { TerraClient } from "terra-api";
 import Anthropic from "@anthropic-ai/sdk";
@@ -95,6 +95,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error syncing user:", error);
       res.status(500).json({ error: "Failed to sync user" });
+    }
+  });
+
+  // User updates feed
+  app.post("/api/user-updates", async (req, res) => {
+    try {
+      const validation = insertUserUpdateSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: fromZodError(validation.error).message,
+        });
+      }
+      const update = await storage.createUserUpdate(validation.data);
+      res.json(update);
+    } catch (error) {
+      console.error("Error creating user update:", error);
+      res.status(500).json({ error: "Failed to create user update" });
+    }
+  });
+
+  app.get("/api/user-updates", async (req, res) => {
+    try {
+      const userId = req.query.userId as string;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      const updates = await storage.getUserUpdates(userId, limit);
+      res.json(updates);
+    } catch (error) {
+      console.error("Error fetching user updates:", error);
+      res.status(500).json({ error: "Failed to fetch user updates" });
     }
   });
 

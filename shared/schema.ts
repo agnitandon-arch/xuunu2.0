@@ -177,6 +177,18 @@ export const notes = pgTable("notes", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const userUpdates = pgTable("user_updates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  photos: json("photos").$type<string[]>().notNull(),
+  shared: boolean("shared").notNull().default(true),
+  groupId: text("group_id"),
+  groupName: text("group_name"),
+  postedAt: timestamp("posted_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertNoteSchema = createInsertSchema(notes).omit({
   id: true,
   createdAt: true,
@@ -187,6 +199,11 @@ export const insertNoteSchema = createInsertSchema(notes).omit({
   audioDuration: z.number().nullable().optional(),
   hasNotification: z.number().min(0).max(1),
   isCompleted: z.number().min(0).max(1),
+});
+
+export const insertUserUpdateSchema = createInsertSchema(userUpdates).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const bioSignatureSnapshots = pgTable("bio_signature_snapshots", {
@@ -319,6 +336,8 @@ export type ConnectedDevice = typeof connectedDevices.$inferSelect;
 export type InsertConnectedDevice = z.infer<typeof insertConnectedDeviceSchema>;
 export type Note = typeof notes.$inferSelect;
 export type InsertNote = z.infer<typeof insertNoteSchema>;
+export type UserUpdate = typeof userUpdates.$inferSelect;
+export type InsertUserUpdate = z.infer<typeof insertUserUpdateSchema>;
 export type BioSignatureSnapshot = typeof bioSignatureSnapshots.$inferSelect;
 export type InsertBioSignatureSnapshot = z.infer<typeof insertBioSignatureSnapshotSchema>;
 export type Medication = typeof medications.$inferSelect;

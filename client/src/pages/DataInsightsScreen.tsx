@@ -27,6 +27,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { updateProfile } from "firebase/auth";
 import { useQuery } from "@tanstack/react-query";
 import type { HealthEntry } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 import {
   arrayUnion,
   collection,
@@ -45,6 +46,7 @@ import {
 import { getDownloadURL, ref, uploadString } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { saveDeviceImage } from "@/lib/deviceImageStore";
+import { getDeviceFeedItems, saveDeviceFeedItems } from "@/lib/deviceFeedStore";
 
 type ShareTarget = {
   id: "tiktok" | "facebook" | "x" | "instagram" | "whatsapp";
@@ -1000,12 +1002,30 @@ export default function DataInsightsScreen({
 
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
 
+  const mergeFeedItems = (lists: FeedItem[][]) => {
+    const map = new Map<string, FeedItem>();
+    lists.flat().forEach((item) => {
+      map.set(item.id, item);
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const aTime = getDateMs(a.postedAt) ?? 0;
+      const bTime = getDateMs(b.postedAt) ?? 0;
+      return bTime - aTime;
+    });
+  };
+
   useEffect(() => {
     if (!user?.uid) {
       setFeedItems(buildDefaultFeedItems(photoUrl || ""));
       return;
     }
+    let isActive = true;
     const loadFeedItems = async () => {
+      const localItemsRaw = await getDeviceFeedItems(`feed-${user.uid}`);
+      const localItems = normalizeFeedItems(localItemsRaw);
+      if (isActive && localItems.length > 0) {
+        setFeedItems(mergeFeedItems([localItems, buildDefaultFeedItems(photoUrl || "")]));
+      }
       try {
         const feedRef = collection(db, "users", user.uid, "feedItems");
         const feedQuery = query(feedRef, orderBy("postedAt", "desc"));
@@ -1015,13 +1035,41 @@ export default function DataInsightsScreen({
           ...(docSnap.data() as Omit<FeedItem, "id">),
         }));
         const normalized = normalizeFeedItems(data);
-        setFeedItems([...normalized, ...buildDefaultFeedItems(photoUrl || "")]);
-      } catch {
-        setFeedItems(buildDefaultFeedItems(photoUrl || ""));
+        const merged = mergeFeedItems([
+          normalized,
+          localItems,
+          buildDefaultFeedItems(photoUrl || ""),
+        ]);
+        if (isActive) setFeedItems(merged);
+        await saveDeviceFeedItems(`feed-${user.uid}`, normalized);
+      } catch (error) {
+        console.error("Failed to load feed items:", error);
+        if (isActive && localItems.length === 0) {
+          setFeedItems(buildDefaultFeedItems(photoUrl || ""));
+        }
+      }
+
+      try {
+        const response = await apiRequest("GET", `/api/user-updates?userId=${user.uid}&limit=50`);
+        const updates = await response.json();
+        const normalizedUpdates = normalizeFeedItems(updates);
+        if (isActive && normalizedUpdates.length > 0) {
+          setFeedItems((prev) => mergeFeedItems([normalizedUpdates, prev]));
+        }
+      } catch (error) {
+        console.error("Failed to load server updates:", error);
       }
     };
     void loadFeedItems();
+    return () => {
+      isActive = false;
+    };
   }, [user?.uid, photoUrl]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    void saveDeviceFeedItems(`feed-${user.uid}`, feedItems);
+  }, [feedItems, user?.uid]);
 
   useEffect(() => {
     setFeedItems((prev) =>
@@ -1225,6 +1273,17 @@ export default function DataInsightsScreen({
         console.error("Failed to save group update:", error);
       }
     }
+    void apiRequest("POST", "/api/user-updates", {
+      userId: user.uid,
+      content: newItem.content,
+      photos: newItem.photos,
+      shared: newItem.shared,
+      groupId: newItem.groupId ?? null,
+      groupName: newItem.groupName ?? null,
+      postedAt: newItem.postedAt,
+    }).catch((error) => {
+      console.error("Failed to save update to server:", error);
+    });
     await Promise.all(
       updatePhotos.map((photo, index) =>
         saveDeviceImage(`feed-${feedId}-${index}`, photo)

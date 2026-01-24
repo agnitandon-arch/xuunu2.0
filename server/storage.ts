@@ -11,6 +11,8 @@ import {
   type InsertConnectedDevice,
   type UserFeatureFlags,
   type InsertUserFeatureFlags,
+  type UserUpdate,
+  type InsertUserUpdate,
   type Note,
   type InsertNote,
   type BioSignatureSnapshot,
@@ -26,6 +28,7 @@ import {
   connectedDevices,
   userFeatureFlags,
   notes,
+  userUpdates,
   bioSignatureSnapshots,
   medications,
   medicationLogs,
@@ -63,6 +66,8 @@ export interface IStorage {
   getUserNotes(userId: string, limit?: number): Promise<Note[]>;
   updateNote(id: string, updates: Partial<InsertNote>): Promise<Note>;
   deleteNote(id: string): Promise<void>;
+  createUserUpdate(update: InsertUserUpdate): Promise<UserUpdate>;
+  getUserUpdates(userId: string, limit?: number): Promise<UserUpdate[]>;
 
   createBioSignatureSnapshot(snapshot: InsertBioSignatureSnapshot): Promise<BioSignatureSnapshot>;
   getUserBioSignatureSnapshots(userId: string, limit?: number): Promise<BioSignatureSnapshot[]>;
@@ -312,6 +317,27 @@ export class DatabaseStorage implements IStorage {
 
   async deleteNote(id: string): Promise<void> {
     await db.delete(notes).where(eq(notes.id, id));
+  }
+
+  async createUserUpdate(update: InsertUserUpdate): Promise<UserUpdate> {
+    const normalizedUpdate: typeof userUpdates.$inferInsert = {
+      ...update,
+      photos: Array.isArray(update.photos) ? update.photos : [],
+    };
+    const [record] = await db
+      .insert(userUpdates)
+      .values(normalizedUpdate)
+      .returning();
+    return record;
+  }
+
+  async getUserUpdates(userId: string, limit: number = 50): Promise<UserUpdate[]> {
+    return await db
+      .select()
+      .from(userUpdates)
+      .where(eq(userUpdates.userId, userId))
+      .orderBy(desc(userUpdates.postedAt))
+      .limit(limit);
   }
 
   async createBioSignatureSnapshot(snapshot: InsertBioSignatureSnapshot): Promise<BioSignatureSnapshot> {
