@@ -18,6 +18,22 @@ service cloud.firestore {
       }
     }
 
+    match /publicProfiles/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /friendRequests/{requestId} {
+      allow create: if isSignedIn() &&
+        request.resource.data.fromUserId == request.auth.uid;
+      allow read: if isSignedIn() &&
+        (resource.data.fromUserId == request.auth.uid ||
+         resource.data.toUserId == request.auth.uid);
+      allow update, delete: if isSignedIn() &&
+        (resource.data.fromUserId == request.auth.uid ||
+         resource.data.toUserId == request.auth.uid);
+    }
+
     match /groupInvites/{inviteCode} {
       allow get: if isSignedIn();
       allow list: if false;

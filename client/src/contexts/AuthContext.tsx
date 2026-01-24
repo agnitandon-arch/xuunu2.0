@@ -12,7 +12,8 @@ import {
   getRedirectResult,
   type AuthError
 } from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
+import { auth, googleProvider, db } from "@/lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
 import { apiRequest } from "@/lib/queryClient";
 
 interface AuthContextType {
@@ -41,6 +42,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: user.uid,
             email: user.email,
           });
+          await setDoc(
+            doc(db, "publicProfiles", user.uid),
+            {
+              displayName: user.displayName || user.email?.split("@")[0] || "Member",
+              email: user.email ?? null,
+              emailLower: user.email ? user.email.toLowerCase() : null,
+              photoUrl: user.photoURL ?? null,
+              updatedAt: new Date().toISOString(),
+            },
+            { merge: true }
+          );
         } catch (error) {
           console.error('Failed to sync user:', error);
         }

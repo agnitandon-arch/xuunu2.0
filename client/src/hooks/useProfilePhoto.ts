@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { updateProfile } from "firebase/auth";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadString } from "firebase/storage";
 import { useAuth } from "@/contexts/AuthContext";
@@ -76,17 +77,23 @@ export function useProfilePhoto() {
       if (!user?.uid) return;
       let nextUrl: string | null = null;
       let nextDataUrl: string | null = null;
+      let resizedDataUrl: string | null = null;
 
       if (value && value.startsWith("data:")) {
         try {
-          const resized = await resizeDataUrl(value);
-          nextDataUrl = resized;
-          const photoRef = ref(storage, `users/${user.uid}/profile/photo.jpg`);
-          await uploadString(photoRef, resized, "data_url");
+          resizedDataUrl = await resizeDataUrl(value);
+        } catch (error) {
+          console.warn("Profile photo resize failed, using original.", error);
+          resizedDataUrl = value;
+        }
+        try {
+          const uploadDataUrl = resizedDataUrl ?? value;
+          const photoRef = ref(storage, `users/${user.uid}/profile/${Date.now()}.jpg`);
+          await uploadString(photoRef, uploadDataUrl, "data_url");
           nextUrl = await getDownloadURL(photoRef);
         } catch (error) {
           console.warn("Profile photo upload failed, saving to Firestore instead.", error);
-          nextDataUrl = value;
+          nextDataUrl = resizedDataUrl ?? value;
         }
       } else {
         nextUrl = value ?? null;
@@ -94,15 +101,39 @@ export function useProfilePhoto() {
 
       await setDoc(
         doc(db, "users", user.uid),
-        { photoUrl: nextUrl, photoDataUrl: nextDataUrl },
+        {
+          photoUrl: nextUrl,
+          photoDataUrl: nextDataUrl,
+          photoUpdatedAt: new Date().toISOString(),
+        },
         { merge: true }
       );
-      if (nextDataUrl) {
+      await setDoc(
+        doc(db, "publicProfiles", user.uid),
+        {
+          displayName: user.displayName || user.email?.split("@")[0] || "Member",
+          email: user.email ?? null,
+          emailLower: user.email ? user.email.toLowerCase() : null,
+          photoUrl: nextUrl ?? nextDataUrl ?? null,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+      if (resizedDataUrl) {
+        await saveDeviceImage(`profile-${user.uid}`, resizedDataUrl);
+      } else if (nextDataUrl) {
         await saveDeviceImage(`profile-${user.uid}`, nextDataUrl);
       }
       setPhotoUrlState(nextUrl ?? nextDataUrl);
+      if (nextUrl) {
+        try {
+          await updateProfile(user, { photoURL: nextUrl });
+        } catch (error) {
+          console.warn("Failed to update auth profile photo.", error);
+        }
+      }
     },
-    [user?.uid]
+    [user]
   );
 
   return { photoUrl, setPhotoUrl };

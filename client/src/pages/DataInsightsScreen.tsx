@@ -184,10 +184,11 @@ type GroupRecord = {
   createdAt: string;
 };
 
-type NetworkMember = {
-  id: string;
-  name: string;
-  avatarUrl?: string;
+type PublicProfileMatch = {
+  userId: string;
+  displayName: string;
+  photoUrl?: string;
+  email?: string;
 };
 
 const SHARE_TARGETS: ShareTarget[] = [
@@ -301,7 +302,11 @@ export default function DataInsightsScreen({
   const imageRef = useRef<HTMLImageElement | null>(null);
   const dragStateRef = useRef<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
   const [showNetworkMembers, setShowNetworkMembers] = useState(false);
-  const [networkDegree, setNetworkDegree] = useState<"second" | "third">("second");
+  const [contactsMatches, setContactsMatches] = useState<PublicProfileMatch[]>([]);
+  const [contactsLoaded, setContactsLoaded] = useState(false);
+  const [contactsError, setContactsError] = useState<string | null>(null);
+  const [isLoadingContacts, setIsLoadingContacts] = useState(false);
+  const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
   const [groups, setGroups] = useState<GroupRecord[]>([]);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [groupName, setGroupName] = useState("");
@@ -443,26 +448,6 @@ export default function DataInsightsScreen({
         avatarUrl: "https://i.pravatar.cc/120?img=22",
         teamChallengeCount: 0,
       },
-    ],
-    []
-  );
-
-  const secondDegreeMembers = useMemo<NetworkMember[]>(
-    () => [
-      { id: "second-1", name: "Maya Rodriguez", avatarUrl: "https://i.pravatar.cc/120?img=31" },
-      { id: "second-2", name: "Ethan Brooks", avatarUrl: "https://i.pravatar.cc/120?img=33" },
-      { id: "second-3", name: "Priya Nair", avatarUrl: "https://i.pravatar.cc/120?img=45" },
-      { id: "second-4", name: "Noah King", avatarUrl: "https://i.pravatar.cc/120?img=52" },
-    ],
-    []
-  );
-
-  const thirdDegreeMembers = useMemo<NetworkMember[]>(
-    () => [
-      { id: "third-1", name: "Sofia Alvarez", avatarUrl: "https://i.pravatar.cc/120?img=36" },
-      { id: "third-2", name: "Liam Patel", avatarUrl: "https://i.pravatar.cc/120?img=39" },
-      { id: "third-3", name: "Grace Kim", avatarUrl: "https://i.pravatar.cc/120?img=41" },
-      { id: "third-4", name: "Diego Santos", avatarUrl: "https://i.pravatar.cc/120?img=49" },
     ],
     []
   );
@@ -1368,6 +1353,17 @@ export default function DataInsightsScreen({
       await setDoc(
         doc(db, "users", user.uid),
         { displayNameOverride: nextName },
+        { merge: true }
+      );
+      await setDoc(
+        doc(db, "publicProfiles", user.uid),
+        {
+          displayName: nextName,
+          email: user.email ?? null,
+          emailLower: user.email ? user.email.toLowerCase() : null,
+          photoUrl: photoUrl || null,
+          updatedAt: new Date().toISOString(),
+        },
         { merge: true }
       );
       setDisplayNameOverride(nextName);
@@ -2391,12 +2387,132 @@ export default function DataInsightsScreen({
     setShowInviteForm(false);
   };
 
-  const handleSendNetworkRequest = (member: NetworkMember) => {
-    toast({
-      title: "Friend request sent",
-      description: `Request sent to ${member.name}.`,
-    });
-    sendNotification("Friend request sent", `Request sent to ${member.name}.`);
+  const handleLoadContacts = async () => {
+    if (!user?.uid) {
+      toast({
+        title: "Not signed in",
+        description: "Sign in to load contacts.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isLoadingContacts) return;
+    const contactApi = typeof navigator !== "undefined" ? (navigator as any).contacts : null;
+    if (!contactApi?.select) {
+      setContactsError("Contact access isn't supported on this device.");
+      setContactsLoaded(true);
+      toast({
+        title: "Contacts not supported",
+        description: "Use a mobile browser that supports contact access.",
+      });
+      return;
+    }
+
+    setIsLoadingContacts(true);
+    setContactsError(null);
+    try {
+      const contacts = await contactApi.select(["name", "email"], { multiple: true });
+      const emails = Array.from(
+        new Set(
+          contacts
+            .flatMap((contact: { email?: string[] }) => contact.email || [])
+            .map((email: string) => email.trim().toLowerCase())
+            .filter(Boolean)
+        )
+      );
+      if (emails.length === 0) {
+        setContactsMatches([]);
+        setContactsLoaded(true);
+        return;
+      }
+
+      const batches: string[][] = [];
+      for (let i = 0; i < emails.length; i += 10) {
+        batches.push(emails.slice(i, i + 10));
+      }
+
+      const matches = new Map<string, PublicProfileMatch>();
+      for (const batch of batches) {
+        const profileQuery = query(
+          collection(db, "publicProfiles"),
+          where("emailLower", "in", batch)
+        );
+        const snapshot = await getDocs(profileQuery);
+        snapshot.forEach((docSnap) => {
+          if (docSnap.id === user.uid) return;
+          const data = docSnap.data() as {
+            displayName?: string;
+            photoUrl?: string;
+            photoDataUrl?: string;
+            email?: string;
+          };
+          matches.set(docSnap.id, {
+            userId: docSnap.id,
+            displayName: data.displayName || data.email || "Member",
+            photoUrl: data.photoUrl || data.photoDataUrl,
+            email: data.email,
+          });
+        });
+      }
+
+      setContactsMatches(Array.from(matches.values()));
+      setContactsLoaded(true);
+    } catch (error) {
+      console.error("Failed to load contacts:", error);
+      setContactsError("Unable to load contacts. Please try again.");
+      setContactsLoaded(true);
+    } finally {
+      setIsLoadingContacts(false);
+    }
+  };
+
+  const handleSendNetworkRequest = async (member: PublicProfileMatch) => {
+    if (!user?.uid) {
+      toast({
+        title: "Not signed in",
+        description: "Sign in to send friend requests.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (sentRequests.has(member.userId)) {
+      toast({
+        title: "Request already sent",
+        description: `You've already requested ${member.displayName}.`,
+      });
+      return;
+    }
+    try {
+      await setDoc(
+        doc(db, "friendRequests", `${user.uid}_${member.userId}`),
+        {
+          fromUserId: user.uid,
+          toUserId: member.userId,
+          fromName: displayName,
+          fromPhotoUrl: photoUrl || "",
+          createdAt: new Date().toISOString(),
+          status: "pending",
+        },
+        { merge: true }
+      );
+      setSentRequests((prev) => {
+        const next = new Set(prev);
+        next.add(member.userId);
+        return next;
+      });
+      toast({
+        title: "Friend request sent",
+        description: `Request sent to ${member.displayName}.`,
+      });
+      sendNotification("Friend request sent", `Request sent to ${member.displayName}.`);
+    } catch (error) {
+      console.error("Friend request failed:", error);
+      toast({
+        title: "Request failed",
+        description: "Unable to send friend request right now.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleShare = async (target: ShareTarget, url: string, text: string) => {
@@ -3480,60 +3596,74 @@ export default function DataInsightsScreen({
           </div>
           {showNetworkMembers && (
             <div className="rounded-xl border border-white/10 bg-black/40 p-4 space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setNetworkDegree("second")}
-                  className={`rounded-full border px-3 py-1 text-xs transition ${
-                    networkDegree === "second"
-                      ? "border-primary/60 text-primary"
-                      : "border-white/20 text-white/60 hover:border-white/40 hover:text-white"
-                  }`}
-                  data-testid="button-second-degree"
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">Find friends on Xuunu</p>
+                  <p className="text-xs text-white/50">
+                    Load your phone contacts to see who is already on Xuunu.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleLoadContacts}
+                  disabled={isLoadingContacts}
+                  data-testid="button-load-contacts"
                 >
-                  2nd Degree
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNetworkDegree("third")}
-                  className={`rounded-full border px-3 py-1 text-xs transition ${
-                    networkDegree === "third"
-                      ? "border-primary/60 text-primary"
-                      : "border-white/20 text-white/60 hover:border-white/40 hover:text-white"
-                  }`}
-                  data-testid="button-third-degree"
-                >
-                  3rd Degree
-                </button>
-                <span className="text-[11px] text-white/40">
-                  {networkDegree === "second"
-                    ? "Friends of friends"
-                    : "Members in your area"}
-                </span>
+                  {isLoadingContacts
+                    ? "Loading..."
+                    : contactsLoaded
+                      ? "Refresh contacts"
+                      : "Load contacts"}
+                </Button>
               </div>
+              {contactsError && (
+                <p className="text-xs text-rose-200">{contactsError}</p>
+              )}
+              {contactsLoaded && !contactsError && contactsMatches.length === 0 && (
+                <p className="text-xs text-white/50">No contacts on Xuunu yet.</p>
+              )}
               <div className="grid gap-2">
-                {(networkDegree === "second" ? secondDegreeMembers : thirdDegreeMembers).map(
-                  (member) => (
+                {contactsMatches.map((member) => {
+                  const isRequested = sentRequests.has(member.userId);
+                  return (
                     <button
-                      key={member.id}
+                      key={member.userId}
                       type="button"
                       onClick={() => handleSendNetworkRequest(member)}
-                      className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-left text-sm text-white/80 transition hover:border-white/30 hover:text-white"
-                      data-testid={`button-network-member-${member.id}`}
+                      disabled={isRequested}
+                      className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition ${
+                        isRequested
+                          ? "border-white/10 bg-white/5 text-white/40"
+                          : "border-white/10 bg-black/30 text-white/80 hover:border-white/30 hover:text-white"
+                      }`}
+                      data-testid={`button-network-member-${member.userId}`}
                     >
-                      <div className="h-8 w-8 overflow-hidden rounded-full border border-white/10 bg-white/5">
-                        {member.avatarUrl ? (
-                          <img src={member.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
+                      <div className="h-10 w-10 overflow-hidden rounded-full border border-white/10 bg-white/5">
+                        {member.photoUrl ? (
+                          <img
+                            src={member.photoUrl}
+                            alt={member.displayName}
+                            className="h-full w-full object-cover"
+                          />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center text-xs text-white/40">
-                            {member.name.charAt(0)}
+                            {member.displayName.charAt(0)}
                           </div>
                         )}
                       </div>
-                      <span>{member.name}</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold">{member.displayName}</p>
+                        {member.email && (
+                          <p className="text-xs text-white/40">{member.email}</p>
+                        )}
+                      </div>
+                      <span className="text-[11px] uppercase tracking-widest text-white/50">
+                        {isRequested ? "Requested" : "Add"}
+                      </span>
                     </button>
-                  )
-                )}
+                  );
+                })}
               </div>
             </div>
           )}
