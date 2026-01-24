@@ -202,7 +202,6 @@ export const insertNoteSchema = createInsertSchema(notes).omit({
 });
 
 export const insertUserUpdateSchema = createInsertSchema(userUpdates).omit({
-  id: true,
   createdAt: true,
 });
 

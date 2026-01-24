@@ -962,10 +962,34 @@ export default function DataInsightsScreen({
       .filter(Boolean) as FeedItem[];
   };
 
+  const stripUndefined = (value: unknown): unknown => {
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => stripUndefined(item))
+        .filter((item) => item !== undefined);
+    }
+    if (value instanceof Date) {
+      return value;
+    }
+    if (value && typeof value === "object") {
+      return Object.entries(value).reduce<Record<string, unknown>>((acc, [key, val]) => {
+        if (val === undefined) return acc;
+        const cleaned = stripUndefined(val);
+        if (cleaned === undefined) return acc;
+        acc[key] = cleaned;
+        return acc;
+      }, {});
+    }
+    return value;
+  };
+
   const saveFeedItem = async (item: FeedItem) => {
     if (!user?.uid) return false;
     try {
-      await setDoc(doc(db, "users", user.uid, "feedItems", item.id), item, { merge: true });
+      const cleaned = stripUndefined(item) as FeedItem;
+      await setDoc(doc(db, "users", user.uid, "feedItems", item.id), cleaned, {
+        merge: true,
+      });
       return true;
     } catch (error) {
       console.error("Failed to save feed item:", error);
@@ -1260,30 +1284,38 @@ export default function DataInsightsScreen({
     };
 
     setFeedItems((prev) => [newItem, ...prev]);
-    const saved = await saveFeedItem(newItem);
+    const firestoreSaved = await saveFeedItem(newItem);
+    let serverSaved = false;
+    if (!firestoreSaved) {
+      try {
+        const response = await apiRequest("POST", "/api/user-updates", {
+          userId: user.uid,
+          id: feedId,
+          content: newItem.content,
+          photos: newItem.photos,
+          shared: newItem.shared,
+          groupId: newItem.groupId ?? null,
+          groupName: newItem.groupName ?? null,
+          postedAt: newItem.postedAt,
+        });
+        serverSaved = response.ok;
+      } catch (error) {
+        console.error("Failed to save update to server:", error);
+      }
+    }
     if (shareToGroup && selectedGroup) {
       try {
-        await setDoc(doc(db, "groups", selectedGroup.id, "updates", feedId), {
+        const groupPayload = stripUndefined({
           ...newItem,
           authorId: user.uid,
           groupId: selectedGroup.id,
           groupName: selectedGroup.name,
-        });
+        }) as Record<string, unknown>;
+        await setDoc(doc(db, "groups", selectedGroup.id, "updates", feedId), groupPayload);
       } catch (error) {
         console.error("Failed to save group update:", error);
       }
     }
-    void apiRequest("POST", "/api/user-updates", {
-      userId: user.uid,
-      content: newItem.content,
-      photos: newItem.photos,
-      shared: newItem.shared,
-      groupId: newItem.groupId ?? null,
-      groupName: newItem.groupName ?? null,
-      postedAt: newItem.postedAt,
-    }).catch((error) => {
-      console.error("Failed to save update to server:", error);
-    });
     await Promise.all(
       updatePhotos.map((photo, index) =>
         saveDeviceImage(`feed-${feedId}-${index}`, photo)
@@ -1295,7 +1327,7 @@ export default function DataInsightsScreen({
     setShareToGroup(false);
     setSelectedGroupId("");
     setShareUpdate(isProfileInvisible ? false : true);
-    if (saved) {
+    if (firestoreSaved || serverSaved) {
       toast({
         title: "Update shared",
         description: "Your latest progress is now visible in the feed.",
