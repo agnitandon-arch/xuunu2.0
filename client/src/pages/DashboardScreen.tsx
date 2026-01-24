@@ -401,6 +401,13 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     });
   };
 
+  const handleSubscribeIntegrations = () => {
+    toast({
+      title: "Subscribe",
+      description: "Subscribe to use integrations.",
+    });
+  };
+
   const handleLogout = async () => {
     try {
       await signOut();
@@ -1000,84 +1007,82 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
               </div>
             </div>
           </div>
-          <div className="space-y-3">
-            <button
-              className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
-              onClick={() => onNavigate?.("medications")}
-              data-testid="button-medications"
-            >
-              <div className="flex items-center gap-3">
-                <Pill className="w-5 h-5 text-primary" />
-                <span className="text-sm">Medication Tracker</span>
+          <div className="relative rounded-2xl border border-white/10 bg-white/5 p-3">
+            {integrationsLocked && (
+              <button
+                type="button"
+                onClick={handleSubscribeIntegrations}
+                className="absolute inset-0 z-10 rounded-2xl"
+                aria-label="Subscribe to use integrations"
+                data-testid="button-subscribe-integrations"
+              />
+            )}
+            <div className={`space-y-3 ${integrationsLocked ? "opacity-50" : ""}`}>
+              <button
+                className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+                onClick={() => onNavigate?.("medications")}
+                data-testid="button-medications"
+                disabled={integrationsLocked}
+              >
+                <div className="flex items-center gap-3">
+                  <Pill className="w-5 h-5 text-primary" />
+                  <span className="text-sm">Medication Tracker</span>
+                </div>
+                <ChevronRight className="w-4 h-4 opacity-60" />
+              </button>
+              <button
+                className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+                onClick={integrationsLocked ? undefined : handleOpenPaymentPortal}
+                disabled={integrationsLocked}
+                data-testid="button-device-connections"
+              >
+                <div className="flex items-center gap-3">
+                  <Watch className="w-5 h-5 text-primary" />
+                  <span className="text-sm">Device Connections</span>
+                </div>
+                <ChevronRight className="w-4 h-4 opacity-60" />
+              </button>
+              <div className="space-y-3">
+                <button
+                  className="w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+                  onClick={integrationsLocked ? undefined : handleOpenPaymentPortal}
+                  disabled={integrationsLocked}
+                  data-testid="button-connect-healthcare-provider"
+                >
+                  <div className="flex items-center gap-3">
+                    <Database className="w-5 h-5 text-primary" />
+                    <span className="text-sm">Connect to Health Care Provider</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 opacity-60" />
+                </button>
+                <button
+                  className="w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+                  onClick={integrationsLocked ? undefined : handleOpenPaymentPortal}
+                  disabled={integrationsLocked}
+                  data-testid="button-upload-bloodwork"
+                >
+                  <div className="flex items-center gap-3">
+                    <Droplets className="w-5 h-5 text-primary" />
+                    <span className="text-sm">Upload Bloodwork</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 opacity-60" />
+                </button>
+                <button
+                  className="w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
+                  onClick={integrationsLocked ? undefined : handleOpenPaymentPortal}
+                  disabled={integrationsLocked}
+                  data-testid="button-connect-indoor-air"
+                >
+                  <div className="flex items-center gap-3">
+                    <Wind className="w-5 h-5 text-primary" />
+                    <span className="text-sm">Connect to Indoor Air Quality</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 opacity-60" />
+                </button>
               </div>
-              <ChevronRight className="w-4 h-4 opacity-60" />
-            </button>
-            <button
-              className={`w-full flex items-center justify-between p-4 border border-white/10 rounded-lg ${
-                integrationsLocked
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover-elevate active-elevate-2"
-              }`}
-              onClick={integrationsLocked ? undefined : handleOpenPaymentPortal}
-              disabled={integrationsLocked}
-              data-testid="button-device-connections"
-            >
-              <div className="flex items-center gap-3">
-                <Watch className="w-5 h-5 text-primary" />
-                <span className="text-sm">Device Connections</span>
-              </div>
-              <ChevronRight className="w-4 h-4 opacity-60" />
-            </button>
-            <div className="space-y-3">
-              <button
-                className={`w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg ${
-                  integrationsLocked
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover-elevate active-elevate-2"
-                }`}
-                onClick={integrationsLocked ? undefined : handleOpenPaymentPortal}
-                disabled={integrationsLocked}
-                data-testid="button-connect-healthcare-provider"
-              >
-                <div className="flex items-center gap-3">
-                  <Database className="w-5 h-5 text-primary" />
-                  <span className="text-sm">Connect to Health Care Provider</span>
-                </div>
-                <ChevronRight className="w-4 h-4 opacity-60" />
-              </button>
-              <button
-                className={`w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg ${
-                  integrationsLocked
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover-elevate active-elevate-2"
-                }`}
-                onClick={integrationsLocked ? undefined : handleOpenPaymentPortal}
-                disabled={integrationsLocked}
-                data-testid="button-upload-bloodwork"
-              >
-                <div className="flex items-center gap-3">
-                  <Droplets className="w-5 h-5 text-primary" />
-                  <span className="text-sm">Upload Bloodwork</span>
-                </div>
-                <ChevronRight className="w-4 h-4 opacity-60" />
-              </button>
-              <button
-                className={`w-full min-h-[72px] flex items-center justify-between p-4 border border-white/10 rounded-lg ${
-                  integrationsLocked
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover-elevate active-elevate-2"
-                }`}
-                onClick={integrationsLocked ? undefined : handleOpenPaymentPortal}
-                disabled={integrationsLocked}
-                data-testid="button-connect-indoor-air"
-              >
-                <div className="flex items-center gap-3">
-                  <Wind className="w-5 h-5 text-primary" />
-                  <span className="text-sm">Connect to Indoor Air Quality</span>
-                </div>
-                <ChevronRight className="w-4 h-4 opacity-60" />
-              </button>
             </div>
+          </div>
+          <div className="space-y-3 mt-3">
             <button
               className="w-full flex items-center justify-between p-4 border border-white/10 rounded-lg hover-elevate active-elevate-2"
               onClick={handleNotificationsClick}
