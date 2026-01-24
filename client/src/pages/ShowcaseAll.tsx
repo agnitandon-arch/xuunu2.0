@@ -5,7 +5,6 @@ import DataInsightsScreen from "./DataInsightsScreen";
 import AccountScreen from "./AccountScreen";
 import EnvironmentalScreen from "./EnvironmentalScreen";
 import BioSignature from "@/components/BioSignature";
-import EnvironmentalSynergyRing from "@/components/EnvironmentalSynergyRing";
 
 export default function ShowcaseAll() {
   const healthData = {
@@ -25,25 +24,15 @@ export default function ShowcaseAll() {
         <p className="text-sm opacity-60">Minimalist Health Tracking Platform</p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-12 px-8 border-b border-white/10">
+      <div className="py-12 px-8 border-b border-white/10">
         <div className="flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-xl font-bold mb-4 uppercase tracking-widest">Environmental Synergy</h2>
-            <EnvironmentalSynergyRing synergyLevel={78} size={280} />
-            <p className="mt-4 text-sm opacity-60 max-w-md mx-auto">
-              Measures how well your health metrics align with environmental conditions.
-              <br />Completion ring shows 0-100% synergy level.
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-xl font-bold mb-4 uppercase tracking-widest">7-day Bio Signature</h2>
+            <h2 className="text-xl font-bold mb-4 uppercase tracking-widest">7-day Bio SYGnature</h2>
             <BioSignature healthData={healthData} size={280} />
             <p className="mt-4 text-sm opacity-60 max-w-md mx-auto">
               A unique, animated visualization that reflects your last 7 days.
-              <br />Challenge completion nudges the pattern toward healthier symmetry.
+              <br />
+              Includes health stability, environmental quality, and activity-recovery balance.
             </p>
           </div>
         </div>

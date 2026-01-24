@@ -1,6 +1,4 @@
-import EnvironmentalSynergyRing from "@/components/EnvironmentalSynergyRing";
 import BioSignature from "@/components/BioSignature";
-import SynergyInsightsDialog from "@/components/SynergyInsightsDialog";
 import BioSignatureDialog from "@/components/BioSignatureDialog";
 import MedicationQuickLog from "@/components/MedicationQuickLog";
 import { Button } from "@/components/ui/button";
@@ -42,8 +40,6 @@ interface DashboardScreenProps {
 export default function DashboardScreen({ onNavigate, onOpenProfile }: DashboardScreenProps) {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
-  const [showBioSignature, setShowBioSignature] = useState(true);
-  const [showSynergyDialog, setShowSynergyDialog] = useState(false);
   const [showBioSignatureDialog, setShowBioSignatureDialog] = useState(false);
   const [supportEmail, setSupportEmail] = useState("");
   const [supportMessage, setSupportMessage] = useState("");
@@ -563,11 +559,6 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     displayNameOverride || user?.displayName || user?.email?.split("@")[0] || "Member";
   const integrationsLocked = !isPaidAccount;
 
-  // Calculate synergy level from real data only
-  const synergyLevel = latestHealth && latestEnv && latestHealth.glucose && latestEnv.aqi ? 
-    Math.min(100, Math.round(((latestHealth.glucose > 0 ? 30 : 0) + (latestEnv.aqi > 0 ? 30 : 0)) / 0.6)) : 
-    0;
-
   return (
     <div className="min-h-screen bg-black pb-20" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       <div className="max-w-lg mx-auto px-6 py-8 space-y-8">
@@ -591,45 +582,23 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
             <div className="text-xs text-white/60">{formattedDate}</div>
           </div>
           <button
-            onClick={() => setShowBioSignature(!showBioSignature)}
+            onClick={() => setShowBioSignatureDialog(true)}
             className="text-xs uppercase tracking-widest text-primary hover-elevate active-elevate-2 px-4 py-2 rounded-full border border-primary/30"
-            data-testid="button-toggle-signature"
+            data-testid="button-open-bio-sygnature"
           >
-            {showBioSignature ? "Show Synergy" : "Bio Signature"}
+            Bio SYGnature
           </button>
         </div>
 
         <div className="flex items-center justify-center pt-4 pb-4">
-          {showBioSignature ? (
-            <button
-              onClick={() => setShowBioSignatureDialog(true)}
-              className="hover-elevate active-elevate-2 rounded-lg transition-all"
-              data-testid="button-open-bio-signature"
-            >
-              <BioSignature healthData={healthData} size={280} />
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowSynergyDialog(true)}
-              className="hover-elevate active-elevate-2 rounded-lg transition-all"
-              data-testid="button-open-synergy"
-            >
-              <EnvironmentalSynergyRing synergyLevel={synergyLevel} />
-            </button>
-          )}
+          <button
+            onClick={() => setShowBioSignatureDialog(true)}
+            className="hover-elevate active-elevate-2 rounded-lg transition-all"
+            data-testid="button-open-bio-signature"
+          >
+            <BioSignature healthData={healthData} size={280} />
+          </button>
         </div>
-
-        {/* Synergy Insights Dialog */}
-        {user && (
-          <SynergyInsightsDialog
-            open={showSynergyDialog}
-            onOpenChange={setShowSynergyDialog}
-            synergyLevel={synergyLevel}
-            healthData={healthData}
-            environmentalData={latestEnv || {}}
-            userId={user.uid}
-          />
-        )}
 
         {/* Bio Signature Dialog */}
         {user && (

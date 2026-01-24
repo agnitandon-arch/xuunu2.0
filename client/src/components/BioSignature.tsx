@@ -57,6 +57,18 @@ export default function BioSignature({ healthData, size = 400 }: BioSignaturePro
         challengeCompletion: Math.min(Math.max(healthData.challengeCompletion ?? 0, 0), 1),
       };
 
+      const healthMetricsStability =
+        (normalizedData.glucose + normalizedData.heartRate + normalizedData.sleep) / 3;
+      const environmentalQuality = Math.max(0, Math.min(1, 1 - normalizedData.aqi));
+      const activityRecoveryBalance = Math.max(
+        0,
+        Math.min(
+          1,
+          ((normalizedData.activity + normalizedData.recovery) / 2) *
+            (1 - normalizedData.strain * 0.75)
+        )
+      );
+
       for (let row = 0; row < gridSize; row++) {
         for (let col = 0; col < gridSize; col++) {
           const x = col * dotSize + dotSize / 2;
@@ -77,16 +89,28 @@ export default function BioSignature({ healthData, size = 400 }: BioSignaturePro
           const strainInfluence = Math.cos(col * 0.3 + normalizedData.strain * Math.PI - time * 0.5) * 0.5 + 0.5;
           const aqiInfluence = Math.sin(distanceFromCenter * 5 + angle * 2 + normalizedData.aqi * Math.PI + time * 0.3) * 0.5 + 0.5;
           const heartRateInfluence = Math.cos((row + col) * 0.2 + normalizedData.heartRate * Math.PI + time * 0.7) * 0.5 + 0.5;
+          const stabilityInfluence = Math.cos(
+            (row - col) * 0.25 + healthMetricsStability * Math.PI * 2 + time * 0.4
+          ) * 0.5 + 0.5;
+          const environmentQualityInfluence = Math.sin(
+            distanceFromCenter * 6 + environmentalQuality * Math.PI * 2 - time * 0.3
+          ) * 0.5 + 0.5;
+          const balanceInfluence = Math.cos(
+            (row + col) * 0.2 + activityRecoveryBalance * Math.PI * 2 - time * 0.6
+          ) * 0.5 + 0.5;
 
           // Combine influences with different weights
           const combinedInfluence =
-            glucoseInfluence * 0.22 +
-            activityInfluence * 0.18 +
-            recoveryInfluence * 0.18 +
-            strainInfluence * 0.13 +
-            aqiInfluence * 0.09 +
-            heartRateInfluence * 0.08 +
-            normalizedData.challengeCompletion * 0.12;
+            glucoseInfluence * 0.16 +
+            activityInfluence * 0.12 +
+            recoveryInfluence * 0.12 +
+            strainInfluence * 0.10 +
+            aqiInfluence * 0.08 +
+            heartRateInfluence * 0.06 +
+            stabilityInfluence * 0.10 +
+            environmentQualityInfluence * 0.08 +
+            balanceInfluence * 0.08 +
+            normalizedData.challengeCompletion * 0.10;
 
           // Calculate dot properties
           const opacity = Math.pow(combinedInfluence, 1.5) * 0.9 + 0.1;
@@ -150,7 +174,7 @@ export default function BioSignature({ healthData, size = 400 }: BioSignaturePro
         {isAnimating ? "Pause" : "Play"} Animation
       </button>
       <p className="mt-2 text-xs uppercase tracking-widest opacity-40">
-        7-day Bio Signature
+        7-day Bio SYGnature
       </p>
     </div>
   );

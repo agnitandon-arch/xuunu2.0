@@ -201,9 +201,24 @@ export const insertNoteSchema = createInsertSchema(notes).omit({
   isCompleted: z.number().min(0).max(1),
 });
 
-export const insertUserUpdateSchema = createInsertSchema(userUpdates).omit({
-  createdAt: true,
-});
+export const insertUserUpdateSchema = createInsertSchema(userUpdates)
+  .omit({
+    createdAt: true,
+  })
+  .extend({
+    groupId: z.string().optional().nullable(),
+    groupName: z.string().optional().nullable(),
+    photos: z.array(z.string()).default([]),
+    postedAt: z.preprocess((value) => {
+      if (value === null || value === undefined || value === "") return undefined;
+      if (value instanceof Date) return value;
+      if (typeof value === "string" || typeof value === "number") {
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+      }
+      return undefined;
+    }, z.date().optional()),
+  });
 
 export const bioSignatureSnapshots = pgTable("bio_signature_snapshots", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

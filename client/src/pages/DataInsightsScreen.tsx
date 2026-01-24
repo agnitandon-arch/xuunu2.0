@@ -1289,16 +1289,17 @@ export default function DataInsightsScreen({
     let serverSaved = false;
     if (!firestoreSaved) {
       try {
-        const response = await apiRequest("POST", "/api/user-updates", {
+        const serverPayload = stripUndefined({
           userId: user.uid,
           id: feedId,
           content: newItem.content,
           photos: newItem.photos,
           shared: newItem.shared,
-          groupId: newItem.groupId ?? null,
-          groupName: newItem.groupName ?? null,
+          groupId: newItem.groupId,
+          groupName: newItem.groupName,
           postedAt: newItem.postedAt,
         });
+        const response = await apiRequest("POST", "/api/user-updates", serverPayload);
         serverSaved = response.ok;
       } catch (error) {
         console.error("Failed to save update to server:", error);

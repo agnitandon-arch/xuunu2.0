@@ -123,14 +123,17 @@ function normalizeChallengeCompletion(completion?: number): number {
  */
 export function computeHealthScore(metrics: HealthMetrics): number {
   const weights = {
-    glucose: 0.22,
-    recovery: 0.18,
-    sleep: 0.15,
-    aqi: 0.09,
-    heartRate: 0.08,
-    activity: 0.18,
-    strain: 0.10,
-    challengeCompletion: 0.10,
+    glucose: 0.16,
+    recovery: 0.12,
+    sleep: 0.10,
+    aqi: 0.08,
+    heartRate: 0.06,
+    activity: 0.12,
+    strain: 0.08,
+    challengeCompletion: 0.08,
+    stability: 0.10,
+    environmentalQuality: 0.05,
+    activityRecoveryBalance: 0.05,
   };
 
   const normalizedScores = {
@@ -144,6 +147,18 @@ export function computeHealthScore(metrics: HealthMetrics): number {
     challengeCompletion: normalizeChallengeCompletion(metrics.challengeCompletion),
   };
 
+  const healthMetricsStability =
+    (normalizedScores.glucose + normalizedScores.heartRate + normalizedScores.sleep) / 3;
+  const environmentalQuality = normalizedScores.aqi;
+  const activityRecoveryBalance = Math.max(
+    0,
+    Math.min(
+      100,
+      (normalizedScores.activity + normalizedScores.recovery) / 2 -
+        normalizedScores.strain * 0.35
+    )
+  );
+
   const weightedScore =
     normalizedScores.glucose * weights.glucose +
     normalizedScores.recovery * weights.recovery +
@@ -152,7 +167,10 @@ export function computeHealthScore(metrics: HealthMetrics): number {
     normalizedScores.heartRate * weights.heartRate +
     normalizedScores.activity * weights.activity +
     normalizedScores.strain * weights.strain +
-    normalizedScores.challengeCompletion * weights.challengeCompletion;
+    normalizedScores.challengeCompletion * weights.challengeCompletion +
+    healthMetricsStability * weights.stability +
+    environmentalQuality * weights.environmentalQuality +
+    activityRecoveryBalance * weights.activityRecoveryBalance;
 
   return Math.round(weightedScore);
 }
@@ -231,16 +249,18 @@ export function getIdealPatternConfig(): BioSignaturePatternConfig {
  * Get guidance text for ideal health pattern
  */
 export function getIdealPatternGuidance(): string {
-  return `The ideal bio signature shows a highly organized, concentric lattice pattern with synchronized oscillation. This represents optimal health balance:
+  return `The ideal Bio SYGnature shows a highly organized, concentric lattice pattern with synchronized oscillation. This represents optimal health balance:
 
+• Health Metrics Stability: steady glucose, heart rate, and sleep rhythm
+• Environmental Quality: AQI <50 (clean air)
+• Activity-Recovery Balance: movement matched with recovery
 • Glucose: 80-120 mg/dL (stable blood sugar)
 • Recovery: >70% (excellent recuperation)
 • Sleep: 7-9 hours (restorative rest)
-• AQI: <50 (clean air quality)
 • Heart Rate: 60-80 bpm (healthy resting rate)
 • Activity: 7-12 (balanced movement)
 • Strain: 8-14 (moderate exertion)
 • Challenges: 3-7 completions/week (consistent follow-through)
 
-When all metrics align within optimal ranges, the pattern becomes bright, dense, and symmetrical - representing a body in environmental synergy.`;
+When all metrics align within optimal ranges, the Bio SYGnature becomes bright, dense, and symmetrical - reflecting strong environmental and recovery synergy.`;
 }

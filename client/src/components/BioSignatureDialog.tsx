@@ -58,9 +58,9 @@ export default function BioSignatureDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-black border-white/10 text-white max-w-md max-h-[90vh] overflow-y-auto" data-testid="dialog-bio-signature">
         <DialogHeader>
-          <DialogTitle className="text-xl">Bio Signature Analysis</DialogTitle>
+          <DialogTitle className="text-xl">Bio SYGnature Analysis</DialogTitle>
           <DialogDescription className="text-white/60">
-            Review your bio signature insights and targets.
+            Review your Bio SYGnature insights and targets.
           </DialogDescription>
         </DialogHeader>
 
@@ -87,7 +87,7 @@ export default function BioSignatureDialog({
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Target className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">Ideal Bio Signature Pattern</span>
+              <span className="text-sm font-medium">Ideal Bio SYGnature Pattern</span>
             </div>
             <div className="bg-white/5 border border-white/10 rounded-lg p-4">
               <p className="text-xs leading-relaxed opacity-80 whitespace-pre-line">
