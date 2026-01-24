@@ -212,8 +212,8 @@ export default function MedicationTrackerScreen({ onBack }: MedicationTrackerScr
     reminderTimeouts.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
     reminderTimeouts.current = [];
 
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    if (!notificationsEnabled || Notification.permission !== "granted") return;
+    if (typeof document === "undefined") return;
+    if (!notificationsEnabled) return;
 
     const now = new Date();
     medications.forEach((medication) => {
@@ -232,13 +232,11 @@ export default function MedicationTrackerScreen({ onBack }: MedicationTrackerScr
         if (delay <= 0) return;
 
         const timeoutId = window.setTimeout(() => {
-          try {
-            new Notification("Medication reminder", {
-              body: `${medication.name} ${medication.dosage}`,
-            });
-          } catch {
-            // Ignore notification errors.
-          }
+          if (document.visibilityState !== "visible") return;
+          toast({
+            title: "Medication reminder",
+            description: `${medication.name} ${medication.dosage}`,
+          });
         }, delay);
         reminderTimeouts.current.push(timeoutId);
       });

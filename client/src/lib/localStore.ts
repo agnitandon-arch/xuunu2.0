@@ -13,6 +13,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { trackBioSignatureCompletion } from "@/lib/analytics";
 
 type HealthEntry = {
   id: string;
@@ -302,6 +303,7 @@ const maybeCreateBioSignatureSnapshot = async (entry: HealthEntry) => {
     createdAt: new Date().toISOString(),
   };
   await setDoc(doc(db, "users", entry.userId, "bioSignatureSnapshots", snapshot.id), snapshot);
+  await trackBioSignatureCompletion(entry.userId);
   const ref = userCollection(entry.userId, "bioSignatureSnapshots");
   const latestSnapshotQuery = query(ref, orderBy("createdAt", "desc"), limit(MAX_SNAPSHOT_HISTORY));
   const latestSnapshotSnap = await getDocs(latestSnapshotQuery);

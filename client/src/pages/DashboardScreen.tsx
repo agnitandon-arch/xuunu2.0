@@ -414,78 +414,20 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   };
 
   const handleNotificationsClick = async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      toast({
-        title: "Notifications",
-        description: "Enable notifications in your phone settings.",
-      });
-      return;
-    }
-
-    if (Notification.permission === "granted") {
-      if (user?.uid) {
-        await setDoc(doc(db, "users", user.uid), { notificationsEnabled: true }, { merge: true });
-        setNotificationsEnabled(true);
-      }
-      toast({
-        title: "Notifications enabled",
-        description: "Notifications are already enabled.",
-      });
-      return;
-    }
-
-    if (Notification.permission === "denied") {
-      if (user?.uid) {
-        await setDoc(
-          doc(db, "users", user.uid),
-          { notificationsEnabled: false },
-          { merge: true }
-        );
-        setNotificationsEnabled(false);
-      }
-      toast({
-        title: "Notifications blocked",
-        description: "Enable notifications in your phone settings.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission === "granted") {
-        if (user?.uid) {
-          await setDoc(
-            doc(db, "users", user.uid),
-            { notificationsEnabled: true },
-            { merge: true }
-          );
-          setNotificationsEnabled(true);
-        }
-        toast({
-          title: "Notifications enabled",
-          description: "You're all set to receive alerts.",
-        });
-      } else {
-        if (user?.uid) {
-          await setDoc(
-            doc(db, "users", user.uid),
-            { notificationsEnabled: false },
-            { merge: true }
-          );
-          setNotificationsEnabled(false);
-        }
-        toast({
-          title: "Notifications disabled",
-          description: "Enable notifications in your phone settings.",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Notifications",
-        description: "Enable notifications in your phone settings.",
-      });
-    }
+    if (!user?.uid) return;
+    const nextEnabled = !notificationsEnabled;
+    await setDoc(
+      doc(db, "users", user.uid),
+      { notificationsEnabled: nextEnabled },
+      { merge: true }
+    );
+    setNotificationsEnabled(nextEnabled);
+    toast({
+      title: nextEnabled ? "In-app notifications enabled" : "Notifications muted",
+      description: nextEnabled
+        ? "You'll see alerts while the app is open."
+        : "You can re-enable notifications anytime.",
+    });
   };
 
   const handleOpenProfile = () => {

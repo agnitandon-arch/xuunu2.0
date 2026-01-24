@@ -15,6 +15,7 @@ import {
 import { auth, googleProvider, db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { apiRequest } from "@/lib/queryClient";
+import { trackDailyActive } from "@/lib/analytics";
 
 interface AuthContextType {
   user: User | null;
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             },
             { merge: true }
           );
+          await trackDailyActive(user.uid);
         } catch (error) {
           console.error('Failed to sync user:', error);
         }

@@ -34,6 +34,11 @@ service cloud.firestore {
          resource.data.toUserId == request.auth.uid);
     }
 
+    match /analyticsDaily/{dayId} {
+      allow read: if false;
+      allow write: if isSignedIn();
+    }
+
     match /groupInvites/{inviteCode} {
       allow get: if isSignedIn();
       allow list: if false;

@@ -344,49 +344,25 @@ export default function DataInsightsScreen({
   });
 
   const canNotify = () =>
-    typeof window !== "undefined" &&
-    "Notification" in window &&
-    Notification.permission === "granted" &&
+    typeof document !== "undefined" &&
+    document.visibilityState === "visible" &&
     notificationsEnabled;
 
   const sendNotification = (title: string, body: string) => {
     if (!canNotify()) return;
-    try {
-      new Notification(title, { body });
-    } catch {
-      // Ignore notification errors.
-    }
+    toast({ title, description: body });
   };
 
   const ensureNotificationsEnabled = async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) return false;
     if (!user?.uid) return false;
-    if (Notification.permission === "granted") {
-      await setDoc(
-        doc(db, "users", user.uid),
-        { notificationsEnabled: true },
-        { merge: true }
-      );
-      setNotificationsEnabled(true);
-      return true;
-    }
-    if (Notification.permission === "default") {
-      try {
-        const result = await Notification.requestPermission();
-        if (result === "granted") {
-          await setDoc(
-            doc(db, "users", user.uid),
-            { notificationsEnabled: true },
-            { merge: true }
-          );
-          setNotificationsEnabled(true);
-          return true;
-        }
-      } catch {
-        return false;
-      }
-    }
-    return false;
+    if (notificationsEnabled) return true;
+    await setDoc(
+      doc(db, "users", user.uid),
+      { notificationsEnabled: true },
+      { merge: true }
+    );
+    setNotificationsEnabled(true);
+    return true;
   };
 
   const handleOpenPaymentPortal = async (plan?: "monthly" | "yearly") => {
@@ -1318,7 +1294,6 @@ export default function DataInsightsScreen({
         title: "Update shared",
         description: "Your latest progress is now visible in the feed.",
       });
-      sendNotification("Update shared", "Your progress update is live.");
     } else {
       toast({
         title: "Saved locally",
@@ -2368,7 +2343,11 @@ export default function DataInsightsScreen({
   }, [activeChallenge, handleStopChallenge, refetchHealth]);
 
   const handleInviteFriend = () => {
-    if (!inviteValue.trim()) {
+    const invites = inviteValue
+      .split(/[,;\n]/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (invites.length === 0) {
       toast({
         title: "Enter an email or username",
         description: "Add a friend by invite to grow your circle.",
@@ -2376,13 +2355,27 @@ export default function DataInsightsScreen({
       });
       return;
     }
-
-    toast({
-      title: "Invite sent",
-      description: `We sent an invite to ${inviteValue}.`,
+    const inviteLink = profileUrl || shareUrl || window.location.origin;
+    const message = `Join me on Xuunu: ${inviteLink}`;
+    const sendInvite = async () => {
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: "Xuunu Invite", text: message });
+          return;
+        } catch {
+          // fall back to copy
+        }
+      }
+      await copyToClipboard(message, "Invite link");
+    };
+    void sendInvite().finally(() => {
+      toast({
+        title: "Invite ready to share",
+        description: `Share with ${invites.length} contact${invites.length === 1 ? "" : "s"}.`,
+      });
+      setInviteValue("");
+      setShowInviteForm(false);
     });
-    setInviteValue("");
-    setShowInviteForm(false);
   };
 
   const handleLoadContacts = async () => {
@@ -2500,7 +2493,6 @@ export default function DataInsightsScreen({
         title: "Friend request sent",
         description: `Request sent to ${member.displayName}.`,
       });
-      sendNotification("Friend request sent", `Request sent to ${member.displayName}.`);
     } catch (error) {
       console.error("Friend request failed:", error);
       toast({
