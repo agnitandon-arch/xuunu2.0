@@ -1,6 +1,7 @@
 const DB_NAME = "xuunu-device-feed";
 const STORE_NAME = "feed";
 const DB_VERSION = 1;
+const MAX_FEED_ITEMS = 50;
 
 const openDatabase = () =>
   new Promise<IDBDatabase>((resolve, reject) => {
@@ -21,10 +22,11 @@ const openDatabase = () =>
 
 export const saveDeviceFeedItems = async (key: string, items: unknown[]) => {
   try {
+    const trimmed = Array.isArray(items) ? items.slice(0, MAX_FEED_ITEMS) : [];
     const db = await openDatabase();
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, "readwrite");
-      tx.objectStore(STORE_NAME).put(items, key);
+      tx.objectStore(STORE_NAME).put(trimmed, key);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error || new Error("Failed to save feed"));
     });

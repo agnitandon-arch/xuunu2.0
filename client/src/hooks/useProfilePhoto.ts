@@ -112,7 +112,6 @@ export function useProfilePhoto() {
         doc(db, "publicProfiles", user.uid),
         {
           displayName: user.displayName || user.email?.split("@")[0] || "Member",
-          email: user.email ?? null,
           emailLower: user.email ? user.email.toLowerCase() : null,
           photoUrl: nextUrl ?? nextDataUrl ?? null,
           updatedAt: new Date().toISOString(),

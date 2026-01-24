@@ -188,7 +188,6 @@ type PublicProfileMatch = {
   userId: string;
   displayName: string;
   photoUrl?: string;
-  email?: string;
 };
 
 const SHARE_TARGETS: ShareTarget[] = [
@@ -1359,7 +1358,6 @@ export default function DataInsightsScreen({
         doc(db, "publicProfiles", user.uid),
         {
           displayName: nextName,
-          email: user.email ?? null,
           emailLower: user.email ? user.email.toLowerCase() : null,
           photoUrl: photoUrl || null,
           updatedAt: new Date().toISOString(),
@@ -2444,13 +2442,11 @@ export default function DataInsightsScreen({
             displayName?: string;
             photoUrl?: string;
             photoDataUrl?: string;
-            email?: string;
           };
           matches.set(docSnap.id, {
             userId: docSnap.id,
-            displayName: data.displayName || data.email || "Member",
+            displayName: data.displayName || "Member",
             photoUrl: data.photoUrl || data.photoDataUrl,
-            email: data.email,
           });
         });
       }
@@ -3654,9 +3650,6 @@ export default function DataInsightsScreen({
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-semibold">{member.displayName}</p>
-                        {member.email && (
-                          <p className="text-xs text-white/40">{member.email}</p>
-                        )}
                       </div>
                       <span className="text-[11px] uppercase tracking-widest text-white/50">
                         {isRequested ? "Requested" : "Add"}

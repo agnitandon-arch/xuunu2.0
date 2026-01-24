@@ -8,6 +8,7 @@ import {
   orderBy,
   query,
   setDoc,
+  startAfter,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -82,6 +83,8 @@ type BioSignatureSnapshot = {
 };
 
 const SNAPSHOT_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_SNAPSHOT_HISTORY = 12;
+const ENVIRONMENTAL_LATEST_ID = "latest";
 
 const toNumber = (value: unknown): number | undefined => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -164,6 +167,14 @@ export const getEnvironmentalReadings = async (userId: string) => {
 };
 
 export const getLatestEnvironmentalReading = async (userId: string) => {
+  const latestRef = doc(db, "users", userId, "environmentalReadings", ENVIRONMENTAL_LATEST_ID);
+  const latestSnap = await getDoc(latestRef);
+  if (latestSnap.exists()) {
+    return {
+      id: latestSnap.id,
+      ...(latestSnap.data() as Omit<EnvironmentalReading, "id">),
+    } as EnvironmentalReading;
+  }
   const ref = userCollection(userId, "environmentalReadings");
   const q = query(ref, orderBy("timestamp", "desc"), limit(1));
   const snapshot = await getDocs(q);
@@ -176,7 +187,7 @@ export const createEnvironmentalReading = async (
   data: Partial<EnvironmentalReading> & { userId: string }
 ) => {
   const reading: EnvironmentalReading = {
-    id: doc(userCollection(data.userId, "environmentalReadings")).id,
+    id: ENVIRONMENTAL_LATEST_ID,
     userId: data.userId,
     timestamp: data.timestamp || new Date().toISOString(),
     aqi: toNumber(data.aqi),
@@ -184,7 +195,11 @@ export const createEnvironmentalReading = async (
     humidity: toNumber(data.humidity),
     locationMode: data.locationMode || "manual",
   };
-  await setDoc(doc(db, "users", data.userId, "environmentalReadings", reading.id), reading);
+  await setDoc(
+    doc(db, "users", data.userId, "environmentalReadings", ENVIRONMENTAL_LATEST_ID),
+    reading,
+    { merge: true }
+  );
   return reading;
 };
 
@@ -287,6 +302,19 @@ const maybeCreateBioSignatureSnapshot = async (entry: HealthEntry) => {
     createdAt: new Date().toISOString(),
   };
   await setDoc(doc(db, "users", entry.userId, "bioSignatureSnapshots", snapshot.id), snapshot);
+  const ref = userCollection(entry.userId, "bioSignatureSnapshots");
+  const latestSnapshotQuery = query(ref, orderBy("createdAt", "desc"), limit(MAX_SNAPSHOT_HISTORY));
+  const latestSnapshotSnap = await getDocs(latestSnapshotQuery);
+  if (latestSnapshotSnap.docs.length < MAX_SNAPSHOT_HISTORY) {
+    return;
+  }
+  const cursor = latestSnapshotSnap.docs[latestSnapshotSnap.docs.length - 1];
+  const staleSnapshotQuery = query(ref, orderBy("createdAt", "desc"), startAfter(cursor));
+  const staleSnapshotSnap = await getDocs(staleSnapshotQuery);
+  if (staleSnapshotSnap.empty) {
+    return;
+  }
+  await Promise.all(staleSnapshotSnap.docs.map((docSnap) => deleteDoc(docSnap.ref)));
 };
 
 export const seedInitialData = async (userId: string) => {
