@@ -1,4 +1,4 @@
-const CACHE_NAME = 'xuunu-v5';
+const CACHE_NAME = 'xuunu-v6';
 const scopeUrl = new URL(self.registration.scope);
 const basePath = scopeUrl.pathname.endsWith('/') ? scopeUrl.pathname : `${scopeUrl.pathname}/`;
 const indexUrl = new URL('index.html', scopeUrl).toString();
@@ -105,4 +105,5 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  self.clients.claim();
 });
