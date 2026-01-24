@@ -3181,12 +3181,7 @@ export default function DataInsightsScreen({
             </div>
             <div className="rounded-lg border border-white/10 bg-black/40 p-3 space-y-3">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Schedule for later</p>
-                  <p className="text-xs text-white/50">
-                    Start 24 hours to 7 days in advance.
-                  </p>
-                </div>
+                <div />
                 <Switch
                   checked={scheduleChallenge}
                   onCheckedChange={setScheduleChallenge}
