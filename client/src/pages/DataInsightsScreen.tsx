@@ -25,7 +25,7 @@ import { Calendar } from "@/components/ui/calendar";
 import EnvironmentalMap from "@/components/EnvironmentalMap";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { updateProfile } from "firebase/auth";
+import { deleteUser, updateProfile } from "firebase/auth";
 import { useQuery } from "@tanstack/react-query";
 import type { HealthEntry } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -248,6 +248,9 @@ export default function DataInsightsScreen({
   const [usernameDraft, setUsernameDraft] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
   const [showEditProfileDialog, setShowEditProfileDialog] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [isProfileInvisible, setIsProfileInvisible] = useState(false);
   const [profileVisibilityDraft, setProfileVisibilityDraft] = useState(false);
   const [isPaidAccount, setIsPaidAccount] = useState(false);
@@ -337,6 +340,8 @@ export default function DataInsightsScreen({
   const { data: featureFlags } = useQuery<{
     paidStatus: boolean;
     cardLast4?: string | null;
+    cardBrand?: string | null;
+    stripeStatus?: string | null;
     hasCustomer?: boolean;
   }>({
     queryKey: [`/api/user-features?userId=${user?.uid}`],
@@ -399,6 +404,108 @@ export default function DataInsightsScreen({
     });
   };
 
+  const handleManageBilling = async () => {
+    if (!user?.uid) return;
+    try {
+      const response = await apiRequest("POST", "/api/stripe/create-portal-session", {
+        userId: user.uid,
+      });
+      const data = await response.json();
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+    } catch (error) {
+      console.error("Stripe portal failed:", error);
+    }
+    if (stripePortalUrl) {
+      window.open(stripePortalUrl, "_blank");
+      return;
+    }
+    toast({
+      title: "Billing unavailable",
+      description: "We couldn't open the billing portal right now.",
+      variant: "destructive",
+    });
+  };
+
+  const deleteCollectionDocs = async (userId: string, collectionName: string) => {
+    const ref = collection(db, "users", userId, collectionName);
+    const snapshot = await getDocs(ref);
+    if (snapshot.empty) return;
+    await Promise.all(snapshot.docs.map((docSnap) => deleteDoc(docSnap.ref)));
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user?.uid) return;
+    if (deleteConfirmText.trim() !== "DELETE") {
+      toast({
+        title: "Confirmation required",
+        description: "Type DELETE to confirm account deletion.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsDeletingAccount(true);
+    try {
+      await Promise.all([
+        deleteCollectionDocs(user.uid, "feedItems"),
+        deleteCollectionDocs(user.uid, "healthEntries"),
+        deleteCollectionDocs(user.uid, "environmentalReadings"),
+        deleteCollectionDocs(user.uid, "medications"),
+        deleteCollectionDocs(user.uid, "medicationLogs"),
+        deleteCollectionDocs(user.uid, "notes"),
+        deleteCollectionDocs(user.uid, "bioSignatureSnapshots"),
+        deleteCollectionDocs(user.uid, "challenges"),
+        deleteCollectionDocs(user.uid, "challengeSchedules"),
+        deleteCollectionDocs(user.uid, "longevityChallenge"),
+        deleteCollectionDocs(user.uid, "settings"),
+        deleteCollectionDocs(user.uid, "meta"),
+      ]);
+
+      const sentRequestsQuery = query(
+        collection(db, "friendRequests"),
+        where("fromUserId", "==", user.uid)
+      );
+      const receivedRequestsQuery = query(
+        collection(db, "friendRequests"),
+        where("toUserId", "==", user.uid)
+      );
+      const [sentSnap, receivedSnap] = await Promise.all([
+        getDocs(sentRequestsQuery),
+        getDocs(receivedRequestsQuery),
+      ]);
+      await Promise.all([
+        ...sentSnap.docs.map((docSnap) => deleteDoc(docSnap.ref)),
+        ...receivedSnap.docs.map((docSnap) => deleteDoc(docSnap.ref)),
+      ]);
+
+      await deleteDoc(doc(db, "publicProfiles", user.uid));
+      await deleteDoc(doc(db, "users", user.uid));
+      await deleteUser(user);
+      toast({
+        title: "Account deleted",
+        description: "Your account and data have been removed.",
+      });
+    } catch (error: any) {
+      console.error("Account deletion failed:", error);
+      if (error?.code === "auth/requires-recent-login") {
+        toast({
+          title: "Re-authentication required",
+          description: "Please sign in again and retry account deletion.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Delete failed",
+          description: "We couldn't delete your account right now.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
 
   const friends = useMemo<FriendProfile[]>(
     () => [
@@ -2735,6 +2842,8 @@ export default function DataInsightsScreen({
           setShowEditProfileDialog(open);
           if (!open) {
             setProfileVisibilityDraft(isProfileInvisible);
+            setShowDeleteConfirm(false);
+            setDeleteConfirmText("");
           }
         }}
       >
@@ -2787,6 +2896,91 @@ export default function DataInsightsScreen({
                 <p className="text-xs text-white/50">
                   Sharing is disabled while your profile is invisible.
                 </p>
+              )}
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/40 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Manage Subscription</p>
+                  <p className="text-xs text-white/60">
+                    Status: {isPaidAccount ? "Active" : "Inactive"}
+                  </p>
+                  {featureFlags?.cardLast4 && (
+                    <p className="text-xs text-white/50">
+                      Card: {featureFlags.cardBrand ? `${featureFlags.cardBrand} ••••` : "••••"}{featureFlags.cardLast4}
+                    </p>
+                  )}
+                  {featureFlags?.stripeStatus && (
+                    <p className="text-xs text-white/50">
+                      Stripe: {featureFlags.stripeStatus}
+                    </p>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleManageBilling}
+                  disabled={!featureFlags?.hasCustomer}
+                  data-testid="button-manage-subscription"
+                >
+                  Manage
+                </Button>
+              </div>
+              {!featureFlags?.hasCustomer && (
+                <p className="text-xs text-white/40">
+                  No active Stripe subscription on file.
+                </p>
+              )}
+            </div>
+            <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 p-3 space-y-3">
+              <div>
+                <p className="text-sm font-medium text-rose-200">Delete account</p>
+                <p className="text-xs text-rose-200/80">
+                  This permanently removes your account and data. This cannot be undone.
+                </p>
+              </div>
+              {!showDeleteConfirm ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  data-testid="button-start-delete-account"
+                >
+                  Delete account
+                </Button>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-rose-200">
+                    Type DELETE to confirm account deletion.
+                  </p>
+                  <Input
+                    value={deleteConfirmText}
+                    onChange={(event) => setDeleteConfirmText(event.target.value)}
+                    className="h-10 bg-black/40 border-rose-500/40 text-sm text-rose-100"
+                    data-testid="input-delete-confirm"
+                  />
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setShowDeleteConfirm(false);
+                        setDeleteConfirmText("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={handleDeleteAccount}
+                      disabled={isDeletingAccount || deleteConfirmText.trim() !== "DELETE"}
+                      data-testid="button-confirm-delete-account"
+                    >
+                      {isDeletingAccount ? "Deleting..." : "Confirm delete"}
+                    </Button>
+                  </div>
+                </div>
               )}
             </div>
             <div className="flex flex-wrap justify-end gap-2">
