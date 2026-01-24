@@ -24,9 +24,14 @@ const ARIZONA_CITIES = [
 interface EnvironmentalMapProps {
   onLocationUpdate?: (lat: number, lng: number) => void;
   onCityNameUpdate?: (cityName: string) => void;
+  autoFetch?: boolean;
 }
 
-export default function EnvironmentalMap({ onLocationUpdate, onCityNameUpdate }: EnvironmentalMapProps) {
+export default function EnvironmentalMap({
+  onLocationUpdate,
+  onCityNameUpdate,
+  autoFetch = false,
+}: EnvironmentalMapProps) {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [cityName, setCityName] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
@@ -108,8 +113,10 @@ export default function EnvironmentalMap({ onLocationUpdate, onCityNameUpdate }:
   };
 
   useEffect(() => {
-    getLocation();
-  }, []);
+    if (autoFetch) {
+      getLocation();
+    }
+  }, [autoFetch]);
 
   return (
     <div className="space-y-4" data-testid="environmental-map">

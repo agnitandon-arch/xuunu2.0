@@ -8,7 +8,7 @@ interface LocationData {
   error: string | null;
 }
 
-export function useUserLocation(autoFetch = true): LocationData & { refetch: () => void } {
+export function useUserLocation(autoFetch = false): LocationData & { refetch: () => void } {
   const [lat, setLat] = useState<number>(0);
   const [lng, setLng] = useState<number>(0);
   const [cityName, setCityName] = useState<string>("");

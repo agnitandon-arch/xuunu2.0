@@ -29,7 +29,8 @@ import { collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, se
 import { db } from "@/lib/firebase";
 
 const PAID_ACCOUNT_EMAIL = "agnishikha@yahoo.com";
-const TERRA_REFRESH_DOC = "terraRefresh";
+const HOME_REFRESH_DOC = "homeRefresh";
+const MAX_DAILY_REFRESHES = 2;
 
 interface DashboardScreenProps {
   onNavigate?: (tab: string) => void;
@@ -100,14 +101,12 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     [env]
   );
 
-  const { data: latestHealth, isLoading: healthLoading, refetch: refetchHealth } =
-    useQuery<HealthEntry | null>({
+  const { data: latestHealth, isLoading: healthLoading } = useQuery<HealthEntry | null>({
     queryKey: [`/api/health-entries/latest?userId=${user?.uid}`],
     enabled: !!user,
   });
 
-  const { data: latestEnv, isLoading: envLoading, refetch: refetchEnv } =
-    useQuery<EnvironmentalReading | null>({
+  const { data: latestEnv, isLoading: envLoading } = useQuery<EnvironmentalReading | null>({
     queryKey: [`/api/environmental-readings/latest?userId=${user?.uid}`],
     enabled: !!user,
   });
@@ -219,48 +218,132 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     },
   });
 
-  const handleMetricRefresh = async (metricId: string) => {
-    if (!user || refreshingMetric) return;
+  const refreshAqiFromLocation = async () => {
+    if (!user?.uid) return;
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      return;
+    }
+    const position = await new Promise<GeolocationPosition | null>((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (value) => resolve(value),
+        () => resolve(null),
+        {
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 6 * 60 * 60 * 1000,
+        }
+      );
+    });
+    if (!position) return;
+    try {
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+      const response = await fetch(`/api/environmental?lat=${latitude}&lng=${longitude}`);
+      if (!response.ok) {
+        throw new Error("Environmental API unavailable");
+      }
+      const data = await response.json();
+      await apiRequest("POST", "/api/environmental-readings", {
+        userId: user.uid,
+        locationMode: "auto",
+        latitude,
+        longitude,
+        aqi: data.aqi ?? null,
+        pm25: data.pm25 ?? null,
+        pm10: data.pm10 ?? null,
+        so2: data.so2 ?? null,
+        no2: data.no2 ?? null,
+        nox: data.nox ?? null,
+        co: data.co ?? null,
+        o3: data.o3 ?? null,
+        vocs: data.vocs ?? null,
+        radon: data.radon ?? null,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: [`/api/environmental-readings/latest?userId=${user.uid}`],
+      });
+    } catch (error) {
+      console.error("AQI refresh failed:", error);
+    }
+  };
+
+  const consumeDailyRefresh = async () => {
+    if (!user?.uid) {
+      return { allowed: false, count: 0 };
+    }
     const today = new Date().toISOString().slice(0, 10);
     let refreshCount = 0;
-
+    let storedDate = today;
     try {
-      const refreshRef = doc(db, "users", user.uid, "meta", TERRA_REFRESH_DOC);
+      const refreshRef = doc(db, "users", user.uid, "meta", HOME_REFRESH_DOC);
       const snapshot = await getDoc(refreshRef);
       const data = snapshot.data() as { date?: string; count?: number } | undefined;
       if (data?.date === today && typeof data.count === "number") {
         refreshCount = data.count;
+        storedDate = data.date;
       }
     } catch {
       refreshCount = 0;
     }
 
-    if (refreshCount >= 4) {
-      toast({
-        title: "Daily refresh limit reached",
-        description: "Maximum 4 Terra refreshes per day. Using cached data.",
-      });
-      return;
+    if (storedDate !== today) {
+      refreshCount = 0;
+    }
+
+    if (refreshCount >= MAX_DAILY_REFRESHES) {
+      return { allowed: false, count: refreshCount };
     }
 
     const nextCount = refreshCount + 1;
     try {
-      const refreshRef = doc(db, "users", user.uid, "meta", TERRA_REFRESH_DOC);
-      await setDoc(refreshRef, { date: today, count: nextCount }, { merge: true });
+      const refreshRef = doc(db, "users", user.uid, "meta", HOME_REFRESH_DOC);
+      await setDoc(
+        refreshRef,
+        { date: today, count: nextCount, updatedAt: new Date().toISOString() },
+        { merge: true }
+      );
     } catch {
       // Ignore storage failures.
     }
+    return { allowed: true, count: nextCount };
+  };
 
-    setRefreshingMetric(metricId);
-    try {
-      await Promise.all([refetchHealth(), refetchEnv()]);
-      toast({
-        title: "Data refreshed",
-        description: `Terra refresh ${nextCount}/4 for today.`,
-      });
-    } finally {
-      setRefreshingMetric(null);
+  const refreshHomeData = async (source: "login" | "manual", metricId?: string) => {
+    if (!user || refreshingMetric) return;
+    const refreshState = await consumeDailyRefresh();
+    if (!refreshState.allowed) {
+      if (source === "manual") {
+        toast({
+          title: "Refresh limited",
+          description: "Updates run twice daily on login to reduce API usage.",
+        });
+      }
+      return;
     }
+    if (source === "manual" && metricId) {
+      setRefreshingMetric(metricId);
+    }
+    try {
+      await refreshAqiFromLocation();
+      if (source === "manual") {
+        toast({
+          title: "Data refreshed",
+          description: `Refresh ${refreshState.count}/${MAX_DAILY_REFRESHES} for today.`,
+        });
+      }
+    } finally {
+      if (source === "manual" && metricId) {
+        setRefreshingMetric(null);
+      }
+    }
+  };
+
+  const handleMetricRefresh = async (metricId: string) => {
+    if (!user || refreshingMetric) return;
+    toast({
+      title: "Refresh scheduled",
+      description: "Metrics refresh twice daily on login to reduce API usage.",
+    });
   };
 
   const handleOpenPaymentPortal = async (plan?: "monthly" | "yearly") => {
@@ -554,6 +637,11 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
       );
     }
   }, [user?.uid, user?.email, featureFlags, firestorePaidStatus]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    void refreshHomeData("login");
+  }, [user?.uid]);
 
   const displayName =
     displayNameOverride || user?.displayName || user?.email?.split("@")[0] || "Member";
