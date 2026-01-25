@@ -837,13 +837,13 @@ export default function DataInsightsScreen({
 
     ctx.drawImage(imageRef.current, drawX, drawY, drawWidth, drawHeight);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    handleCropCancel();
     try {
       await setPhotoUrl(dataUrl);
       toast({
         title: "Profile photo updated",
         description: "Your photo will appear across all tabs.",
       });
-      handleCropCancel();
     } catch {
       toast({
         title: "Photo update failed",
@@ -1676,6 +1676,7 @@ export default function DataInsightsScreen({
       return;
     }
     setIsCreatingGroup(true);
+    setShowGroupDialog(false);
     try {
       const inviteCode = createInviteCode();
       const groupRef = doc(collection(db, "groups"));
