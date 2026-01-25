@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { 
   User, 
   signInWithPopup, 
@@ -32,10 +32,20 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const authResolvedRef = useRef(false);
 
   useEffect(() => {
     googleProvider.setCustomParameters({ prompt: "select_account" });
+    const timeoutId = window.setTimeout(() => {
+      if (authResolvedRef.current) return;
+      console.warn("Auth state resolution timed out, continuing without user.");
+      setUser(null);
+      setLoading(false);
+    }, 5000);
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      authResolvedRef.current = true;
+      window.clearTimeout(timeoutId);
       setUser(user);
       setLoading(false);
       if (user) {
@@ -63,7 +73,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })();
       }
     });
-    return unsubscribe;
+    return () => {
+      window.clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
