@@ -1,21 +1,23 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import LoginScreen from "@/pages/LoginScreen";
-import DashboardScreen from "@/pages/DashboardScreen";
-import DataInsightsScreen from "@/pages/DataInsightsScreen";
-import AccountScreen from "@/pages/AccountScreen";
-import DeviceConnectionScreen from "@/pages/DeviceConnectionScreen";
-import MedicationTrackerScreen from "@/pages/MedicationTrackerScreen";
-import ShowcaseAll from "@/pages/ShowcaseAll";
 import { Loader2 } from "lucide-react";
-import FriendProfileScreen, { FriendProfile } from "@/pages/FriendProfileScreen";
-import PublicProfileScreen from "@/pages/PublicProfileScreen";
-import OnboardingScreen from "@/pages/OnboardingScreen";
+import type { FriendProfile } from "@/pages/FriendProfileScreen";
 import ErrorBoundary from "@/components/ErrorBoundary";
+
+const LoginScreen = lazy(() => import("@/pages/LoginScreen"));
+const DashboardScreen = lazy(() => import("@/pages/DashboardScreen"));
+const DataInsightsScreen = lazy(() => import("@/pages/DataInsightsScreen"));
+const AccountScreen = lazy(() => import("@/pages/AccountScreen"));
+const DeviceConnectionScreen = lazy(() => import("@/pages/DeviceConnectionScreen"));
+const MedicationTrackerScreen = lazy(() => import("@/pages/MedicationTrackerScreen"));
+const ShowcaseAll = lazy(() => import("@/pages/ShowcaseAll"));
+const FriendProfileScreen = lazy(() => import("@/pages/FriendProfileScreen"));
+const PublicProfileScreen = lazy(() => import("@/pages/PublicProfileScreen"));
+const OnboardingScreen = lazy(() => import("@/pages/OnboardingScreen"));
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
@@ -43,10 +45,18 @@ function AppContent() {
     );
   }
 
+  const screenFallback = (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <Loader2 className="w-8 h-8 text-primary animate-spin" />
+    </div>
+  );
+
   if (showShowcase) {
     return (
       <div>
-        <ShowcaseAll />
+        <Suspense fallback={screenFallback}>
+          <ShowcaseAll />
+        </Suspense>
         <div className="fixed bottom-4 right-4 z-50">
           <button
             onClick={() => setShowShowcase(false)}
@@ -60,15 +70,21 @@ function AppContent() {
   }
 
   if (!user) {
-    return <LoginScreen />;
+    return (
+      <Suspense fallback={screenFallback}>
+        <LoginScreen />
+      </Suspense>
+    );
   }
 
   if (!hasCompletedOnboarding) {
     return (
-      <OnboardingScreen
-        userId={user.uid}
-        onComplete={() => setHasCompletedOnboarding(true)}
-      />
+      <Suspense fallback={screenFallback}>
+        <OnboardingScreen
+          userId={user.uid}
+          onComplete={() => setHasCompletedOnboarding(true)}
+        />
+      </Suspense>
     );
   }
 
@@ -119,7 +135,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {renderScreen()}
+      <Suspense fallback={screenFallback}>{renderScreen()}</Suspense>
     </div>
   );
 }
