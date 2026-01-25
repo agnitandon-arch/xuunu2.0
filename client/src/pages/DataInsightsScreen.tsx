@@ -230,12 +230,18 @@ interface DataInsightsScreenProps {
   onBack?: () => void;
   onPreviewPublicProfile?: () => void;
   onViewFriend?: (friend: FriendProfile) => void;
+  onViewGroup?: (group: { id: string; name: string }) => void;
+  openChallengePicker?: boolean;
+  onChallengePickerOpened?: () => void;
 }
 
 export default function DataInsightsScreen({
   onBack,
   onPreviewPublicProfile,
   onViewFriend,
+  onViewGroup,
+  openChallengePicker,
+  onChallengePickerOpened,
 }: DataInsightsScreenProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -1741,6 +1747,9 @@ export default function DataInsightsScreen({
         title: "Joined group",
         description: `You joined ${invite.groupName || "the group"}.`,
       });
+      if (onViewGroup) {
+        onViewGroup({ id: invite.groupId, name: invite.groupName || "Group" });
+      }
     } catch (error) {
       console.error("Failed to join group:", error);
       toast({
@@ -1768,6 +1777,10 @@ export default function DataInsightsScreen({
 
   const handleOpenGroupUpdates = async (group: GroupRecord) => {
     if (!group.id) return;
+    if (onViewGroup) {
+      onViewGroup({ id: group.id, name: group.name });
+      return;
+    }
     setActiveGroupId(group.id);
     setActiveGroupName(group.name);
     setShowGroupUpdatesDialog(true);
@@ -1882,6 +1895,12 @@ export default function DataInsightsScreen({
     setShareChallenge(false);
     setShowShareOptions(false);
   }, [isProfileInvisible]);
+
+  useEffect(() => {
+    if (!openChallengePicker) return;
+    setShowChallengePicker(true);
+    onChallengePickerOpened?.();
+  }, [openChallengePicker, onChallengePickerOpened]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {

@@ -18,13 +18,16 @@ const ShowcaseAll = lazy(() => import("@/pages/ShowcaseAll"));
 const FriendProfileScreen = lazy(() => import("@/pages/FriendProfileScreen"));
 const PublicProfileScreen = lazy(() => import("@/pages/PublicProfileScreen"));
 const OnboardingScreen = lazy(() => import("@/pages/OnboardingScreen"));
+const GroupUpdatesScreen = lazy(() => import("@/pages/GroupUpdatesScreen"));
 
 function AppContent() {
   const { user, loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showShowcase, setShowShowcase] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<FriendProfile | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<{ id: string; name: string } | null>(null);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [openChallengePicker, setOpenChallengePicker] = useState(false);
 
   useEffect(() => {
     if (typeof document !== "undefined") {
@@ -113,6 +116,12 @@ function AppContent() {
               setSelectedFriend(friend);
               setActiveTab("friend-profile");
             }}
+            onViewGroup={(group) => {
+              setSelectedGroup(group);
+              setActiveTab("group-updates");
+            }}
+            openChallengePicker={openChallengePicker}
+            onChallengePickerOpened={() => setOpenChallengePicker(false)}
           />
         );
       case "account":
@@ -126,6 +135,20 @@ function AppContent() {
         );
       case "public-profile":
         return <PublicProfileScreen onBack={() => setActiveTab("data")} />;
+      case "group-updates":
+        return selectedGroup ? (
+          <GroupUpdatesScreen
+            groupId={selectedGroup.id}
+            groupName={selectedGroup.name}
+            onBack={() => setActiveTab("data")}
+            onJoinChallenge={() => {
+              setOpenChallengePicker(true);
+              setActiveTab("data");
+            }}
+          />
+        ) : (
+          <DataInsightsScreen onBack={() => setActiveTab("dashboard")} />
+        );
       case "devices":
         return <DeviceConnectionScreen />;
       case "medications":
