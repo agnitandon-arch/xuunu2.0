@@ -264,53 +264,32 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
     },
   });
 
-  const refreshAqiFromLocation = async () => {
+  const captureLoginLocation = () => {
     if (!user?.uid) return;
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       return;
     }
-    const position = await new Promise<GeolocationPosition | null>((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (value) => resolve(value),
-        () => resolve(null),
-        {
-          enableHighAccuracy: false,
-          timeout: 10000,
-          maximumAge: 6 * 60 * 60 * 1000,
-        }
-      );
-    });
-    if (!position) return;
-    try {
-      const latitude = position.coords.latitude;
-      const longitude = position.coords.longitude;
-      const response = await fetch(`/api/environmental?lat=${latitude}&lng=${longitude}`);
-      if (!response.ok) {
-        throw new Error("Environmental API unavailable");
+    const cacheKey = `xuunu-login-location-${user.uid}`;
+    if (sessionStorage.getItem(cacheKey)) return;
+    sessionStorage.setItem(cacheKey, "requested");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const payload = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          capturedAt: new Date().toISOString(),
+        };
+        sessionStorage.setItem(cacheKey, JSON.stringify(payload));
+      },
+      () => {
+        // Ignore location errors.
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 6 * 60 * 60 * 1000,
       }
-      const data = await response.json();
-      await apiRequest("POST", "/api/environmental-readings", {
-        userId: user.uid,
-        locationMode: "auto",
-        latitude,
-        longitude,
-        aqi: data.aqi ?? null,
-        pm25: data.pm25 ?? null,
-        pm10: data.pm10 ?? null,
-        so2: data.so2 ?? null,
-        no2: data.no2 ?? null,
-        nox: data.nox ?? null,
-        co: data.co ?? null,
-        o3: data.o3 ?? null,
-        vocs: data.vocs ?? null,
-        radon: data.radon ?? null,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: [`/api/environmental-readings/latest?userId=${user.uid}`],
-      });
-    } catch (error) {
-      console.error("AQI refresh failed:", error);
-    }
+    );
   };
 
   const consumeDailyRefresh = async () => {
@@ -370,7 +349,6 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
       setRefreshingMetric(metricId);
     }
     try {
-      await refreshAqiFromLocation();
       await Promise.all([refetchHealth(), refetchEnv()]);
       if (source === "manual") {
         toast({
@@ -636,6 +614,7 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
 
   useEffect(() => {
     if (!user?.uid) return;
+    captureLoginLocation();
     void refreshHomeData("login");
   }, [user?.uid]);
 

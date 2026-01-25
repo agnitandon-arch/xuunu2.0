@@ -22,7 +22,6 @@ import { Label } from "@/components/ui/label";
 import { useProfilePhoto } from "@/hooks/useProfilePhoto";
 import type { FriendProfile } from "@/pages/FriendProfileScreen";
 import { Calendar } from "@/components/ui/calendar";
-import EnvironmentalMap from "@/components/EnvironmentalMap";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { deleteUser, updateProfile } from "firebase/auth";
@@ -4122,10 +4121,6 @@ export default function DataInsightsScreen({
               </Button>
             </div>
           </div>
-        </section>
-
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
-          <EnvironmentalMap />
         </section>
 
         <Dialog open={showGroupDialog} onOpenChange={setShowGroupDialog}>
