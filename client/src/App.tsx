@@ -27,6 +27,13 @@ function AppContent() {
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
 
   useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.dataset.appReady = "true";
+      sessionStorage.removeItem("xuunu-recover-attempted");
+    }
+  }, []);
+
+  useEffect(() => {
     if (user?.uid) {
       setHasCompletedOnboarding(false);
     }
