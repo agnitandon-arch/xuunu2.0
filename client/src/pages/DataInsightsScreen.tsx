@@ -1364,6 +1364,11 @@ export default function DataInsightsScreen({
     };
 
     setFeedItems((prev) => [newItem, ...prev]);
+    setUpdateText("");
+    setUpdatePhotos([]);
+    setShareToGroup(false);
+    setSelectedGroupId("");
+    setShareUpdate(isProfileInvisible ? false : true);
     const firestoreSaved = await saveFeedItem(newItem);
     let serverSaved = false;
     if (!firestoreSaved) {
@@ -1403,21 +1408,11 @@ export default function DataInsightsScreen({
       )
     );
 
-    setUpdateText("");
-    setUpdatePhotos([]);
-    setShareToGroup(false);
-    setSelectedGroupId("");
-    setShareUpdate(isProfileInvisible ? false : true);
     if (firestoreSaved || serverSaved) {
       toast({
         title: "Update shared",
         description: "Your latest progress is now visible in the feed.",
       });
-      if (typeof window !== "undefined") {
-        window.setTimeout(() => {
-          window.location.reload();
-        }, 300);
-      }
     } else {
       toast({
         title: "Saved locally",
@@ -3226,7 +3221,7 @@ export default function DataInsightsScreen({
               }
               data-testid="button-share-update"
             >
-              {isSharingUpdate ? "Saving..." : "Share Update"}
+              {isSharingUpdate ? "Saving..." : "Save"}
             </Button>
           </div>
         </section>
