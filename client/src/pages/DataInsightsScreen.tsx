@@ -58,7 +58,13 @@ type ShareTarget = {
 
 const PAID_ACCOUNT_EMAIL = "agnishikha@yahoo.com";
 
-type ChallengeType = "Hiking" | "Running" | "Biking";
+type ChallengeType =
+  | "Hiking"
+  | "Running"
+  | "Biking"
+  | "Swimming"
+  | "Strength Training"
+  | "Longevity Challenge";
 
 type ChallengeLocation = {
   lat: number;
@@ -264,6 +270,7 @@ export default function DataInsightsScreen({
     useState<LongevityChallengeType | null>(null);
   const [longevityPhotos, setLongevityPhotos] = useState<string[]>([]);
   const [longevityNote, setLongevityNote] = useState("");
+  const [showLongevityDialog, setShowLongevityDialog] = useState(false);
   const [showChallengePicker, setShowChallengePicker] = useState(false);
   const [selectedChallengeType, setSelectedChallengeType] = useState<ChallengeType | null>(null);
   const [invitedFriends, setInvitedFriends] = useState<string[]>([]);
@@ -3335,14 +3342,32 @@ export default function DataInsightsScreen({
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-widest text-white/40">Challenge Type</p>
               <div className="grid gap-2 sm:grid-cols-3">
-                {(["Hiking", "Running", "Biking"] as ChallengeType[]).map((type) => {
+                {(
+                  [
+                    "Hiking",
+                    "Running",
+                    "Biking",
+                    "Swimming",
+                    "Strength Training",
+                    "Longevity Challenge",
+                  ] as ChallengeType[]
+                ).map((type) => {
                   const isSelected = selectedChallengeType === type;
+                  const isLongevity = type === "Longevity Challenge";
                   return (
                     <Button
                       key={type}
                       variant={isSelected ? "default" : "outline"}
-                      onClick={() => setSelectedChallengeType(type)}
-                      data-testid={`button-select-${type.toLowerCase()}-challenge`}
+                      onClick={() => {
+                        if (isLongevity) {
+                          setShowChallengePicker(false);
+                          resetChallengeDialog();
+                          setShowLongevityDialog(true);
+                          return;
+                        }
+                        setSelectedChallengeType(type);
+                      }}
+                      data-testid={`button-select-${type.toLowerCase().replace(/\s+/g, "-")}-challenge`}
                     >
                       {type}
                     </Button>
@@ -3544,213 +3569,225 @@ export default function DataInsightsScreen({
         </DialogContent>
       </Dialog>
 
-      <section
-        className={`rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4 ${
-          challengesLocked ? "opacity-60" : ""
-        }`}
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-widest text-white/70">
-              Longevity Challenge
-            </h3>
-            <p className="text-xs text-white/50">
+      <Dialog open={showLongevityDialog} onOpenChange={setShowLongevityDialog}>
+        <DialogContent className="bg-black border-white/10 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Longevity Challenge</DialogTitle>
+            <DialogDescription className="text-white/60">
               Pick a weekly habit and post daily photo proof.
-            </p>
-            {challengesLocked && (
-              <p className="text-xs text-white/40 mt-1">
-                Upgrade to unlock longevity challenges.
-              </p>
-            )}
-          </div>
-          {longevityChallenge && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleResetLongevityChallenge}
-              disabled={challengesLocked}
-              data-testid="button-reset-longevity"
-            >
-              Start New
-            </Button>
-          )}
-        </div>
-        {longevityChallenge ? (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">
-                    {longevityConfig?.title ?? "Longevity Challenge"}{" "}
-                    <span className="text-xs text-white/50">({longevityConfig?.cadence})</span>
-                  </p>
-                  <p className="text-xs text-white/50">Started {longevityStartedAtLabel}</p>
-                </div>
-                <div className="text-xs text-white/60 text-right">
-                  <div>
-                    {longevityLoggedDays}/{longevityRequiredDays} days logged
-                  </div>
-                  <div>{longevityDaysRemaining} days remaining</div>
-                </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div
+            className={`rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4 ${
+              challengesLocked ? "opacity-60" : ""
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-white/50">
+                  {challengesLocked
+                    ? "Upgrade to unlock longevity challenges."
+                    : "Complete daily posts to finish the week."}
+                </p>
               </div>
-              <p className="text-xs text-white/60">{longevityConfig?.description}</p>
-              {longevityIsComplete && (
-                <div className="text-xs text-green-300">
-                  Week complete! Start a new challenge to continue.
-                </div>
+              {longevityChallenge && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleResetLongevityChallenge}
+                  disabled={challengesLocked}
+                  data-testid="button-reset-longevity"
+                >
+                  Start New
+                </Button>
               )}
             </div>
-
-            {!longevityIsComplete && longevityDaysSinceStart <= 7 && (
-              <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">Log today's activity</p>
-                    <p className="text-xs text-white/50">
-                      {longevityHasLoggedToday
-                        ? "Already logged for today."
-                        : "Add photos of today's activity."}
-                    </p>
-                  </div>
-                  <span className="text-[11px] uppercase tracking-widest text-white/40">
-                    {longevityHasLoggedToday ? "Logged" : "Pending"}
-                  </span>
-                </div>
-                {!longevityHasLoggedToday && (
-                  <>
-                    <textarea
-                      value={longevityNote}
-                      onChange={(event) => setLongevityNote(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" && !event.shiftKey) {
-                          event.preventDefault();
-                          handleLogLongevityDay();
-                        }
-                      }}
-                      className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/80 focus:outline-none focus:ring-2 focus:ring-primary/40"
-                      rows={2}
-                      placeholder="Activity note (optional)"
-                      data-testid="input-longevity-note"
-                    />
-                    <div className="flex flex-wrap items-center gap-2">
-                      <label className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/70 transition hover:border-white/40 hover:text-white">
-                        <Camera className="h-3.5 w-3.5" />
-                        Add photos
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={handleAddLongevityPhotos}
-                          data-testid="input-longevity-photos"
-                        />
-                      </label>
+            {longevityChallenge ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">
+                        {longevityConfig?.title ?? "Longevity Challenge"}{" "}
+                        <span className="text-xs text-white/50">
+                          ({longevityConfig?.cadence})
+                        </span>
+                      </p>
+                      <p className="text-xs text-white/50">
+                        Started {longevityStartedAtLabel}
+                      </p>
                     </div>
-                    {longevityPhotos.length > 0 && (
-                      <div className="grid grid-cols-2 gap-2">
-                        {longevityPhotos.map((photo, index) => (
-                          <div
-                            key={`${photo}-${index}`}
-                            className="relative overflow-hidden rounded-lg border border-white/10 bg-black/40"
-                          >
-                            <img src={photo} alt="Longevity upload" className="h-24 w-full object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveLongevityPhoto(index)}
-                              className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] text-white/80"
-                              data-testid={`button-remove-longevity-photo-${index}`}
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ))}
+                    <div className="text-xs text-white/60 text-right">
+                      <div>
+                        {longevityLoggedDays}/{longevityRequiredDays} days logged
                       </div>
-                    )}
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={handleLogLongevityDay}
-                        disabled={longevityPhotos.length === 0 || challengesLocked}
-                        data-testid="button-log-longevity-day"
-                      >
-                        Post Today's Activity
-                      </Button>
+                      <div>{longevityDaysRemaining} days remaining</div>
                     </div>
-                  </>
+                  </div>
+                  <p className="text-xs text-white/60">{longevityConfig?.description}</p>
+                  {longevityIsComplete && (
+                    <div className="text-xs text-green-300">
+                      Week complete! Start a new challenge to continue.
+                    </div>
+                  )}
+                </div>
+
+                {!longevityIsComplete && longevityDaysSinceStart <= 7 && (
+                  <div className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Log today's activity</p>
+                        <p className="text-xs text-white/50">
+                          {longevityHasLoggedToday
+                            ? "Already logged for today."
+                            : "Add photos of today's activity."}
+                        </p>
+                      </div>
+                      <span className="text-[11px] uppercase tracking-widest text-white/40">
+                        {longevityHasLoggedToday ? "Logged" : "Pending"}
+                      </span>
+                    </div>
+                    {!longevityHasLoggedToday && (
+                      <>
+                        <textarea
+                          value={longevityNote}
+                          onChange={(event) => setLongevityNote(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" && !event.shiftKey) {
+                              event.preventDefault();
+                              handleLogLongevityDay();
+                            }
+                          }}
+                          className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/80 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                          rows={2}
+                          placeholder="Activity note (optional)"
+                          data-testid="input-longevity-note"
+                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/70 transition hover:border-white/40 hover:text-white">
+                            <Camera className="h-3.5 w-3.5" />
+                            Add photos
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={handleAddLongevityPhotos}
+                              data-testid="input-longevity-photos"
+                            />
+                          </label>
+                        </div>
+                        {longevityPhotos.length > 0 && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {longevityPhotos.map((photo, index) => (
+                              <div
+                                key={`${photo}-${index}`}
+                                className="relative overflow-hidden rounded-lg border border-white/10 bg-black/40"
+                              >
+                                <img
+                                  src={photo}
+                                  alt="Longevity upload"
+                                  className="h-24 w-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveLongevityPhoto(index)}
+                                  className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] text-white/80"
+                                  data-testid={`button-remove-longevity-photo-${index}`}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex justify-end">
+                          <Button
+                            onClick={handleLogLongevityDay}
+                            disabled={longevityPhotos.length === 0 || challengesLocked}
+                            data-testid="button-log-longevity-day"
+                          >
+                            Post Today's Activity
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {longevityDaysSinceStart > 7 && !longevityIsComplete && (
+                  <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-4 text-xs text-yellow-100">
+                    This weekly challenge window is complete. Start a new longevity
+                    challenge to continue.
+                  </div>
+                )}
+
+                {longevityLogs.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-xs uppercase tracking-widest text-white/40">Daily Posts</p>
+                    {longevityLogs.map((log) => (
+                      <div
+                        key={log.date}
+                        className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-2"
+                      >
+                        <div className="flex items-center justify-between text-xs text-white/60">
+                          <span>{log.date}</span>
+                          <span>{log.photos.length} photos</span>
+                        </div>
+                        {log.note && <p className="text-sm text-white/80">{log.note}</p>}
+                        <div className="grid grid-cols-2 gap-2">
+                          {log.photos.map((photo, index) => (
+                            <img
+                              key={`${log.date}-${index}`}
+                              src={photo}
+                              alt="Longevity day"
+                              className="h-24 w-full rounded-lg object-cover"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-            )}
-
-            {longevityDaysSinceStart > 7 && !longevityIsComplete && (
-              <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-4 text-xs text-yellow-100">
-                This weekly challenge window is complete. Start a new longevity challenge to
-                continue.
-              </div>
-            )}
-
-            {longevityLogs.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-xs uppercase tracking-widest text-white/40">Daily Posts</p>
-                {longevityLogs.map((log) => (
-                  <div
-                    key={log.date}
-                    className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-2"
+            ) : (
+              <div className="space-y-4">
+                <div className="grid gap-3">
+                  {LONGEVITY_OPTIONS.map((option) => (
+                    <button
+                      key={option.type}
+                      type="button"
+                      onClick={() => setSelectedLongevityType(option.type)}
+                      className={`rounded-xl border px-4 py-3 text-left transition ${
+                        selectedLongevityType === option.type
+                          ? "border-primary/60 bg-primary/10"
+                          : "border-white/10 bg-black/40 hover:border-white/30"
+                      }`}
+                      data-testid={`button-select-longevity-${option.type.toLowerCase()}`}
+                      disabled={challengesLocked}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold">{option.title}</p>
+                        <span className="text-xs text-white/50">{option.cadence}</span>
+                      </div>
+                      <p className="text-xs text-white/60 mt-1">{option.description}</p>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleStartLongevityChallenge}
+                    disabled={!selectedLongevityType || challengesLocked}
+                    data-testid="button-start-longevity"
                   >
-                    <div className="flex items-center justify-between text-xs text-white/60">
-                      <span>{log.date}</span>
-                      <span>{log.photos.length} photos</span>
-                    </div>
-                    {log.note && <p className="text-sm text-white/80">{log.note}</p>}
-                    <div className="grid grid-cols-2 gap-2">
-                      {log.photos.map((photo, index) => (
-                        <img
-                          key={`${log.date}-${index}`}
-                          src={photo}
-                          alt="Longevity day"
-                          className="h-24 w-full rounded-lg object-cover"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                    Start Longevity Challenge
+                  </Button>
+                </div>
               </div>
             )}
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid gap-3">
-              {LONGEVITY_OPTIONS.map((option) => (
-                <button
-                  key={option.type}
-                  type="button"
-                  onClick={() => setSelectedLongevityType(option.type)}
-                  className={`rounded-xl border px-4 py-3 text-left transition ${
-                    selectedLongevityType === option.type
-                      ? "border-primary/60 bg-primary/10"
-                      : "border-white/10 bg-black/40 hover:border-white/30"
-                  }`}
-                  data-testid={`button-select-longevity-${option.type.toLowerCase()}`}
-                  disabled={challengesLocked}
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold">{option.title}</p>
-                    <span className="text-xs text-white/50">{option.cadence}</span>
-                  </div>
-                  <p className="text-xs text-white/60 mt-1">{option.description}</p>
-                </button>
-              ))}
-            </div>
-            <div className="flex justify-end">
-              <Button
-                onClick={handleStartLongevityChallenge}
-                disabled={!selectedLongevityType || challengesLocked}
-                data-testid="button-start-longevity"
-              >
-                Start Longevity Challenge
-              </Button>
-            </div>
-          </div>
-        )}
-      </section>
+        </DialogContent>
+      </Dialog>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
           <div className="flex items-center justify-between">
