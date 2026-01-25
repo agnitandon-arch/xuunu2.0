@@ -1689,12 +1689,6 @@ export default function DataInsightsScreen({
         createdAt: new Date().toISOString(),
       };
       await setDoc(groupRef, record);
-      await setDoc(doc(db, "groupInvites", inviteCode), {
-        groupId: record.id,
-        ownerId: user.uid,
-        groupName: record.name,
-        createdAt: record.createdAt,
-      });
       setGroupName("");
       setGroupInvitedFriends([]);
       setShowGroupDialog(false);
@@ -1702,6 +1696,21 @@ export default function DataInsightsScreen({
         title: "Group created",
         description: `Invite code: ${inviteCode}`,
       });
+      try {
+        await setDoc(doc(db, "groupInvites", inviteCode), {
+          groupId: record.id,
+          ownerId: user.uid,
+          groupName: record.name,
+          createdAt: record.createdAt,
+        });
+      } catch (inviteError) {
+        console.error("Failed to save group invite:", inviteError);
+        toast({
+          title: "Invite not saved",
+          description: "Group created, but invite code failed to save.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error("Failed to create group:", error);
       toast({
