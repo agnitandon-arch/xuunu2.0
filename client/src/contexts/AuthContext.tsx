@@ -35,31 +35,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     googleProvider.setCustomParameters({ prompt: "select_account" });
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // Sync user to database
-        try {
-          await apiRequest("POST", "/api/users/sync", {
-            id: user.uid,
-            email: user.email,
-          });
-          await setDoc(
-            doc(db, "publicProfiles", user.uid),
-            {
-              displayName: user.displayName || user.email?.split("@")[0] || "Member",
-              emailLower: user.email ? user.email.toLowerCase() : null,
-              photoUrl: user.photoURL ?? null,
-              updatedAt: new Date().toISOString(),
-            },
-            { merge: true }
-          );
-          await trackDailyActive(user.uid);
-        } catch (error) {
-          console.error('Failed to sync user:', error);
-        }
-      }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
+      if (user) {
+        // Sync user to database in background
+        void (async () => {
+          try {
+            await apiRequest("POST", "/api/users/sync", {
+              id: user.uid,
+              email: user.email,
+            });
+            await setDoc(
+              doc(db, "publicProfiles", user.uid),
+              {
+                displayName: user.displayName || user.email?.split("@")[0] || "Member",
+                emailLower: user.email ? user.email.toLowerCase() : null,
+                photoUrl: user.photoURL ?? null,
+                updatedAt: new Date().toISOString(),
+              },
+              { merge: true }
+            );
+            await trackDailyActive(user.uid);
+          } catch (error) {
+            console.error("Failed to sync user:", error);
+          }
+        })();
+      }
     });
     return unsubscribe;
   }, []);
