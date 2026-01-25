@@ -1413,6 +1413,11 @@ export default function DataInsightsScreen({
         title: "Update shared",
         description: "Your latest progress is now visible in the feed.",
       });
+      if (typeof window !== "undefined") {
+        window.setTimeout(() => {
+          window.location.reload();
+        }, 300);
+      }
     } else {
       toast({
         title: "Saved locally",
@@ -2340,7 +2345,7 @@ export default function DataInsightsScreen({
     [activeChallenge, getCurrentLocation, latestHealth?.steps, toast, user]
   );
 
-  const handleFinalizeChallenge = async (shared: boolean) => {
+  const handleFinalizeChallenge = async (shared: boolean, closeImmediately = false) => {
     if (!pendingChallenge) return;
     if (!user) {
       toast({
@@ -2351,6 +2356,10 @@ export default function DataInsightsScreen({
       return;
     }
     const record = { ...pendingChallenge, shared };
+    if (closeImmediately) {
+      setPendingChallenge(null);
+      setShareChallenge(true);
+    }
     let challengeSaved = true;
     try {
       await saveChallenge(record);
@@ -2400,8 +2409,10 @@ export default function DataInsightsScreen({
         variant: "destructive",
       });
     }
-    setPendingChallenge(null);
-    setShareChallenge(true);
+    if (!closeImmediately) {
+      setPendingChallenge(null);
+      setShareChallenge(true);
+    }
   };
 
   useEffect(() => {
@@ -3575,10 +3586,13 @@ export default function DataInsightsScreen({
                 />
               </div>
               <div className="flex flex-wrap justify-end gap-2">
-                <Button variant="outline" onClick={() => handleFinalizeChallenge(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => handleFinalizeChallenge(false, true)}
+                >
                   Keep Private
                 </Button>
-                <Button onClick={() => handleFinalizeChallenge(shareChallenge)}>
+                <Button onClick={() => handleFinalizeChallenge(shareChallenge, true)}>
                   Save Challenge
                 </Button>
               </div>
