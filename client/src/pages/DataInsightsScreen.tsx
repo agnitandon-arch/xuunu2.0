@@ -1369,57 +1369,78 @@ export default function DataInsightsScreen({
     setShareToGroup(false);
     setSelectedGroupId("");
     setShareUpdate(isProfileInvisible ? false : true);
-    const firestoreSaved = await saveFeedItem(newItem);
+    let firestoreSaved = false;
     let serverSaved = false;
-    if (!firestoreSaved) {
-      try {
-        const serverPayload = stripUndefined({
-          userId: user.uid,
-          id: feedId,
-          content: newItem.content,
-          photos: newItem.photos,
-          shared: newItem.shared,
-          groupId: newItem.groupId,
-          groupName: newItem.groupName,
-          postedAt: newItem.postedAt,
-        });
-        const response = await apiRequest("POST", "/api/user-updates", serverPayload);
-        serverSaved = response.ok;
-      } catch (error) {
-        console.error("Failed to save update to server:", error);
-      }
-    }
-    if (shareToGroup && selectedGroup) {
-      try {
-        const groupPayload = stripUndefined({
-          ...newItem,
-          authorId: user.uid,
-          groupId: selectedGroup.id,
-          groupName: selectedGroup.name,
-        }) as Record<string, unknown>;
-        await setDoc(doc(db, "groups", selectedGroup.id, "updates", feedId), groupPayload);
-      } catch (error) {
-        console.error("Failed to save group update:", error);
-      }
-    }
-    await Promise.all(
-      updatePhotos.map((photo, index) =>
-        saveDeviceImage(`feed-${feedId}-${index}`, photo)
-      )
-    );
+    try {
+      const firestoreSave = saveFeedItem(newItem);
+      const timeoutMs = 6000;
+      firestoreSaved = await Promise.race([
+        firestoreSave,
+        new Promise<boolean>((resolve) => {
+          setTimeout(() => resolve(false), timeoutMs);
+        }),
+      ]);
 
-    if (firestoreSaved || serverSaved) {
+      if (!firestoreSaved) {
+        try {
+          const serverPayload = stripUndefined({
+            userId: user.uid,
+            id: feedId,
+            content: newItem.content,
+            photos: newItem.photos,
+            shared: newItem.shared,
+            groupId: newItem.groupId,
+            groupName: newItem.groupName,
+            postedAt: newItem.postedAt,
+          });
+          const response = await apiRequest("POST", "/api/user-updates", serverPayload);
+          serverSaved = response.ok;
+        } catch (error) {
+          console.error("Failed to save update to server:", error);
+        }
+      }
+
+      if (shareToGroup && selectedGroup) {
+        try {
+          const groupPayload = stripUndefined({
+            ...newItem,
+            authorId: user.uid,
+            groupId: selectedGroup.id,
+            groupName: selectedGroup.name,
+          }) as Record<string, unknown>;
+          await setDoc(doc(db, "groups", selectedGroup.id, "updates", feedId), groupPayload);
+        } catch (error) {
+          console.error("Failed to save group update:", error);
+        }
+      }
+
+      await Promise.all(
+        updatePhotos.map((photo, index) =>
+          saveDeviceImage(`feed-${feedId}-${index}`, photo)
+        )
+      );
+
+      if (firestoreSaved || serverSaved) {
+        toast({
+          title: "Update shared",
+          description: "Your latest progress is now visible in the feed.",
+        });
+      } else {
+        toast({
+          title: "Saved locally",
+          description: "Your update was saved on this device. We'll retry sync.",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to share update:", error);
       toast({
-        title: "Update shared",
-        description: "Your latest progress is now visible in the feed.",
+        title: "Update failed",
+        description: "Please try again.",
+        variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Saved locally",
-        description: "Your update was saved on this device. We'll retry sync.",
-      });
+    } finally {
+      setIsSharingUpdate(false);
     }
-    setIsSharingUpdate(false);
   };
 
   const handleSaveDisplayName = async () => {
