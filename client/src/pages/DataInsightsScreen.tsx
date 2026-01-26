@@ -3278,7 +3278,7 @@ export default function DataInsightsScreen({
             data-testid="button-join-challenge"
             disabled={!user || challengesLocked}
           >
-            Join Challenge
+              Challenges
           </Button>
         </div>
         {activeChallenge && (
