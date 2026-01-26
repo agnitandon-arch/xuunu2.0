@@ -2955,6 +2955,7 @@ export default function DataInsightsScreen({
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-white/60">Username</Label>
+              <p className="text-xs text-white/50">Use your code to join a group.</p>
               <Input
                 value={usernameDraft}
                 onChange={(event) => setUsernameDraft(event.target.value)}
