@@ -274,7 +274,9 @@ export default function DataInsightsScreen({
   const [groups, setGroups] = useState<GroupRecord[]>([]);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [groupName, setGroupName] = useState("");
+  const [joinCode, setJoinCode] = useState("");
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [isJoiningGroup, setIsJoiningGroup] = useState(false);
   const [shareToGroup, setShareToGroup] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [showGroupUpdatesDialog, setShowGroupUpdatesDialog] = useState(false);
@@ -1803,6 +1805,59 @@ export default function DataInsightsScreen({
     }
   };
 
+  const handleJoinGroup = async () => {
+    if (!user?.uid) {
+      toast({
+        title: "Not signed in",
+        description: "Please sign in to join a group.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const code = joinCode.trim().toUpperCase();
+    if (!code) {
+      toast({
+        title: "Invite code required",
+        description: "Enter the group code to join.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsJoiningGroup(true);
+    try {
+      const inviteSnap = await getDoc(doc(db, "groupInvites", code));
+      if (!inviteSnap.exists()) {
+        toast({
+          title: "Invalid invite",
+          description: "That invite code was not found.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const invite = inviteSnap.data() as { groupId: string; groupName?: string };
+      if (onViewGroup) {
+        onViewGroup({ id: invite.groupId, name: invite.groupName || "Group" });
+      }
+      await updateDoc(doc(db, "groups", invite.groupId), {
+        members: arrayUnion(user.uid),
+      });
+      setJoinCode("");
+      toast({
+        title: "Joined group",
+        description: `You joined ${invite.groupName || "the group"}.`,
+      });
+    } catch (error) {
+      console.error("Failed to join group:", error);
+      toast({
+        title: "Join failed",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsJoiningGroup(false);
+    }
+  };
+
   const handleShareGroupInvite = async (group: GroupRecord) => {
     const message = `Join my group "${group.name}" in Xuunu with invite code: ${group.inviteCode}`;
     if (navigator.share) {
@@ -2939,6 +2994,8 @@ export default function DataInsightsScreen({
             setProfileVisibilityDraft(isProfileInvisible);
             setShowDeleteConfirm(false);
             setDeleteConfirmText("");
+            setJoinCode("");
+            setIsJoiningGroup(false);
           }
         }}
       >
@@ -2966,13 +3023,31 @@ export default function DataInsightsScreen({
             </div>
             <div className="space-y-2">
               <Label className="text-xs text-white/60">Username</Label>
-              <p className="text-xs text-white/50">Use your code to join a group.</p>
               <Input
                 value={usernameDraft}
                 onChange={(event) => setUsernameDraft(event.target.value)}
                 className="h-10 bg-black/40 border-white/10 text-sm"
                 data-testid="input-edit-username"
               />
+              <p className="text-xs text-white/50">Use your code to join a group.</p>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={joinCode}
+                  onChange={(event) => setJoinCode(event.target.value)}
+                  className="h-10 bg-black/40 border-white/10 text-sm uppercase"
+                  placeholder="Group code"
+                  data-testid="input-edit-join-code"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleJoinGroup}
+                  disabled={isJoiningGroup || !joinCode.trim()}
+                  data-testid="button-edit-join-group"
+                >
+                  {isJoiningGroup ? "Joining..." : "Join"}
+                </Button>
+              </div>
             </div>
             <div className="rounded-lg border border-white/10 bg-black/40 p-3 space-y-2">
               <div className="flex items-center justify-between gap-3">
