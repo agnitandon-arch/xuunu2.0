@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Plus, Database, ChevronRight, Pill, Watch, Droplets, Wind } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { HealthEntry, EnvironmentalReading } from "@shared/schema";
@@ -60,47 +60,6 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
   const stripePortalUrl = env.VITE_STRIPE_PAYMENT_URL;
   const stripeMonthlyUrl = env.VITE_STRIPE_MONTHLY_URL;
   const stripeYearlyUrl = env.VITE_STRIPE_YEARLY_URL;
-  const dashboards = useMemo(
-    () => [
-      {
-        id: "performance",
-        title: "Performance Dashboard",
-        description: "Training load, HRV, recovery, and readiness trends.",
-        url:
-          env.VITE_LOOKER_PERFORMANCE_DASHBOARD_URL ||
-          env.NEXT_PUBLIC_LOOKER_PERFORMANCE_DASHBOARD_URL ||
-          "",
-      },
-      {
-        id: "health",
-        title: "Health Dashboard",
-        description: "Vitals, glucose stability, and metabolic patterns.",
-        url:
-          env.VITE_LOOKER_HEALTH_DASHBOARD_URL ||
-          env.NEXT_PUBLIC_LOOKER_HEALTH_DASHBOARD_URL ||
-          "",
-      },
-      {
-        id: "recovery",
-        title: "Recovery Dashboard",
-        description: "Sleep quality, strain balance, and recovery insights.",
-        url:
-          env.VITE_LOOKER_RECOVERY_DASHBOARD_URL ||
-          env.NEXT_PUBLIC_LOOKER_RECOVERY_DASHBOARD_URL ||
-          "",
-      },
-      {
-        id: "energy",
-        title: "Energy Dashboard",
-        description: "Nutrition, activity, and energy utilization trends.",
-        url:
-          env.VITE_LOOKER_ENERGY_DASHBOARD_URL ||
-          env.NEXT_PUBLIC_LOOKER_ENERGY_DASHBOARD_URL ||
-          "",
-      },
-    ],
-    [env]
-  );
 
   const {
     data: latestHealth,
@@ -978,42 +937,6 @@ export default function DashboardScreen({ onNavigate, onOpenProfile }: Dashboard
         )}
 
         <MedicationQuickLog />
-
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold">Dashboards</h2>
-            <p className="text-xs text-white/50">
-              Your health dashboards appear here.
-            </p>
-          </div>
-          <div className="grid gap-4">
-            {dashboards.map((dashboard) => (
-              <div key={dashboard.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-semibold">{dashboard.title}</h3>
-                    <p className="text-xs text-white/60">{dashboard.description}</p>
-                  </div>
-                </div>
-                <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3">
-                  {dashboard.url ? (
-                    <iframe
-                      title={dashboard.title}
-                      src={dashboard.url}
-                      className="h-[360px] w-full"
-                      style={{ border: "none" }}
-                      allowFullScreen
-                    />
-                  ) : (
-                    <div className="flex h-[240px] items-center justify-center text-xs text-white/50">
-                      Dashboard URL not configured yet.
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
 
         <div>
           <TooltipProvider>

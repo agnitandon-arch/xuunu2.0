@@ -45,7 +45,6 @@ import {
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadString } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
-import { saveDeviceImage } from "@/lib/deviceImageStore";
 import { getDeviceFeedItems, saveDeviceFeedItems } from "@/lib/deviceFeedStore";
 
 type ShareTarget = {
@@ -414,6 +413,17 @@ export default function DataInsightsScreen({
             ? "Stripe yearly • $99/year."
             : "Powered by Stripe • $9.99/month or $99/year.",
     });
+  };
+
+  const handleOpenPrimaryGroup = () => {
+    if (groups.length === 0) {
+      toast({
+        title: "No groups yet",
+        description: "Create or join a group to view updates.",
+      });
+      return;
+    }
+    void handleOpenGroupUpdates(groups[0]);
   };
 
   const handleManageBilling = async () => {
@@ -1347,6 +1357,14 @@ export default function DataInsightsScreen({
     const feedId = `feed-${Date.now()}`;
 
     const selectedGroup = groups.find((group) => group.id === selectedGroupId);
+    const draft = {
+      text: updateText,
+      photos: updatePhotos,
+      shareToGroup,
+      selectedGroupId,
+      shareUpdate,
+    };
+
     const newItem: FeedItem = {
       id: feedId,
       authorName: "You",
@@ -1414,12 +1432,6 @@ export default function DataInsightsScreen({
         }
       }
 
-      await Promise.all(
-        updatePhotos.map((photo, index) =>
-          saveDeviceImage(`feed-${feedId}-${index}`, photo)
-        )
-      );
-
       if (firestoreSaved || serverSaved) {
         toast({
           title: "Update shared",
@@ -1427,9 +1439,16 @@ export default function DataInsightsScreen({
         });
       } else {
         toast({
-          title: "Saved locally",
-          description: "Your update was saved on this device. We'll retry sync.",
+          title: "Update failed",
+          description: "We couldn't save your update. Please try again.",
+          variant: "destructive",
         });
+        setFeedItems((prev) => prev.filter((item) => item.id !== feedId));
+        setUpdateText(draft.text);
+        setUpdatePhotos(draft.photos);
+        setShareToGroup(draft.shareToGroup);
+        setSelectedGroupId(draft.selectedGroupId);
+        setShareUpdate(draft.shareUpdate);
       }
     } catch (error) {
       console.error("Failed to share update:", error);
@@ -1463,12 +1482,23 @@ export default function DataInsightsScreen({
     }
     setIsSavingName(true);
     try {
-      await updateProfile(user, { displayName: nextName });
-      await setDoc(
-        doc(db, "users", user.uid),
-        { displayNameOverride: nextName },
-        { merge: true }
-      );
+      const timeoutMs = 6000;
+      await Promise.race([
+        updateProfile(user, { displayName: nextName }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), timeoutMs)
+        ),
+      ]);
+      await Promise.race([
+        setDoc(
+          doc(db, "users", user.uid),
+          { displayNameOverride: nextName },
+          { merge: true }
+        ),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), timeoutMs)
+        ),
+      ]);
       await setDoc(
         doc(db, "publicProfiles", user.uid),
         {
@@ -1503,6 +1533,7 @@ export default function DataInsightsScreen({
   };
 
   const handleSaveProfileSettings = async () => {
+    setShowEditProfileDialog(false);
     const trimmedName = usernameDraft.trim();
     if (trimmedName && trimmedName !== displayName) {
       const saved = await handleSaveDisplayName();
@@ -1519,7 +1550,7 @@ export default function DataInsightsScreen({
           )
         );
       }
-      await setDoc(
+      void setDoc(
         doc(db, "users", user.uid),
         { profileInvisible: profileVisibilityDraft },
         { merge: true }
@@ -1531,7 +1562,6 @@ export default function DataInsightsScreen({
           : "Your profile is visible again.",
       });
     }
-    setShowEditProfileDialog(false);
   };
 
   const getCurrentLocation = useCallback(
@@ -1770,6 +1800,9 @@ export default function DataInsightsScreen({
         return;
       }
       const invite = inviteSnap.data() as { groupId: string; groupName?: string };
+      if (onViewGroup) {
+        onViewGroup({ id: invite.groupId, name: invite.groupName || "Group" });
+      }
       await updateDoc(doc(db, "groups", invite.groupId), {
         members: arrayUnion(user.uid),
       });
@@ -1778,9 +1811,6 @@ export default function DataInsightsScreen({
         title: "Joined group",
         description: `You joined ${invite.groupName || "the group"}.`,
       });
-      if (onViewGroup) {
-        onViewGroup({ id: invite.groupId, name: invite.groupName || "Group" });
-      }
     } catch (error) {
       console.error("Failed to join group:", error);
       toast({
@@ -2851,6 +2881,15 @@ export default function DataInsightsScreen({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
+                onClick={handleOpenPrimaryGroup}
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-[11px] text-white/70 transition hover:border-white/40 hover:text-white"
+                data-testid="button-open-groups"
+              >
+                <Users className="h-4 w-4" />
+                Groups
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   if (isProfileInvisible) return;
                   setShowShareOptions((prev) => !prev);
@@ -2994,17 +3033,17 @@ export default function DataInsightsScreen({
                 </p>
               )}
             </div>
-            <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 p-3 space-y-3">
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-3">
               <div>
-                <p className="text-sm font-medium text-rose-200">Delete account</p>
-                <p className="text-xs text-rose-200/80">
+                <p className="text-sm font-medium text-white/70">Delete account</p>
+                <p className="text-xs text-white/50">
                   This permanently removes your account and data. This cannot be undone.
                 </p>
               </div>
               {!showDeleteConfirm ? (
                 <Button
                   type="button"
-                  variant="destructive"
+                  variant="outline"
                   onClick={() => setShowDeleteConfirm(true)}
                   data-testid="button-start-delete-account"
                 >
@@ -3012,13 +3051,13 @@ export default function DataInsightsScreen({
                 </Button>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-xs text-rose-200">
+                  <p className="text-xs text-white/50">
                     Type DELETE to confirm account deletion.
                   </p>
                   <Input
                     value={deleteConfirmText}
                     onChange={(event) => setDeleteConfirmText(event.target.value)}
-                    className="h-10 bg-black/40 border-rose-500/40 text-sm text-rose-100"
+                    className="h-10 bg-black/40 border-white/20 text-sm text-white/80"
                     data-testid="input-delete-confirm"
                   />
                   <div className="flex flex-wrap justify-end gap-2">
@@ -3034,7 +3073,7 @@ export default function DataInsightsScreen({
                     </Button>
                     <Button
                       type="button"
-                      variant="destructive"
+                      variant="outline"
                       onClick={handleDeleteAccount}
                       disabled={isDeletingAccount || deleteConfirmText.trim() !== "DELETE"}
                       data-testid="button-confirm-delete-account"
