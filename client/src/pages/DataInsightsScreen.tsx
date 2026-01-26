@@ -11,6 +11,8 @@ import {
   MapPin,
   Flag,
   Medal,
+  Play,
+  Send,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -48,7 +50,7 @@ import { db, storage } from "@/lib/firebase";
 import { getDeviceFeedItems, saveDeviceFeedItems } from "@/lib/deviceFeedStore";
 
 type ShareTarget = {
-  id: "tiktok" | "facebook" | "x" | "instagram" | "whatsapp";
+  id: "tiktok" | "facebook" | "x" | "instagram" | "whatsapp" | "sms";
   label: string;
   requiresCopy?: boolean;
   buildUrl: (url: string, text: string) => string;
@@ -231,6 +233,15 @@ const SHARE_TARGETS: ShareTarget[] = [
     buildUrl: (url, text) => `sms:?body=${encodeURIComponent(`${text} ${url}`)}`,
   },
 ];
+
+const SHARE_TARGET_ICONS = {
+  tiktok: Play,
+  facebook: Users,
+  x: ExternalLink,
+  instagram: Camera,
+  whatsapp: Share2,
+  sms: Send,
+} satisfies Record<ShareTarget["id"], typeof Share2>;
 
 interface DataInsightsScreenProps {
   onBack?: () => void;
@@ -2947,23 +2958,28 @@ export default function DataInsightsScreen({
           />
 
           {showShareOptions && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {SHARE_TARGETS.map((target) => (
-                <button
-                  key={target.id}
-                  type="button"
-                  onClick={() =>
-                    handleShare(
-                      target,
-                      profileUrl || shareUrl,
-                      "Check out my Xuunu profile."
-                    )
-                  }
-                  className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/70 transition hover:border-white/30 hover:text-white"
-                >
-                  {target.label}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              {SHARE_TARGETS.map((target) => {
+                const Icon = SHARE_TARGET_ICONS[target.id];
+                return (
+                  <button
+                    key={target.id}
+                    type="button"
+                    onClick={() =>
+                      handleShare(
+                        target,
+                        profileUrl || shareUrl,
+                        "Check out my Xuunu profile."
+                      )
+                    }
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-white/70 transition hover:border-white/30 hover:text-white"
+                    aria-label={target.label}
+                    title={target.label}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
