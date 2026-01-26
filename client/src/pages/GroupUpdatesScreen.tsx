@@ -296,12 +296,6 @@ export default function GroupUpdatesScreen({
     void cleanupExpiredComments();
   }, [groupId, memberIds, user?.uid]);
 
-  const challengeCount = useMemo(
-    () =>
-      updates.filter((item) => item.challenge || item.challengeSchedule).length,
-    [updates]
-  );
-
   const handlePostComment = async () => {
     if (!user?.uid) {
       toast({
@@ -434,16 +428,6 @@ export default function GroupUpdatesScreen({
             <p className="text-xs text-white/50">Updates from group members.</p>
           </div>
         </div>
-
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs uppercase tracking-widest text-white/50">Challenges</p>
-            <span className="text-xs text-white/60">{challengeCount} shared</span>
-          </div>
-          <p className="text-xs text-white/50">
-            Join a new challenge to post progress to this group.
-          </p>
-        </section>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
           <div className="flex items-center justify-between">
