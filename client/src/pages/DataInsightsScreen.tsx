@@ -163,6 +163,7 @@ type ChallengeScheduleSummary = {
 type FeedItem = {
   id: string;
   userId?: string;
+  authorId?: string;
   authorName: string;
   authorAvatar: string;
   time: string;
@@ -1040,6 +1041,7 @@ export default function DataInsightsScreen({
         return {
           id: entry.id || `feed-${Date.now()}`,
           userId: typeof entry.userId === "string" ? entry.userId : undefined,
+          authorId: typeof entry.authorId === "string" ? entry.authorId : undefined,
           authorName,
           authorAvatar: entry.authorAvatar || "",
           postedAt: postedAtValue,
@@ -1083,7 +1085,11 @@ export default function DataInsightsScreen({
   const saveFeedItem = async (item: FeedItem) => {
     if (!user?.uid) return false;
     try {
-      const cleaned = stripUndefined({ ...item, userId: user.uid }) as FeedItem;
+      const cleaned = stripUndefined({
+        ...item,
+        userId: user.uid,
+        authorId: item.authorId ?? user.uid,
+      }) as FeedItem;
       await setDoc(doc(db, "users", user.uid, "feedItems", item.id), cleaned, {
         merge: true,
       });
@@ -1374,6 +1380,7 @@ export default function DataInsightsScreen({
 
     const newItem: FeedItem = {
       id: feedId,
+      authorId: user.uid,
       authorName: "You",
       authorAvatar: photoUrl || "",
       postedAt: new Date().toISOString(),
