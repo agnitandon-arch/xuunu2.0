@@ -162,6 +162,7 @@ type ChallengeScheduleSummary = {
 
 type FeedItem = {
   id: string;
+  userId?: string;
   authorName: string;
   authorAvatar: string;
   time: string;
@@ -1038,6 +1039,7 @@ export default function DataInsightsScreen({
             : undefined;
         return {
           id: entry.id || `feed-${Date.now()}`,
+          userId: typeof entry.userId === "string" ? entry.userId : undefined,
           authorName,
           authorAvatar: entry.authorAvatar || "",
           postedAt: postedAtValue,
@@ -1081,7 +1083,7 @@ export default function DataInsightsScreen({
   const saveFeedItem = async (item: FeedItem) => {
     if (!user?.uid) return false;
     try {
-      const cleaned = stripUndefined(item) as FeedItem;
+      const cleaned = stripUndefined({ ...item, userId: user.uid }) as FeedItem;
       await setDoc(doc(db, "users", user.uid, "feedItems", item.id), cleaned, {
         merge: true,
       });
