@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import BioSignature from "@/components/BioSignature";
 import { Loader2, Sparkles, Target } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -65,13 +66,17 @@ export default function BioSignatureDialog({
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
+          <div className="flex items-center justify-center">
+            <BioSignature healthData={healthData} size={240} />
+          </div>
+
           {/* AI Insights */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="w-4 h-4 text-primary" />
               <span className="text-sm font-medium">AI-Powered Insights</span>
             </div>
-            
+
             {loadingInsights ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 text-primary animate-spin" />
