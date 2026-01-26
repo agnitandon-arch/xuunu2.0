@@ -17,7 +17,6 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
   const [hipaaAccepted, setHipaaAccepted] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [platform, setPlatform] = useState<"ios" | "android" | null>(null);
-  const [skipConnection, setSkipConnection] = useState(false);
 
   useEffect(() => {
     const loadOnboarding = async () => {
@@ -27,7 +26,6 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
         const data = snapshot.data() ?? {};
         setHipaaAccepted(!!data.hipaaAccepted);
         setIsConnected(!!data.isConnected);
-        setSkipConnection(!!data.skipConnection);
         if (data.platform === "ios" || data.platform === "android") {
           setPlatform(data.platform);
         }
@@ -49,12 +47,10 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
   const handleSelectPlatform = async (value: "ios" | "android") => {
     setPlatform(value);
     if (value === "ios") {
-      setSkipConnection(false);
       setIsConnected(true);
       await saveOnboarding({
         platform: value,
         isConnected: true,
-        skipConnection: false,
       });
       toast({
         title: "Apple Health connected",
@@ -79,7 +75,6 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
       await saveOnboarding({
         platform: value,
         isConnected: true,
-        skipConnection: false,
       });
       toast({
         title: "Google Health connection started",
@@ -105,7 +100,7 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
       });
       return;
     }
-    if (!isConnected && !skipConnection) {
+    if (!isConnected) {
       toast({
         title: "Health connection required",
         description: "Connect your health account to continue.",
@@ -190,32 +185,16 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
               Android
             </Button>
           </div>
-          {platform === "ios" && (
+          {platform === "ios" && isConnected && (
             <div className="text-xs text-green-400">
-              Apple Health connected automatically.
+              Apple Health connected.
             </div>
           )}
-          {platform === "android" && (
+          {platform === "android" && isConnected && (
             <div className="text-xs text-green-400">
-              Google Health connection started.
+              Google Health connected.
             </div>
           )}
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setSkipConnection(true);
-              void saveOnboarding({ skipConnection: true });
-              toast({
-                title: "We'll remind you later",
-                description: "You can connect your health account anytime.",
-              });
-            }}
-            className="w-full"
-            data-testid="button-remind-later"
-          >
-            Remind me later
-          </Button>
         </div>
 
         <Button
