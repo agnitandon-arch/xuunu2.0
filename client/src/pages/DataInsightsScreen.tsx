@@ -3641,12 +3641,6 @@ export default function DataInsightsScreen({
                 />
               </div>
               <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => handleFinalizeChallenge(false, true)}
-                >
-                  Keep Private
-                </Button>
                 <Button onClick={() => handleFinalizeChallenge(shareChallenge, true)}>
                   Save Challenge
                 </Button>
