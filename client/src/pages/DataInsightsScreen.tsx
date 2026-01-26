@@ -276,6 +276,7 @@ export default function DataInsightsScreen({
   const [shareToGroup, setShareToGroup] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [showGroupUpdatesDialog, setShowGroupUpdatesDialog] = useState(false);
+  const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [activeGroupName, setActiveGroupName] = useState("");
   const [groupUpdates, setGroupUpdates] = useState<FeedItem[]>([]);
@@ -364,13 +365,14 @@ export default function DataInsightsScreen({
 
   const handleOpenPrimaryGroup = () => {
     if (groups.length === 0) {
-      toast({
-        title: "No groups yet",
-        description: "Create or join a group to view updates.",
-      });
+      setShowGroupDialog(true);
       return;
     }
-    void handleOpenGroupUpdates(groups[0]);
+    if (groups.length === 1) {
+      void handleOpenGroupUpdates(groups[0]);
+      return;
+    }
+    setShowGroupPicker(true);
   };
 
   const handleManageBilling = async () => {
@@ -4102,57 +4104,6 @@ export default function DataInsightsScreen({
           </div>
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-widest text-white/50">Groups</p>
-              <p className="text-sm font-semibold">Invite-only groups</p>
-            </div>
-            <Button size="sm" variant="outline" onClick={() => setShowGroupDialog(true)}>
-              Create Group
-            </Button>
-          </div>
-          {groups.length === 0 ? (
-            <div className="text-xs text-white/50">
-              No groups yet. Create one to get started.
-            </div>
-          ) : (
-            <div className="grid gap-3">
-              {groups.map((group) => (
-                <div key={group.id} className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold">{group.name}</p>
-                      <p className="text-xs text-white/50">
-                        {group.members.length} member{group.members.length === 1 ? "" : "s"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleOpenGroupUpdates(group)}
-                        data-testid={`button-view-group-${group.id}`}
-                      >
-                        Updates
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleShareGroupInvite(group)}
-                        data-testid={`button-invite-group-${group.id}`}
-                      >
-                        Invite
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="text-[11px] text-white/40">Invite code: {group.inviteCode}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
         <Dialog open={showGroupDialog} onOpenChange={setShowGroupDialog}>
           <DialogContent className="bg-black border-white/10 text-white">
             <DialogHeader>
@@ -4198,6 +4149,46 @@ export default function DataInsightsScreen({
                   {isCreatingGroup ? "Creating..." : "Create Group"}
                 </Button>
               </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showGroupPicker} onOpenChange={setShowGroupPicker}>
+          <DialogContent className="bg-black border-white/10 text-white max-w-md">
+            <DialogHeader>
+              <DialogTitle>Select a group</DialogTitle>
+              <DialogDescription className="text-white/60">
+                Choose which group updates to view.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              {groups.map((group) => (
+                <button
+                  key={group.id}
+                  type="button"
+                  onClick={() => {
+                    setShowGroupPicker(false);
+                    void handleOpenGroupUpdates(group);
+                  }}
+                  className="w-full rounded-lg border border-white/10 bg-black/40 px-4 py-3 text-left transition hover:border-white/30"
+                  data-testid={`button-select-group-${group.id}`}
+                >
+                  <p className="text-sm font-semibold">{group.name}</p>
+                  <p className="text-xs text-white/50">
+                    {group.members.length} member{group.members.length === 1 ? "" : "s"}
+                  </p>
+                </button>
+              ))}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowGroupPicker(false);
+                  setShowGroupDialog(true);
+                }}
+                data-testid="button-create-group-from-picker"
+              >
+                Create Group
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
