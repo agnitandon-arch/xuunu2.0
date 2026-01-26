@@ -1596,6 +1596,18 @@ export default function DataInsightsScreen({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const isStrengthTraining = (type?: string) => type === "Strength Training";
+
+  const getChallengeMinutes = (seconds: number) => Math.max(1, Math.ceil(seconds / 60));
+
+  const getChallengeMetricLabel = (type?: string) =>
+    isStrengthTraining(type) ? "Minutes" : "Steps";
+
+  const getChallengeMetricValue = (type: string | undefined, durationSec: number, stepsDelta: number) =>
+    isStrengthTraining(type)
+      ? getChallengeMinutes(durationSec).toLocaleString()
+      : stepsDelta.toLocaleString();
+
   const formatDateTimeLocal = (date: Date) => {
     const pad = (value: number) => value.toString().padStart(2, "0");
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
@@ -2135,7 +2147,9 @@ export default function DataInsightsScreen({
     resetChallengeDialog();
     toast({
       title: `${type} challenge started`,
-      description: "Timer is running. Move to record steps.",
+      description: isStrengthTraining(type)
+        ? "Timer is running. Track your minutes."
+        : "Timer is running. Move to record steps.",
     });
   };
 
@@ -2472,7 +2486,11 @@ export default function DataInsightsScreen({
         authorAvatar: photoUrl || "",
         postedAt: new Date().toISOString(),
         time: "Just now",
-        content: `${record.type} challenge completed in ${formatDuration(record.durationSec)} (${record.stepsDelta.toLocaleString()} steps).`,
+        content: `${record.type} challenge completed in ${formatDuration(record.durationSec)} (${getChallengeMetricValue(
+          record.type,
+          record.durationSec,
+          record.stepsDelta
+        )} ${getChallengeMetricLabel(record.type).toLowerCase()}).`,
         photos: [],
         shared,
         source: "you",
@@ -3340,8 +3358,10 @@ export default function DataInsightsScreen({
             )}
             <div className="flex items-center justify-between">
               <div className="text-xs text-white/50">
-                Steps recorded:{" "}
-                {(lastStepsRef.current ?? activeChallenge.stepsStart).toLocaleString()}
+                {isStrengthTraining(activeChallenge.type) ? "Minutes recorded:" : "Steps recorded:"}{" "}
+                {isStrengthTraining(activeChallenge.type)
+                  ? getChallengeMinutes(elapsedSeconds).toLocaleString()
+                  : (lastStepsRef.current ?? activeChallenge.stepsStart).toLocaleString()}
               </div>
               <Button
                 variant="destructive"
@@ -3353,7 +3373,8 @@ export default function DataInsightsScreen({
               </Button>
             </div>
             <p className="text-[11px] text-white/40">
-              Auto-stops after 5 minutes with no step updates.
+              Auto-stops after 5 minutes with no{" "}
+              {isStrengthTraining(activeChallenge.type) ? "activity" : "step"} updates.
             </p>
           </div>
         )}
@@ -3599,7 +3620,12 @@ export default function DataInsightsScreen({
                   </span>
                 </div>
                 <div className="text-xs text-white/60">
-                  Steps: {pendingChallenge.stepsDelta.toLocaleString()}
+                  {getChallengeMetricLabel(pendingChallenge.type)}:{" "}
+                  {getChallengeMetricValue(
+                    pendingChallenge.type,
+                    pendingChallenge.durationSec,
+                    pendingChallenge.stepsDelta
+                  )}
                 </div>
                 {pendingChallenge.invitedFriends &&
                   pendingChallenge.invitedFriends.length > 0 && (
@@ -3609,7 +3635,9 @@ export default function DataInsightsScreen({
                   )}
                 {pendingChallenge.autoStopped && (
                   <div className="text-xs text-yellow-300/80">
-                    Auto-stopped after steps stopped updating.
+                    Auto-stopped after{" "}
+                    {isStrengthTraining(pendingChallenge.type) ? "activity" : "steps"} stopped
+                    updating.
                   </div>
                 )}
                 {pendingChallenge.startLocation && (
