@@ -3,7 +3,6 @@ export type HealthBand = 'optimal' | 'transitional' | 'poor';
 export interface BioSignaturePatternConfig {
   density: number; // 0-1, how many dots are active
   symmetry: number; // 0-1, how organized the pattern is
-  animationSpeed: number; // multiplier for animation
   colorIntensity: number; // 0-1, brightness of blue
   jitter: number; // 0-1, randomness in positioning
   band: HealthBand;
@@ -196,7 +195,6 @@ export function getPatternConfig(metrics: HealthMetrics): BioSignaturePatternCon
     return {
       density: 0.85 + (score - 75) / 100, // 0.85-1.0
       symmetry: 0.95,
-      animationSpeed: 1.0,
       colorIntensity: 0.9 + (score - 75) / 250, // 0.9-1.0
       jitter: 0.05,
       band,
@@ -210,7 +208,6 @@ export function getPatternConfig(metrics: HealthMetrics): BioSignaturePatternCon
     return {
       density: 0.5 + normalizedScore * 0.35, // 0.5-0.85
       symmetry: 0.6 + normalizedScore * 0.35, // 0.6-0.95
-      animationSpeed: 0.7 + normalizedScore * 0.3, // 0.7-1.0
       colorIntensity: 0.6 + normalizedScore * 0.3, // 0.6-0.9
       jitter: 0.3 - normalizedScore * 0.25, // 0.3-0.05
       band,
@@ -222,7 +219,6 @@ export function getPatternConfig(metrics: HealthMetrics): BioSignaturePatternCon
   return {
     density: 0.2 + (score / 40) * 0.3, // 0.2-0.5
     symmetry: 0.2 + (score / 40) * 0.4, // 0.2-0.6
-    animationSpeed: 0.3 + (score / 40) * 0.4, // 0.3-0.7
     colorIntensity: 0.3 + (score / 40) * 0.3, // 0.3-0.6
     jitter: 0.7 - (score / 40) * 0.4, // 0.7-0.3
     band,
@@ -237,7 +233,6 @@ export function getIdealPatternConfig(): BioSignaturePatternConfig {
   return {
     density: 1.0,
     symmetry: 1.0,
-    animationSpeed: 1.0,
     colorIntensity: 1.0,
     jitter: 0.0,
     band: 'optimal',
@@ -249,7 +244,7 @@ export function getIdealPatternConfig(): BioSignaturePatternConfig {
  * Get guidance text for ideal health pattern
  */
 export function getIdealPatternGuidance(): string {
-  return `The ideal Bio SYGnature shows a highly organized, concentric lattice pattern with synchronized oscillation. This represents optimal health balance:
+  return `The ideal Bio SYGnature shows a highly organized, concentric lattice pattern where all corners are lighted up. Corner lighting strengthens iteratively as health improves, reflecting optimal balance:
 
 • Health Metrics Stability: steady glucose, heart rate, and sleep rhythm
 • Environmental Quality: AQI <50 (clean air)
@@ -262,5 +257,5 @@ export function getIdealPatternGuidance(): string {
 • Strain: 8-14 (moderate exertion)
 • Challenges: 3-7 completions/week (consistent follow-through)
 
-When all metrics align within optimal ranges, the Bio SYGnature becomes bright, dense, and symmetrical - reflecting strong environmental and recovery synergy.`;
+When all metrics align within optimal ranges, the Bio SYGnature becomes bright, dense, and symmetrical with fully illuminated corners, reflecting strong environmental and recovery synergy.`;
 }
