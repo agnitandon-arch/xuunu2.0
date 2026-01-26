@@ -223,6 +223,11 @@ const SHARE_TARGETS: ShareTarget[] = [
     label: "WhatsApp",
     buildUrl: (url, text) => `https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`,
   },
+  {
+    id: "sms",
+    label: "SMS",
+    buildUrl: (url, text) => `sms:?body=${encodeURIComponent(`${text} ${url}`)}`,
+  },
 ];
 
 interface DataInsightsScreenProps {
@@ -2726,6 +2731,10 @@ export default function DataInsightsScreen({
     }
 
     const shareLink = target.buildUrl(url, text);
+    if (target.id === "sms") {
+      window.location.href = shareLink;
+      return;
+    }
     window.open(shareLink, "_blank", "noopener,noreferrer");
   };
 
@@ -2890,8 +2899,21 @@ export default function DataInsightsScreen({
               </button>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   if (isProfileInvisible) return;
+                  const link = profileUrl || shareUrl;
+                  if (navigator.share && link) {
+                    try {
+                      await navigator.share({
+                        title: "Xuunu Profile",
+                        text: "Check out my Xuunu profile.",
+                        url: link,
+                      });
+                      return;
+                    } catch {
+                      // fall back to share options
+                    }
+                  }
                   setShowShareOptions((prev) => !prev);
                 }}
                 className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] transition ${
@@ -2924,8 +2946,8 @@ export default function DataInsightsScreen({
                   onClick={() =>
                     handleShare(
                       target,
-                      shareUrl,
-                      "Check out my Xuunu progress and dashboards."
+                      profileUrl || shareUrl,
+                      "Check out my Xuunu profile."
                     )
                   }
                   className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/70 transition hover:border-white/30 hover:text-white"
