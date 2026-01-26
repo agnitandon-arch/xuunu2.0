@@ -2890,11 +2890,17 @@ export default function DataInsightsScreen({
                   </Tooltip>
                 </TooltipProvider>
                 {(hasUserChallengePost || teamChallengeCount > 0) && (
-                  <div className="inline-flex items-center gap-2 text-primary/80">
+                  <div className="mt-1 inline-flex items-center gap-2 text-primary/80">
                     {hasUserChallengePost && (
-                      <span className="inline-flex items-center" aria-label="Challenge active">
+                      <button
+                        type="button"
+                        onClick={() => setShowChallengePicker(true)}
+                        className="inline-flex items-center rounded-full border border-primary/30 px-2 py-1 text-[10px] text-primary/80 hover:text-primary"
+                        aria-label="Open challenges"
+                        data-testid="button-open-challenges-icon"
+                      >
                         <Flag className="h-3 w-3" />
-                      </span>
+                      </button>
                     )}
                     {teamChallengeCount > 0 && (
                       <span
