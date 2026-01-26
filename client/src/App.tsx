@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import type { FriendProfile } from "@/pages/FriendProfileScreen";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { Analytics } from "@vercel/analytics/react";
 
 const LoginScreen = lazy(() => import("@/pages/LoginScreen"));
 const DashboardScreen = lazy(() => import("@/pages/DashboardScreen"));
@@ -177,6 +178,7 @@ function App() {
         </ErrorBoundary>
         <Toaster />
       </TooltipProvider>
+      <Analytics />
     </QueryClientProvider>
   );
 }
