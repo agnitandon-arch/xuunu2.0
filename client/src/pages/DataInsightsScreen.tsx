@@ -202,7 +202,6 @@ export default function DataInsightsScreen({
   const [profileUrl, setProfileUrl] = useState("");
   const [updateText, setUpdateText] = useState("");
   const [updatePhotos, setUpdatePhotos] = useState<string[]>([]);
-  const [shareUpdate, setShareUpdate] = useState(true);
   const [isSharingUpdate, setIsSharingUpdate] = useState(false);
   const [displayNameOverride, setDisplayNameOverride] = useState<string | null>(null);
   const [usernameDraft, setUsernameDraft] = useState("");
@@ -1318,9 +1317,9 @@ export default function DataInsightsScreen({
       photos: updatePhotos,
       shareToGroup,
       selectedGroupId,
-      shareUpdate,
     };
 
+    const sharedPublicly = !shareToGroup && !isProfileInvisible;
     const newItem: FeedItem = {
       id: feedId,
       authorId: user.uid,
@@ -1330,7 +1329,7 @@ export default function DataInsightsScreen({
       time: "Just now",
       content: updateText.trim() || "Shared new progress.",
       photos: updatePhotos,
-      shared: shareToGroup ? false : shareUpdate,
+      shared: sharedPublicly,
       source: "you" as const,
       likesCount: 0,
       liked: false,
@@ -1343,7 +1342,6 @@ export default function DataInsightsScreen({
     setUpdatePhotos([]);
     setShareToGroup(false);
     setSelectedGroupId("");
-    setShareUpdate(isProfileInvisible ? false : true);
     let firestoreSaved = false;
     let serverSaved = false;
     try {
@@ -1405,7 +1403,6 @@ export default function DataInsightsScreen({
         setUpdatePhotos(draft.photos);
         setShareToGroup(draft.shareToGroup);
         setSelectedGroupId(draft.selectedGroupId);
-        setShareUpdate(draft.shareUpdate);
       }
     } catch (error) {
       console.error("Failed to share update:", error);
@@ -1908,10 +1905,8 @@ export default function DataInsightsScreen({
 
   useEffect(() => {
     if (!isProfileInvisible) return;
-    setShareUpdate(false);
     setShareScheduledChallenge(false);
     setShareChallenge(false);
-    setShowShareOptions(false);
   }, [isProfileInvisible]);
 
   useEffect(() => {
@@ -3165,22 +3160,6 @@ export default function DataInsightsScreen({
                 )}
               </div>
             )}
-            <div className="ml-auto flex items-center gap-2 text-xs text-white/60">
-              <span>
-                {shareToGroup
-                  ? "Group-only"
-                  : isProfileInvisible
-                    ? "Invisible"
-                    : shareUpdate
-                      ? "Shared"
-                      : "Private"}
-              </span>
-              <Switch
-                checked={shareUpdate}
-                onCheckedChange={setShareUpdate}
-                disabled={isProfileInvisible || shareToGroup}
-              />
-            </div>
           </div>
           {updatePhotos.length > 0 && (
             <div className="grid grid-cols-2 gap-2">
