@@ -1,19 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Copy,
-  ExternalLink,
-  Share2,
-  Camera,
-  Users,
-  UserPlus,
-  Heart,
-  Plus,
-  MapPin,
-  Flag,
-  Medal,
-  Play,
-  Send,
-} from "lucide-react";
+import { Share2, UserPlus, Heart, Plus, MapPin, Flag, Medal } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,13 +34,6 @@ import {
 import { getDownloadURL, ref, uploadString } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { getDeviceFeedItems, saveDeviceFeedItems } from "@/lib/deviceFeedStore";
-
-type ShareTarget = {
-  id: "tiktok" | "facebook" | "x" | "instagram" | "whatsapp" | "sms";
-  label: string;
-  requiresCopy?: boolean;
-  buildUrl: (url: string, text: string) => string;
-};
 
 const PAID_ACCOUNT_EMAIL = "agnishikha@yahoo.com";
 
@@ -198,51 +177,6 @@ type PublicProfileMatch = {
   photoUrl?: string;
 };
 
-const SHARE_TARGETS: ShareTarget[] = [
-  {
-    id: "tiktok",
-    label: "TikTok",
-    requiresCopy: true,
-    buildUrl: () => "https://www.tiktok.com/",
-  },
-  {
-    id: "facebook",
-    label: "Facebook",
-    buildUrl: (url) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
-  },
-  {
-    id: "x",
-    label: "X",
-    buildUrl: (url, text) =>
-      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
-  },
-  {
-    id: "instagram",
-    label: "Instagram",
-    requiresCopy: true,
-    buildUrl: () => "https://www.instagram.com/",
-  },
-  {
-    id: "whatsapp",
-    label: "WhatsApp",
-    buildUrl: (url, text) => `https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`,
-  },
-  {
-    id: "sms",
-    label: "SMS",
-    buildUrl: (url, text) => `sms:?body=${encodeURIComponent(`${text} ${url}`)}`,
-  },
-];
-
-const SHARE_TARGET_ICONS = {
-  tiktok: Play,
-  facebook: Users,
-  x: ExternalLink,
-  instagram: Camera,
-  whatsapp: Share2,
-  sms: Send,
-} satisfies Record<ShareTarget["id"], typeof Share2>;
-
 interface DataInsightsScreenProps {
   onBack?: () => void;
   onPreviewPublicProfile?: () => void;
@@ -266,8 +200,6 @@ export default function DataInsightsScreen({
   const { photoUrl, setPhotoUrl } = useProfilePhoto();
   const [shareUrl, setShareUrl] = useState("");
   const [profileUrl, setProfileUrl] = useState("");
-  const [showShareOptions, setShowShareOptions] = useState(false);
-  const [showProfileShare, setShowProfileShare] = useState(false);
   const [updateText, setUpdateText] = useState("");
   const [updatePhotos, setUpdatePhotos] = useState<string[]>([]);
   const [shareUpdate, setShareUpdate] = useState(true);
@@ -2727,37 +2659,6 @@ export default function DataInsightsScreen({
     }
   };
 
-  const handleShare = async (target: ShareTarget, url: string, text: string) => {
-    if (!url) {
-      toast({
-        title: "Link unavailable",
-        description: "Please reload and try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: "Xuunu Progress", text, url });
-        return;
-      } catch {
-        // fall back to platform-specific share URLs
-      }
-    }
-
-    if (target.requiresCopy) {
-      await copyToClipboard(url, "Share link");
-    }
-
-    const shareLink = target.buildUrl(url, text);
-    if (target.id === "sms") {
-      window.location.href = shareLink;
-      return;
-    }
-    window.open(shareLink, "_blank", "noopener,noreferrer");
-  };
-
   const scheduleBounds = getScheduleBounds();
   const scheduleNow = useMemo(() => Date.now(), [scheduleTick]);
   const longevityConfig = longevityChallenge ? getLongevityConfig(longevityChallenge.type) : null;
@@ -2922,6 +2823,14 @@ export default function DataInsightsScreen({
                 onClick={async () => {
                   if (isProfileInvisible) return;
                   const link = profileUrl || shareUrl;
+                  if (!link) {
+                    toast({
+                      title: "Link unavailable",
+                      description: "Please reload and try again.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
                   if (navigator.share && link) {
                     try {
                       await navigator.share({
@@ -2934,7 +2843,7 @@ export default function DataInsightsScreen({
                       // fall back to share options
                     }
                   }
-                  setShowShareOptions((prev) => !prev);
+                  await copyToClipboard(link, "Profile link");
                 }}
                 className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] transition ${
                   isProfileInvisible
@@ -2957,31 +2866,6 @@ export default function DataInsightsScreen({
             data-testid="input-profile-photo"
           />
 
-          {showShareOptions && (
-            <div className="flex flex-wrap items-center gap-2">
-              {SHARE_TARGETS.map((target) => {
-                const Icon = SHARE_TARGET_ICONS[target.id];
-                return (
-                  <button
-                    key={target.id}
-                    type="button"
-                    onClick={() =>
-                      handleShare(
-                        target,
-                        profileUrl || shareUrl,
-                        "Check out my Xuunu profile."
-                      )
-                    }
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-white/70 transition hover:border-white/30 hover:text-white"
-                    aria-label={target.label}
-                    title={target.label}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
 
       <Dialog
