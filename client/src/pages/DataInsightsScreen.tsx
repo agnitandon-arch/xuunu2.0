@@ -620,10 +620,24 @@ export default function DataInsightsScreen({
     const unsubscribe = onSnapshot(
       groupsQuery,
       (snapshot) => {
-        const results = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...(docSnap.data() as Omit<GroupRecord, "id">),
-        }));
+        const results = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data() as Partial<GroupRecord>;
+          const members = Array.isArray(data.members)
+            ? data.members.filter((member) => typeof member === "string")
+            : [];
+          const invitedFriends = Array.isArray(data.invitedFriends)
+            ? data.invitedFriends.filter((friend) => typeof friend === "string")
+            : [];
+          return {
+            id: docSnap.id,
+            name: typeof data.name === "string" ? data.name : "Group",
+            ownerId: typeof data.ownerId === "string" ? data.ownerId : "",
+            inviteCode: typeof data.inviteCode === "string" ? data.inviteCode : "",
+            members,
+            invitedFriends,
+            createdAt: typeof data.createdAt === "string" ? data.createdAt : new Date().toISOString(),
+          } as GroupRecord;
+        });
         setGroups(results);
       },
       () => setGroups([])
