@@ -2976,7 +2976,7 @@ export default function DataInsightsScreen({
           <DialogHeader>
             <DialogTitle className="text-lg">Edit profile</DialogTitle>
             <DialogDescription className="text-white/60">
-              Update your photo, name, and visibility.
+              Update your photo and name.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -3004,26 +3004,6 @@ export default function DataInsightsScreen({
               />
             </div>
             <div className="rounded-lg border border-white/10 bg-black/40 p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Visibility</p>
-                  <p className="text-xs text-white/60">
-                    Hide your profile from everyone.
-                  </p>
-                </div>
-                <Switch
-                  checked={profileVisibilityDraft}
-                  onCheckedChange={setProfileVisibilityDraft}
-                  data-testid="switch-profile-visibility"
-                />
-              </div>
-              {profileVisibilityDraft && (
-                <p className="text-xs text-white/50">
-                  Sharing is disabled while your profile is invisible.
-                </p>
-              )}
-            </div>
-            <div className="rounded-lg border border-white/10 bg-black/40 p-3 space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">Manage Subscription</p>
@@ -3037,7 +3017,7 @@ export default function DataInsightsScreen({
                   )}
                   {featureFlags?.stripeStatus && (
                     <p className="text-xs text-white/50">
-                      Stripe: {featureFlags.stripeStatus}
+                      Subscription: {featureFlags.stripeStatus}
                     </p>
                   )}
                 </div>
@@ -3053,9 +3033,35 @@ export default function DataInsightsScreen({
               </div>
               {!featureFlags?.hasCustomer && (
                 <p className="text-xs text-white/40">
-                  No active Stripe subscription on file.
+                  No active subscription.
                 </p>
               )}
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/40 p-3 space-y-3">
+              <div>
+                <p className="text-sm font-medium">Connect to a group</p>
+                <p className="text-xs text-white/60">
+                  Enter an invite code to join a group.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={joinCode}
+                  onChange={(event) => setJoinCode(event.target.value)}
+                  className="h-10 bg-black/40 border-white/10 text-sm uppercase"
+                  placeholder="Invite code"
+                  data-testid="input-edit-join-code"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleJoinGroup}
+                  disabled={isJoiningGroup || !joinCode.trim()}
+                  data-testid="button-edit-join-group"
+                >
+                  {isJoiningGroup ? "Joining..." : "Connect"}
+                </Button>
+              </div>
             </div>
             <div className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-3">
               <div>
