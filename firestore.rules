@@ -69,6 +69,43 @@ service cloud.firestore {
         allow update, delete: if isSignedIn() &&
           request.auth.uid == resource.data.authorId;
       }
+
+      match /comments/{commentId} {
+        allow read: if isSignedIn() &&
+          request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.members;
+        allow create: if isSignedIn() &&
+          request.resource.data.keys().hasOnly([
+            "authorId",
+            "authorName",
+            "authorAvatar",
+            "text",
+            "createdAt",
+            "likedBy"
+          ]) &&
+          request.resource.data.authorId == request.auth.uid &&
+          request.resource.data.likedBy is list &&
+          request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.members;
+        allow update: if isSignedIn() &&
+          request.resource.data.keys().hasOnly([
+            "authorId",
+            "authorName",
+            "authorAvatar",
+            "text",
+            "createdAt",
+            "likedBy"
+          ]) &&
+          request.resource.data.authorId == resource.data.authorId &&
+          request.resource.data.authorName == resource.data.authorName &&
+          request.resource.data.authorAvatar == resource.data.authorAvatar &&
+          request.resource.data.text == resource.data.text &&
+          request.resource.data.createdAt == resource.data.createdAt &&
+          request.resource.data.likedBy is list &&
+          request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.members;
+        allow delete: if isSignedIn() &&
+          (request.auth.uid == resource.data.authorId ||
+            (request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.members &&
+             resource.data.createdAt < request.time - duration.value(7, 'd')));
+      }
     }
 
     match /activities/{activityId} {
