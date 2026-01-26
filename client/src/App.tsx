@@ -141,10 +141,6 @@ function AppContent() {
             groupId={selectedGroup.id}
             groupName={selectedGroup.name}
             onBack={() => setActiveTab("data")}
-            onJoinChallenge={() => {
-              setOpenChallengePicker(true);
-              setActiveTab("data");
-            }}
           />
         ) : (
           <DataInsightsScreen onBack={() => setActiveTab("dashboard")} />

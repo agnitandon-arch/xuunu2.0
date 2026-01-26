@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Button } from "@/components/ui/button";
 
 type ChallengeSummary = {
   type?: string;
@@ -29,7 +28,6 @@ interface GroupUpdatesScreenProps {
   groupId: string;
   groupName: string;
   onBack: () => void;
-  onJoinChallenge: () => void;
 }
 
 const normalizeDateValue = (value: unknown) => {
@@ -65,7 +63,6 @@ export default function GroupUpdatesScreen({
   groupId,
   groupName,
   onBack,
-  onJoinChallenge,
 }: GroupUpdatesScreenProps) {
   const [updates, setUpdates] = useState<GroupUpdate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -123,13 +120,6 @@ export default function GroupUpdatesScreen({
             <h1 className="text-2xl font-bold mt-2">{groupName}</h1>
             <p className="text-xs text-white/50">Updates from group members.</p>
           </div>
-          <Button
-            variant="outline"
-            onClick={onJoinChallenge}
-            data-testid="button-join-group-challenge"
-          >
-            Join Challenge
-          </Button>
         </div>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
