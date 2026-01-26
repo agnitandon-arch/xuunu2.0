@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Xuunu</string>
+    <string name="title_activity_main">Xuunu</string>
+    <string name="package_name">com.xuunu.app</string>
+    <string name="custom_url_scheme">com.xuunu.app</string>
+</resources>
