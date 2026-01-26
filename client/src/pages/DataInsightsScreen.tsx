@@ -4210,9 +4210,7 @@ export default function DataInsightsScreen({
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
-              {isLoadingGroupUpdates ? (
-                <div className="text-xs text-white/50">Loading updates...</div>
-              ) : groupUpdates.length === 0 ? (
+              {groupUpdates.length === 0 ? (
                 <div className="text-xs text-white/50">No updates yet.</div>
               ) : (
                 groupUpdates.map((update) => (
