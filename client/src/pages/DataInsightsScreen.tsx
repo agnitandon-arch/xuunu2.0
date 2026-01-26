@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Share2, UserPlus, Heart, Plus, MapPin, Flag, Medal, Users } from "lucide-react";
+import { Share2, UserPlus, Heart, Plus, MapPin, Flag, Medal, Users, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
