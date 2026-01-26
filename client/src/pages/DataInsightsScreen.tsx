@@ -12,6 +12,7 @@ import type { FriendProfile } from "@/pages/FriendProfileScreen";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { deleteUser, updateProfile } from "firebase/auth";
 import { useQuery } from "@tanstack/react-query";
 import type { HealthEntry } from "@shared/schema";
@@ -245,6 +246,7 @@ export default function DataInsightsScreen({
   const [scheduledChallenges, setScheduledChallenges] = useState<ChallengeSchedule[]>([]);
   const [scheduleTick, setScheduleTick] = useState(0);
   const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
+  const [scheduleCalendarOpen, setScheduleCalendarOpen] = useState(false);
   const scheduleTimeoutsRef = useRef<Record<string, number>>({});
   const liveLocationRef = useRef<ChallengeLocation>(null);
   const locationWatchIdRef = useRef<number | null>(null);
@@ -3399,10 +3401,11 @@ export default function DataInsightsScreen({
           setShowChallengePicker(open);
           if (!open) {
             resetChallengeDialog();
+            setScheduleCalendarOpen(false);
           }
         }}
       >
-        <DialogContent className="bg-black border-white/10 text-white">
+        <DialogContent className="bg-black border-white/10 text-white max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Join a challenge</DialogTitle>
             <DialogDescription className="text-white/60">
@@ -3449,17 +3452,35 @@ export default function DataInsightsScreen({
             <div className="rounded-lg border border-white/10 bg-black/40 p-3 space-y-3">
               <div className="space-y-2">
                 <label className="text-xs text-white/60">Pick a date</label>
-                <div className="rounded-lg border border-white/10 bg-black/40 p-2">
-                  <Calendar
-                    mode="single"
-                    selected={scheduleDate}
-                    onSelect={setScheduleDate}
-                    disabled={(date) =>
-                      date < startOfDay(scheduleBounds.min) ||
-                      date > endOfDay(scheduleBounds.max)
-                    }
-                  />
-                </div>
+                <Popover open={scheduleCalendarOpen} onOpenChange={setScheduleCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-between"
+                      data-testid="button-open-challenge-calendar"
+                    >
+                      {scheduleDate
+                        ? formatOptionalDateOnly(scheduleDate, "Pick a date")
+                        : "Pick a date"}
+                      <span className="text-xs text-white/50">▼</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="bg-black border-white/10 text-white">
+                    <Calendar
+                      mode="single"
+                      selected={scheduleDate}
+                      onSelect={(value) => {
+                        setScheduleDate(value);
+                        setScheduleCalendarOpen(false);
+                      }}
+                      disabled={(date) =>
+                        date < startOfDay(scheduleBounds.min) ||
+                        date > endOfDay(scheduleBounds.max)
+                      }
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <label className="text-xs text-white/60">Pick a time</label>
