@@ -883,7 +883,7 @@ export default function DataInsightsScreen({
       return;
     }
 
-    Promise.all(selected.map((file) => readAndResizeImage(file, 1280)))
+    Promise.all(selected.map((file) => prepareUpdatePhoto(file)))
       .then((results) => {
         setUpdatePhotos((prev) => [...prev, ...results]);
       })
@@ -1141,6 +1141,39 @@ export default function DataInsightsScreen({
   }, [feedItems, user?.uid]);
 
   useEffect(() => {
+    if (!user?.uid || feedItems.length === 0) return;
+    const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const expired = feedItems.filter((item) => {
+      if (item.source !== "you") return false;
+      if (!item.photos || item.photos.length === 0) return false;
+      const postedMs = getDateMs(item.postedAt);
+      return postedMs !== null && postedMs < cutoffMs;
+    });
+    if (expired.length === 0) return;
+    const expiredIds = new Set(expired.map((item) => item.id));
+    setFeedItems((prev) =>
+      prev.map((item) => (expiredIds.has(item.id) ? { ...item, photos: [] } : item))
+    );
+    const updates = expired.map((item) =>
+      updateDoc(doc(db, "users", user.uid, "feedItems", item.id), {
+        photos: [],
+      }).catch((error) => {
+        console.error("Failed to clear expired photos:", error);
+      })
+    );
+    const groupUpdates = expired
+      .filter((item) => item.groupId)
+      .map((item) =>
+        updateDoc(doc(db, "groups", item.groupId as string, "updates", item.id), {
+          photos: [],
+        }).catch((error) => {
+          console.error("Failed to clear group photos:", error);
+        })
+      );
+    void Promise.all([...updates, ...groupUpdates]);
+  }, [feedItems, user?.uid]);
+
+  useEffect(() => {
     setFeedItems((prev) =>
       prev.map((item) =>
         item.source === "you"
@@ -1319,6 +1352,24 @@ export default function DataInsightsScreen({
       selectedGroupId,
     };
 
+    let sanitizedPhotos = updatePhotos;
+    try {
+      sanitizedPhotos = await Promise.all(
+        updatePhotos.map(async (photo) =>
+          photo.startsWith("data:") ? compressImageForFirestore(photo) : photo
+        )
+      );
+    } catch (error) {
+      console.error("Failed to compress update photos:", error);
+      toast({
+        title: "Photo upload failed",
+        description: "Please try adding your photo again.",
+        variant: "destructive",
+      });
+      setIsSharingUpdate(false);
+      return;
+    }
+
     const sharedPublicly = !shareToGroup && !isProfileInvisible;
     const newItem: FeedItem = {
       id: feedId,
@@ -1328,7 +1379,7 @@ export default function DataInsightsScreen({
       postedAt: new Date().toISOString(),
       time: "Just now",
       content: updateText.trim() || "Shared new progress.",
-      photos: updatePhotos,
+      photos: sanitizedPhotos,
       shared: sharedPublicly,
       source: "you" as const,
       likesCount: 0,
@@ -1848,12 +1899,12 @@ export default function DataInsightsScreen({
       image.src = dataUrl;
     });
 
-  const readAndResizeImage = async (file: File, maxSize = 720) =>
+  const readAndResizeImage = async (file: File, maxSize = 720, quality = 0.74) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async () => {
         try {
-          const resized = await resizeImageDataUrl(reader.result as string, maxSize);
+          const resized = await resizeImageDataUrl(reader.result as string, maxSize, quality);
           resolve(resized);
         } catch (error) {
           reject(error);
@@ -1862,6 +1913,35 @@ export default function DataInsightsScreen({
       reader.onerror = () => reject(new Error("Failed to read image"));
       reader.readAsDataURL(file);
     });
+
+  const estimateDataUrlBytes = (dataUrl: string) => {
+    const base64 = dataUrl.split(",")[1] ?? "";
+    return Math.ceil((base64.length * 3) / 4);
+  };
+
+  const compressImageForFirestore = async (
+    dataUrl: string,
+    maxSize = 720,
+    targetBytes = 360_000,
+    startQuality = 0.7
+  ) => {
+    let quality = startQuality;
+    let size = maxSize;
+    let result = await resizeImageDataUrl(dataUrl, size, quality);
+    let attempts = 0;
+    while (estimateDataUrlBytes(result) > targetBytes && attempts < 4) {
+      quality = Math.max(0.45, quality - 0.1);
+      size = Math.max(420, Math.round(size * 0.85));
+      result = await resizeImageDataUrl(result, size, quality);
+      attempts += 1;
+    }
+    return result;
+  };
+
+  const prepareUpdatePhoto = async (file: File) => {
+    const resized = await readAndResizeImage(file, 960, 0.72);
+    return compressImageForFirestore(resized);
+  };
 
   const uploadPhotoDataUrls = async (photos: string[], pathPrefix: string) => {
     if (!user?.uid || photos.length === 0) return [];
