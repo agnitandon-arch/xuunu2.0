@@ -4242,6 +4242,21 @@ export default function DataInsightsScreen({
           </DialogContent>
         </Dialog>
 
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-widest text-white/50">Groups</p>
+              <p className="text-sm font-semibold">Create a group</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setShowGroupDialog(true)}>
+              Create Group
+            </Button>
+          </div>
+          <p className="text-xs text-white/50">
+            Create invite-only groups to share updates with friends.
+          </p>
+        </section>
+
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
