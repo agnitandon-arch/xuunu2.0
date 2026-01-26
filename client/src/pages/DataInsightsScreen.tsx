@@ -228,7 +228,6 @@ export default function DataInsightsScreen({
   const [selectedChallengeType, setSelectedChallengeType] = useState<ChallengeType | null>(null);
   const [invitedFriends, setInvitedFriends] = useState<string[]>([]);
   const [groupInvitedFriends, setGroupInvitedFriends] = useState<string[]>([]);
-  const [scheduleChallenge, setScheduleChallenge] = useState(false);
   const [scheduleDate, setScheduleDate] = useState<Date | undefined>();
   const [scheduleTime, setScheduleTime] = useState("");
   const [shareScheduledChallenge, setShareScheduledChallenge] = useState(true);
@@ -245,6 +244,7 @@ export default function DataInsightsScreen({
   const [shareChallenge, setShareChallenge] = useState(true);
   const [scheduledChallenges, setScheduledChallenges] = useState<ChallengeSchedule[]>([]);
   const [scheduleTick, setScheduleTick] = useState(0);
+  const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
   const scheduleTimeoutsRef = useRef<Record<string, number>>({});
   const liveLocationRef = useRef<ChallengeLocation>(null);
   const locationWatchIdRef = useRef<number | null>(null);
@@ -1942,19 +1942,18 @@ export default function DataInsightsScreen({
   const resetChallengeDialog = () => {
     setSelectedChallengeType(null);
     setInvitedFriends([]);
-    setScheduleChallenge(false);
     setScheduleDate(undefined);
     setScheduleTime("");
     setShareScheduledChallenge(true);
   };
 
   useEffect(() => {
-    if (!scheduleChallenge) return;
+    if (!showChallengePicker) return;
     if (scheduleDate && scheduleTime) return;
     const { min } = getScheduleBounds();
     setScheduleDate(min);
     setScheduleTime(formatTime(min));
-  }, [scheduleChallenge, scheduleDate, scheduleTime]);
+  }, [showChallengePicker, scheduleDate, scheduleTime]);
 
   useEffect(() => {
     if (!isProfileInvisible) return;
@@ -2120,6 +2119,14 @@ export default function DataInsightsScreen({
       toast({
         title: "Unlock challenges",
         description: "Upgrade to a paid account to schedule challenges.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (scheduledChallenges.length >= 3) {
+      toast({
+        title: "Schedule limit reached",
+        description: "You can schedule up to 3 challenges at a time.",
         variant: "destructive",
       });
       return;
@@ -3326,10 +3333,22 @@ export default function DataInsightsScreen({
             {scheduledChallenges.map((challenge) => {
               const startTime = getDateMs(challenge.scheduledFor);
               const isReady = startTime !== null && scheduleNow >= startTime;
+              const isExpanded = expandedScheduleId === challenge.id;
               return (
                 <div
                   key={challenge.id}
                   className="rounded-lg border border-white/10 bg-black/40 p-4 space-y-2"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() =>
+                    setExpandedScheduleId((prev) => (prev === challenge.id ? null : challenge.id))
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setExpandedScheduleId((prev) => (prev === challenge.id ? null : challenge.id));
+                    }
+                  }}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
@@ -3341,16 +3360,21 @@ export default function DataInsightsScreen({
                     <Button
                       size="sm"
                       variant={isReady ? "default" : "outline"}
-                      onClick={() => handleStartScheduledChallenge(challenge)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleStartScheduledChallenge(challenge);
+                      }}
                       disabled={!isReady || !!activeChallenge || challengesLocked}
                       data-testid={`button-start-scheduled-${challenge.id}`}
                     >
                       {isReady ? "Start Challenge" : "Scheduled"}
                     </Button>
                   </div>
-                  {challenge.invitedFriends?.length > 0 && (
+                  {isExpanded && (
                     <p className="text-xs text-white/50">
-                      Invited: {challenge.invitedFriends.join(", ")}
+                      {challenge.invitedFriends?.length
+                        ? `Accepted: ${challenge.invitedFriends.join(", ")}`
+                        : "No accepted friends yet."}
                     </p>
                   )}
                   <p className="text-[11px] text-white/40">
@@ -3382,7 +3406,7 @@ export default function DataInsightsScreen({
           <DialogHeader>
             <DialogTitle>Join a challenge</DialogTitle>
             <DialogDescription className="text-white/60">
-              Pick a challenge type to start your timer.
+              Pick a challenge type and choose a start time.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -3422,6 +3446,57 @@ export default function DataInsightsScreen({
                 })}
               </div>
             </div>
+            <div className="rounded-lg border border-white/10 bg-black/40 p-3 space-y-3">
+              <div className="space-y-2">
+                <label className="text-xs text-white/60">Pick a date</label>
+                <div className="rounded-lg border border-white/10 bg-black/40 p-2">
+                  <Calendar
+                    mode="single"
+                    selected={scheduleDate}
+                    onSelect={setScheduleDate}
+                    disabled={(date) =>
+                      date < startOfDay(scheduleBounds.min) ||
+                      date > endOfDay(scheduleBounds.max)
+                    }
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-white/60">Pick a time</label>
+                <Input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(event) => setScheduleTime(event.target.value)}
+                  className="bg-black/40 border-white/10 text-sm"
+                  data-testid="input-schedule-challenge"
+                />
+                {scheduleDate && scheduleTime && buildScheduledDate(scheduleDate, scheduleTime) && (
+                  <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white/70">
+                    Starts in{" "}
+                    {formatCountdown(buildScheduledDate(scheduleDate, scheduleTime) as Date)}
+                  </div>
+                )}
+                <p className="text-[11px] text-white/40">
+                  Earliest: {scheduleBounds.min.toLocaleString()} • Latest:{" "}
+                  {scheduleBounds.max.toLocaleString()}
+                </p>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+                <div>
+                  <p className="text-xs font-medium text-white/80">Share scheduled challenge</p>
+                  <p className="text-[11px] text-white/50">
+                    {isProfileInvisible
+                      ? "Profile is invisible. Sharing is disabled."
+                      : "Posts the invite to your public profile."}
+                  </p>
+                </div>
+                <Switch
+                  checked={shareScheduledChallenge}
+                  onCheckedChange={setShareScheduledChallenge}
+                  disabled={isProfileInvisible}
+                />
+              </div>
+            </div>
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-widest text-white/40">Invite Friends</p>
               <div className="grid gap-2">
@@ -3445,93 +3520,26 @@ export default function DataInsightsScreen({
                 )}
               </div>
             </div>
-            <div className="rounded-lg border border-white/10 bg-black/40 p-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <div />
-                <Switch
-                  checked={scheduleChallenge}
-                  onCheckedChange={setScheduleChallenge}
-                  disabled={challengesLocked}
-                />
-              </div>
-              {scheduleChallenge && (
-                <div className="space-y-2">
-                  <div className="space-y-2">
-                    <label className="text-xs text-white/60">Pick a date</label>
-                    <div className="rounded-lg border border-white/10 bg-black/40 p-2">
-                      <Calendar
-                        mode="single"
-                        selected={scheduleDate}
-                        onSelect={setScheduleDate}
-                        disabled={(date) =>
-                          date < startOfDay(scheduleBounds.min) ||
-                          date > endOfDay(scheduleBounds.max)
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs text-white/60">Pick a time</label>
-                    <Input
-                      type="time"
-                      value={scheduleTime}
-                      onChange={(event) => setScheduleTime(event.target.value)}
-                      className="bg-black/40 border-white/10 text-sm"
-                      data-testid="input-schedule-challenge"
-                    />
-                    {scheduleDate && scheduleTime && buildScheduledDate(scheduleDate, scheduleTime) && (
-                      <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white/70">
-                        Starts in{" "}
-                        {formatCountdown(buildScheduledDate(scheduleDate, scheduleTime) as Date)}
-                      </div>
-                    )}
-                    <p className="text-[11px] text-white/40">
-                      Earliest: {scheduleBounds.min.toLocaleString()} • Latest:{" "}
-                      {scheduleBounds.max.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/30 px-3 py-2">
-                    <div>
-                      <p className="text-xs font-medium text-white/80">Share scheduled challenge</p>
-                      <p className="text-[11px] text-white/50">
-                        {isProfileInvisible
-                          ? "Profile is invisible. Sharing is disabled."
-                          : "Posts the invite to your public profile."}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={shareScheduledChallenge}
-                      onCheckedChange={setShareScheduledChallenge}
-                      disabled={isProfileInvisible}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
             <div className="flex flex-wrap justify-end gap-2">
+              <p className="mr-auto text-[11px] text-white/40">
+                {scheduledChallenges.length >= 3
+                  ? "Challenge limit reached (max 3)."
+                  : "You can schedule up to 3 challenges."}
+              </p>
               <Button variant="outline" onClick={() => setShowChallengePicker(false)}>
                 Cancel
               </Button>
-              {scheduleChallenge ? (
-                <Button
-                  onClick={handleScheduleChallenge}
-                    disabled={!selectedChallengeType || challengesLocked}
-                  data-testid="button-schedule-challenge"
-                >
-                  Schedule Challenge
-                </Button>
-              ) : (
-                <Button
-                  onClick={() =>
-                    selectedChallengeType &&
-                    handleStartChallenge(selectedChallengeType, { invitedFriends })
-                  }
-                    disabled={!selectedChallengeType || challengesLocked}
-                  data-testid="button-start-challenge"
-                >
-                  Start Challenge
-                </Button>
-              )}
+              <Button
+                onClick={handleScheduleChallenge}
+                disabled={
+                  !selectedChallengeType ||
+                  challengesLocked ||
+                  scheduledChallenges.length >= 3
+                }
+                data-testid="button-save-challenge"
+              >
+                Save Challenge
+              </Button>
             </div>
           </div>
         </DialogContent>
