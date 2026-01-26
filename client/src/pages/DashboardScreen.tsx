@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Plus, Database, ChevronRight, Pill, Watch, Droplets, Wind } from "lucide-react";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { HealthEntry, EnvironmentalReading } from "@shared/schema";
