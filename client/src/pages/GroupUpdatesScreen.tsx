@@ -430,39 +430,6 @@ export default function GroupUpdatesScreen({
         </div>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs uppercase tracking-widest text-white/50">Group members</p>
-            <span className="text-xs text-white/60">{members.length}</span>
-          </div>
-          {isLoadingMembers ? (
-            <div className="text-xs text-white/50">Loading members...</div>
-          ) : members.length === 0 ? (
-            <div className="text-xs text-white/50">No members yet.</div>
-          ) : (
-            <div className="flex flex-wrap gap-3">
-              {members.map((member) => (
-                <div key={member.userId} className="flex items-center gap-2">
-                  <div className="h-9 w-9 overflow-hidden rounded-full border border-white/10 bg-white/5">
-                    {member.photoUrl ? (
-                      <img
-                        src={member.photoUrl}
-                        alt={member.displayName}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-xs text-white/40">
-                        {member.displayName.charAt(0)}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-xs text-white/70">{member.displayName}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs uppercase tracking-widest text-white/50">Let's talk</p>
             <span className="text-xs text-white/40">Comments expire after 7 days</span>
@@ -556,14 +523,43 @@ export default function GroupUpdatesScreen({
           </div>
         </section>
 
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs uppercase tracking-widest text-white/50">Group members</p>
+            <span className="text-xs text-white/60">{members.length}</span>
+          </div>
+          {isLoadingMembers ? (
+            <div className="text-xs text-white/50">Loading members...</div>
+          ) : members.length === 0 ? (
+            <div className="text-xs text-white/50">No members yet.</div>
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              {members.map((member) => (
+                <div key={member.userId} className="flex items-center gap-2">
+                  <div className="h-9 w-9 overflow-hidden rounded-full border border-white/10 bg-white/5">
+                    {member.photoUrl ? (
+                      <img
+                        src={member.photoUrl}
+                        alt={member.displayName}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xs text-white/40">
+                        {member.displayName.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-xs text-white/70">{member.displayName}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         <section className="space-y-4">
           {isLoading ? (
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-xs text-white/50">
               Loading updates...
-            </div>
-          ) : updates.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-xs text-white/50">
-              No group updates yet.
             </div>
           ) : (
             updates.map((item) => (
