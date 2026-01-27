@@ -10,7 +10,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { connectAppleHealth, isNativeIos } from "@/lib/appleHealth";
+import { connectAppleHealth, fetchAppleHealthSummary, isNativeIos } from "@/lib/appleHealth";
+import { createHealthEntry } from "@/lib/localStore";
 
 interface UserCredentials {
   id: string;
@@ -38,6 +39,8 @@ export default function DeviceConnectionScreen() {
   const [terraWebhookSecret, setTerraWebhookSecret] = useState("");
   const [appleHealthConnected, setAppleHealthConnected] = useState(false);
   const [isAppleHealthConnecting, setIsAppleHealthConnecting] = useState(false);
+  const [isAppleHealthSyncing, setIsAppleHealthSyncing] = useState(false);
+  const [appleHealthLastSyncAt, setAppleHealthLastSyncAt] = useState<string | null>(null);
 
   // Fetch existing credentials
   const { data: credentials, isLoading: credentialsLoading } = useQuery<UserCredentials | null>({
@@ -71,6 +74,9 @@ export default function DeviceConnectionScreen() {
       (snapshot) => {
         const data = snapshot.data() ?? {};
         setAppleHealthConnected(!!data.appleHealthConnected);
+        setAppleHealthLastSyncAt(
+          typeof data.appleHealthLastSyncAt === "string" ? data.appleHealthLastSyncAt : null
+        );
       },
       () => setAppleHealthConnected(false)
     );
@@ -105,6 +111,9 @@ export default function DeviceConnectionScreen() {
         title: "Apple Health connected",
         description: "Allow access in the Health app if prompted.",
       });
+      if (user?.uid) {
+        await handleSyncAppleHealth();
+      }
     } catch (error: any) {
       toast({
         title: "Connection failed",
@@ -113,6 +122,57 @@ export default function DeviceConnectionScreen() {
       });
     } finally {
       setIsAppleHealthConnecting(false);
+    }
+  };
+
+  const handleSyncAppleHealth = async () => {
+    if (!user?.uid) return;
+    if (!appleHealthConnected) {
+      toast({
+        title: "Apple Health not connected",
+        description: "Connect Apple Health first to sync data.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isAppleHealthSyncing) return;
+    setIsAppleHealthSyncing(true);
+    try {
+      const result = await fetchAppleHealthSummary();
+      if (!result.ok) {
+        throw new Error("Unable to read Apple Health data");
+      }
+      const { steps, sleepHours, heartRate } = result.data;
+      await createHealthEntry({
+        userId: user.uid,
+        timestamp: new Date().toISOString(),
+        steps,
+        sleepHours,
+        heartRate,
+      });
+      const syncedAt = new Date().toISOString();
+      await setDoc(
+        doc(db, "users", user.uid),
+        { appleHealthLastSyncAt: syncedAt },
+        { merge: true }
+      );
+      setAppleHealthLastSyncAt(syncedAt);
+      toast({
+        title: "Apple Health synced",
+        description:
+          typeof heartRate === "number"
+            ? "Latest steps, sleep, and heart data imported."
+            : "Latest steps and sleep data imported.",
+      });
+    } catch (error: any) {
+      console.error("Apple Health sync failed:", error);
+      toast({
+        title: "Sync failed",
+        description: error?.message || "Unable to sync Apple Health data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAppleHealthSyncing(false);
     }
   };
 
@@ -313,12 +373,35 @@ export default function DeviceConnectionScreen() {
                   <p className="text-xs opacity-60">
                     Tap to open Apple Health and grant access.
                   </p>
+                  {appleHealthLastSyncAt && (
+                    <p className="text-[11px] text-white/40">
+                      Last synced {new Date(appleHealthLastSyncAt).toLocaleString()}
+                    </p>
+                  )}
                 </div>
               </div>
               {appleHealthConnected ? (
-                <div className="flex items-center gap-2 text-xs text-green-400">
-                  <CheckCircle className="w-4 h-4" />
-                  Connected
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-2 text-xs text-green-400">
+                    <CheckCircle className="w-4 h-4" />
+                    Connected
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSyncAppleHealth}
+                    disabled={isAppleHealthSyncing}
+                    data-testid="button-sync-apple-health"
+                  >
+                    {isAppleHealthSyncing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Syncing
+                      </>
+                    ) : (
+                      "Sync now"
+                    )}
+                  </Button>
                 </div>
               ) : (
                 <Button
