@@ -29,7 +29,7 @@ export const connectAppleHealth = async () => {
       return { ok: false, reason: "unavailable" } as const;
     }
     await CapacitorHealthkit.requestAuthorization({
-      read: ["steps", "distance", "duration", "calories", "activity"],
+      read: ["steps", "heartRate", "activity"],
       write: [],
     });
     return { ok: true } as const;
