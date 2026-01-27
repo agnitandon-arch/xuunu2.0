@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { connectAppleHealth, isNativeIos } from "@/lib/appleHealth";
 
 interface OnboardingScreenProps {
   userId: string;
@@ -47,14 +48,38 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
   const handleSelectPlatform = async (value: "ios" | "android") => {
     setPlatform(value);
     if (value === "ios") {
+      if (!isNativeIos()) {
+        toast({
+          title: "Apple Health requires iPhone",
+          description: "Open onboarding in the iOS app to connect.",
+          variant: "destructive",
+        });
+        setIsConnected(false);
+        return;
+      }
+      const result = await connectAppleHealth();
+      if (!result.ok) {
+        toast({
+          title: "Apple Health connection failed",
+          description: "Please try again to continue onboarding.",
+          variant: "destructive",
+        });
+        setIsConnected(false);
+        return;
+      }
       setIsConnected(true);
       await saveOnboarding({
         platform: value,
         isConnected: true,
       });
+      await setDoc(
+        doc(db, "users", userId),
+        { appleHealthConnected: true },
+        { merge: true }
+      );
       toast({
         title: "Apple Health connected",
-        description: "Apple Health syncs automatically on iOS.",
+        description: "Access granted for Apple Health data.",
       });
     } else {
       const isAndroid =
@@ -70,7 +95,6 @@ export default function OnboardingScreen({ userId, onComplete }: OnboardingScree
       if (typeof window !== "undefined") {
         window.open("https://fit.google.com/", "_blank");
       }
-      setSkipConnection(false);
       setIsConnected(true);
       await saveOnboarding({
         platform: value,

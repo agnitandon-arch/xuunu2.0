@@ -10,6 +10,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { connectAppleHealth, isNativeIos } from "@/lib/appleHealth";
 
 interface UserCredentials {
   id: string;
@@ -78,9 +79,7 @@ export default function DeviceConnectionScreen() {
 
   const handleConnectAppleHealth = async () => {
     if (isAppleHealthConnecting) return;
-    const isIos =
-      typeof navigator !== "undefined" && /iPad|iPhone|iPod/i.test(navigator.userAgent);
-    if (!isIos) {
+    if (!isNativeIos()) {
       toast({
         title: "Apple Health requires iPhone",
         description: "Open this page on your iOS device to connect.",
@@ -90,8 +89,9 @@ export default function DeviceConnectionScreen() {
     }
     setIsAppleHealthConnecting(true);
     try {
-      if (typeof window !== "undefined") {
-        window.location.href = "x-apple-health://";
+      const result = await connectAppleHealth();
+      if (!result.ok) {
+        throw new Error("HealthKit authorization failed");
       }
       if (user?.uid) {
         await setDoc(
