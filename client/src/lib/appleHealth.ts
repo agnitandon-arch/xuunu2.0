@@ -5,8 +5,8 @@ type HealthkitPlugin = {
   requestAuthorization: (options: { all?: string[]; read?: string[]; write?: string[] }) => Promise<void>;
   queryHKitSampleType: (options: {
     sampleName: string;
-    startDate: Date;
-    endDate: Date;
+    startDate: string;
+    endDate: string;
     limit: number;
   }) => Promise<{ countReturn: number; resultData: Array<Record<string, unknown>> }>;
 };
@@ -41,8 +41,8 @@ export const connectAppleHealth = async () => {
 const querySample = async (sampleName: string, startDate: Date, endDate: Date) => {
   const response = await CapacitorHealthkit.queryHKitSampleType({
     sampleName,
-    startDate,
-    endDate,
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
     limit: 0,
   });
   return Array.isArray(response?.resultData) ? response.resultData : [];
